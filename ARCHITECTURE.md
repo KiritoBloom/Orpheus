@@ -6,7 +6,7 @@
 - **React 19** — almost everything is `"use client"`. One server component (`src/app/layout.tsx` + `src/app/page.tsx`) wraps a single client shell (`GameRoot`).
 - **Tailwind CSS 4** (`@import "tailwindcss"`) — the visual language is encoded in CSS variables at `src/app/globals.css` (CRT, workstation palette, animations, window states).
 - **Zustand 5** — live state (three stores) + persisted to **IndexedDB** via `idb-keyval` (key `orpheus-save-v1`).
-- **`framer-motion` 13** — reserved for future flourish; not load-bearing.
+- **CSS only motion** — authentic 90s snap via stepped 80ms transitions; no `framer-motion` runtime (removed for bundle hygiene).
 - **Web Audio API** — all sound is synthesized (`src/audio/engine.ts`); keyboard clicks use `public/sound-effects/unicae_games_keyboard_soundpack_1/Single Keys`.
 
 No server database, no auth, no external REST calls, no env keys.
@@ -25,12 +25,12 @@ src/
   game/
     data/
       filesystem.ts      FsNode[] + all text/csv bodies (+ computed key lines)
-      emails.ts          Email[] (~28)
-      chatMessages.ts    THREADS + CHAT_MESSAGES (~32) — Daniel's historic threads, readable via tools
-      browserHistory.ts  HISTORY + CACHED_PAGES (+ Kestrel/fora/arxiv/obit)
-      systemLogs.ts      LOGS (~51)
-      evidence.ts        EVIDENCE[] (people/events/locations/documents/hypotheses)
-      photos.ts          PhotoMeta[] registry
+      emails.ts          Email[] (17: inbox 8 / sent 4 / drafts 2 / archive 2 / trash 1)
+      chatMessages.ts    THREADS (6) + CHAT_MESSAGES (31) — Daniel's historic threads, readable via tools
+      browserHistory.ts  HISTORY (18) + CACHED_PAGES (17) — every history entry has a cached page
+      systemLogs.ts      LOGS (51: log_001–051, final night 02:13 fully logged)
+      evidence.ts        EVIDENCE[] (20: people 5 / events 5 / locations 2 / documents 5 / hypotheses 3)
+      photos.ts          PhotoMeta[] (12: 9 main + 3 private backup) + registry
     state/
       persistence.ts     idb-keyval single-record SaveData (version 1, debounced writes)
       osStore.ts         phase/windows/focus/z/toasts/flags/vault/clock/settings

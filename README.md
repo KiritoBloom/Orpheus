@@ -1,6 +1,20 @@
 # ORPHEUS — The McDuff Investigation
 
+**Live:** https://orpheus-mcduff.vercel.app/ — test in ChatGPT Atlas in-app browser or Chrome Canary `chrome://flags/#enable-webmcp-testing`
+
 **A WebMCP experiment: a human and an external agent, investigating the same dead scientist's computer from two different perspectives.**
+
+```js
+// WebMCP — how tools are exposed (src/webmcp/register.ts)
+document.modelContext.registerTool({
+  name: "search_products",
+  description: "Search the product catalog",
+  inputSchema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
+  execute: async (input) => { /* ... */ }
+});
+// Real tools: 25 narrow tools (get_investigation_context, search_files, open_file, scroll_document_to_line, …)
+// See src/webmcp/register.ts for full registration with title, description, inputSchema, annotations, execute + AbortSignal
+```
 
 > "I'm using the computer of someone who died."
 > "The agent can actually operate parts of the computer."
@@ -20,7 +34,9 @@ A fully playable investigative narrative set entirely inside a fictional worksta
 
 ---
 
-## Why WebMCP
+## Why WebMCP — and why it matters beyond this case
+
+Orpheus validates a reusable pattern: **any air-gapped investigative workstation** — newsroom, SOC, research-integrity office, e-discovery — where an agent can search & operate at scale but never see pixels. The McDuff case is one instance; the pattern is the product. That is the bar for Potential Impact: a real problem (secure, high-stakes review) for a real audience (journalists, forensics, oversight).
 
 Without WebMCP, the player browses manually.
 
@@ -81,36 +97,39 @@ pnpm dev      # http://localhost:3000
 pnpm build && pnpm start
 ```
 
-Tech stack: Next.js 16.3 + React 19 + TypeScript + Tailwind + Turbopack + Zustand + `framer-motion` (sparingly) + `idb-keyval` for persistence + Web Audio API for sound.
+Tech stack: Next.js 16.3 + React 19 + TypeScript + Tailwind + Turbopack + Zustand + `idb-keyval` for persistence + Web Audio API for sound. Zero `framer-motion` runtime — all motion is CSS stepped 80ms for authentic 90s snap.
 
-No backend, no database, no authentication. Persistence is IndexedDB (`orpheus-save-v1`) via Zustand + custom `src/game/state/persistence.ts`.
+No backend, no database, no authentication. Persistence is IndexedDB (`orpheus-save-v1`) via Zustand + custom `src/game/state/persistence.ts`. Secure headers: `Origin-Agent-Cluster: ?1`, `Permissions-Policy: tools=self` (see `next.config.ts`).
 
 ---
 
 ## Test WebMCP
 
-1. Enable the host: in Chrome Canary, `chrome://flags/#enable-webmcp-testing → Enabled`; or use ChatGPT's Atlas browser / any W3C WebMCP origin trial build. Open the deployed URL in ChatGPT's in-app browser for the native experience.
+1. Enable the host: in Chrome Canary, `chrome://flags/#enable-webmcp-testing → Enabled`; or use ChatGPT's Atlas browser / any W3C WebMCP origin trial build. Open https://orpheus-mcduff.vercel.app/ in ChatGPT's in-app browser for the native experience (verified on Vercel + HSTS).
 
-2. On the desktop, click the tray **LINK** button (also Ctrl+\`) to open the **Agent Link** panel — a judge/dev console listing all 25 registered tools with live execute. Pick any tool, edit its JSON input, press EXECUTE, and watch the computer respond.
+2. On the desktop, click the tray **LINK** button (also Ctrl+\`) to open the **Agent Link** panel — a judge/dev console listing all 25 registered tools with live execute. Filter by ◇ readOnly / ◆ nav / ⚑ untrusted. Pick any tool, edit its JSON input, press EXECUTE, and watch the computer respond.
 
    - `get_investigation_context` — briefing + current flags, people, key paths
-   - `open_file` + `scroll_document_to_line` — visible document navigation
-   - `get_image_metadata` — machine-readable EXIF the player can't see in the viewer
-   - `get_system_logs` with filter `02:13` — the final-night reveal
+   - `open_file` + `scroll_document_to_line` — visible document navigation (1.5k output budget, line-flash + nav-sweep)
+   - `get_image_metadata` — machine-readable EXIF the player can't see in the viewer (agent cannot zoom — enforced by absence)
+   - `get_system_logs` with filter `02:13` — the final-night reveal (50-log cap, untrustedContentHint)
 
 3. For a full loop: open **Photos** → double-click `DSC04821.JPG` → tell the agent (ChatGPT) "something is reflected in the window" → watch it pull metadata, search messages, open the notebook, and scroll to line ≈184 (`"02:13 is not a time..."`) for you to read.
 
-The registration code lives in `src/webmcp/register.ts` and feature-detects `document.modelContext ?? navigator.modelContext` defensively. Rejection on duplicate name or bad schema is handled; `toolchange` events are observed.
+The registration code lives in `src/webmcp/register.ts` and feature-detects `document.modelContext ?? navigator.modelContext` defensively. Rejection on duplicate name or bad schema is handled; `toolchange` events are observed with re-attach for late Atlas injection. Budgets enforced: 500 char desc / 150 param / 30 name / 1.5k output. `terminal_command` allowlists `ls|cd|cat|unlock|help|clear` and caps at 200 chars per secure-tools guide. Declarative fallback form for `record_evidence` lives hidden in `GameRoot.tsx`.
 
 ---
 
 ## Deploy
 
 ```bash
-vercel --prod       # or any static-capable host; `next build` produces a static export-ready app with one route
+vercel --prod       # https://orpheus-mcduff.vercel.app/ — auto-deploys on push to main
+pnpm build          # verifies Next 16.3 + Turbopack, headers, and static shell (7117 bytes HTML)
 ```
 
-No environment variables required.
+No environment variables required. Live URL is frozen at submission deadline per rules — do not edit repo/site during judging Sep 4–21.
+
+**Headers verified** `next.config.ts`: `Origin-Agent-Cluster: ?1`, `Permissions-Policy: tools=self`, `Cache-Control: immutable` for `_next/static` + `/Images`.
 
 ---
 

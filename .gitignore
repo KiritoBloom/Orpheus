@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# submission draft — never commit (local persuasive draft for Devpost form)
+SUBMISSION_DRAFT.md
+SUBMISSION_DRAFT.txt
+_draft/

@@ -17,9 +17,10 @@ export default function AgentLinkPanel({ onClose }: { onClose: () => void }) {
   const [args, setArgs] = useState("{}");
   const [output, setOutput] = useState("—");
   const [busy, setBusy] = useState(false);
+  const [filter, setFilter] = useState<"all" | "read" | "nav" | "evidence">("all");
   const status = useAria((s) => s.status);
 
-  useEffect(() => setAvailable(webmcpAvailable()), []);
+  useEffect(() => { setAvailable(webmcpAvailable()); }, []); // eslint-disable-line react-hooks/set-state-in-effect
 
   const def = TOOL_DEFS.find((t) => t.name === selected)!;
 
@@ -49,22 +50,35 @@ export default function AgentLinkPanel({ onClose }: { onClose: () => void }) {
 
         <div className="px-3 py-2 border-b border-line text-[10.5px] leading-relaxed">
           <span className={available ? "text-accent" : "text-amber"}>
-            {available ? "● WEBMCP HOST DETECTED — tools are registered to document.modelContext" : "○ NO WEBMCP HOST — tools callable locally"}
+            {available ? "● WEBMCP HOST DETECTED — tools are registered to document.modelContext" : "○ NO WEBMCP HOST — tools callable locally (LINK console)"}
           </span>
-          <span className="text-faint"> · AGENT STATUS: {status.toUpperCase()} · {TOOL_DEFS.length} TOOLS</span>
+          <span className="text-faint"> · AGENT STATUS: {status.toUpperCase()} · {TOOL_DEFS.length} TOOLS · BUDGETS: 500 desc / 150 param / 1.5k out</span>
+          <div className="mt-1 flex gap-1">
+            {(["all", "read", "nav", "evidence"] as const).map((f) => (
+              <button key={f} onClick={() => setFilter(f)} className={`px-1.5 py-0.5 text-[9px] tracking-[0.12em] border ${filter === f ? "bg-sel text-accent border-accentdim" : "text-faint border-line"}`}>{f.toUpperCase()}</button>
+            ))}
+            <span className="ml-auto text-[9px] text-faint">◇ readOnly · ◆ nav/write · ⚑ untrusted</span>
+          </div>
         </div>
 
         <div className="flex-1 min-h-0 grid grid-cols-[240px_1fr]">
           <div className="border-r border-line overflow-y-auto py-1">
-            {TOOL_DEFS.map((t) => (
+            {TOOL_DEFS.filter((t) => {
+              if (filter === "all") return true;
+              if (filter === "read") return !!t.annotations?.readOnlyHint;
+              if (filter === "nav") return !t.annotations?.readOnlyHint && !t.name.startsWith("record") && !t.name.startsWith("highlight");
+              if (filter === "evidence") return t.name.includes("evidence");
+              return true;
+            }).map((t) => (
               <button
                 key={t.name}
                 onClick={() => { setSelected(t.name); setArgs(defaultArgs(t)); }}
-                className={`block w-full text-left px-3 py-[3px] text-[11px] truncate ${
+                className={`block w-full text-left px-3 py-[3px] text-[11px] truncate flex items-center gap-1 ${
                   selected === t.name ? "bg-sel text-accent" : "text-dim hover:text-txt"
                 }`}
+                title={t.title ?? t.name}
               >
-                {t.annotations?.readOnlyHint ? "◇" : "◆"} {t.name}
+                <span>{t.annotations?.readOnlyHint ? "◇" : "◆"}</span><span className="truncate">{t.name}</span>{t.annotations?.untrustedContentHint && <span className="text-amber text-[9px]">⚑</span>}
               </button>
             ))}
           </div>

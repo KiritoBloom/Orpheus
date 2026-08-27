@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Email, MailFolder } from "@/types/game";
-import { isMailUnread, mailSelectBus, markEmailRead } from "@/game/services";
+import { mailSelectBus, markEmailRead } from "@/game/services";
 import { useOS } from "@/game/state/osStore";
 import { sfx } from "@/audio/engine";
 

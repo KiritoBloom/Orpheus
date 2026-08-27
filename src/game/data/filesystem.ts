@@ -627,7 +627,7 @@ Try this: zoom into a photo until a detail you could not see at 1×
 becomes clear. Tell the agent what you see, in your own words. Watch
 what she pulls from the machine-readable world. That visible handoff
 — her window opening on your screen — is WebMCP. No hidden clicks,
-no screenshots, just 23 narrow tools (open_file, scroll_document_to_
+no screenshots, just 25 narrow tools (open_file, scroll_document_to_
 line, get_image_metadata, search_messages, etc.). Inspect them:
 tray → LINK (Ctrl+\`).
 

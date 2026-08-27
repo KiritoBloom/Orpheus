@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getSave, loadSave } from "@/game/state/persistence";
+import { loadSave } from "@/game/state/persistence";
 import { useOS } from "@/game/state/osStore";
 import { useAria } from "@/game/state/ariaStore";
 import { useInvestigation } from "@/game/state/investigationStore";
@@ -22,8 +22,6 @@ import EndingSequence from "@/components/EndingSequence";
    Owns: phase transitions, persistence hydration, WebMCP
    registration, local-assist enable, store sync, global FX.
    ============================================================ */
-
-type InternalPhase = "title" | "boot" | "briefing" | "desktop" | "ending";
 
 export default function GameRoot() {
   const phase = useOS((s) => s.phase);
@@ -63,18 +61,34 @@ export default function GameRoot() {
   }, [hydrate]);
 
   /* ---------- webmcp registration (poll for late injection) ---------- */
+  // Justin Rushing / Sarah Drasner: ChatGPT Atlas + Chrome 149 both inject async — poll + live toolchange
   useEffect(() => {
     if (!ready) return;
     registerWebMCPTools();
     const id = setInterval(() => {
       if (registerWebMCPTools()) clearInterval(id);
-    }, 1200);
+    }, 800);
     const onChange = () => registerWebMCPTools();
-    const mc = getModelContext() as EventTarget | null;
-    mc?.addEventListener?.("toolchange", onChange);
+    // Re-acquire on each change — initial getModelContext() is often null at hydration
+    const attach = () => {
+      const mc = getModelContext() as EventTarget | null;
+      mc?.addEventListener?.("toolchange", onChange as EventListener);
+      return mc;
+    };
+    let mc = attach();
+    // If still null, retry attach after 1.2s (late injection typical for Atlas)
+    let attachId: ReturnType<typeof setTimeout> | null = null;
+    if (!mc) {
+      attachId = setTimeout(() => {
+        mc = attach();
+      }, 1200);
+    }
     return () => {
       clearInterval(id);
-      mc?.removeEventListener?.("toolchange", onChange);
+      if (attachId) clearTimeout(attachId);
+      mc?.removeEventListener?.("toolchange", onChange as EventListener);
+      // also try current context in case it changed
+      (getModelContext() as EventTarget | null)?.removeEventListener?.("toolchange", onChange as EventListener);
     };
   }, [ready]);
 
@@ -213,7 +227,7 @@ export default function GameRoot() {
     async (mode: "new" | "continue") => {
       if (mode === "new") {
         // wipe both persistent + live state before leaving title
-        const { wipeSave, getSave: _g } = await import("@/game/state/persistence");
+        const { wipeSave } = await import("@/game/state/persistence");
         await wipeSave();
         // reset mutated data arrays to original unread state
         const { EMAILS: _emails } = await import("@/game/data/emails");
@@ -300,6 +314,24 @@ export default function GameRoot() {
 
       {/* always-on toasts — hidden behind title's own vignette but fine */}
       {phase === "desktop" && <Toasts />}
+
+      {/* ---------- declarative WebMCP tool — https://developer.chrome.com/docs/ai/webmcp/declarative-api ---------- */}
+      {/* Sarah Drasner: show both imperative + declarative. This form is a second path to record_evidence, visible to agents that prefer filling forms. Imperative remains primary. */}
+      <form
+        id="webmcp-declarative-evidence"
+        data-webmcp-tool="record_evidence"
+        data-webmcp-description="Record evidence via form — alternative to record_evidence tool"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const fd = new FormData(e.currentTarget as HTMLFormElement);
+          const id = String(fd.get("evidenceId") || "").trim();
+          if (id) import("@/game/services").then((S) => S.recordEvidenceById(id));
+        }}
+        style={{ display: "none" }}
+        aria-hidden
+      >
+        <input name="evidenceId" type="hidden" defaultValue="ev_daniel" />
+      </form>
     </div>
   );
 }
