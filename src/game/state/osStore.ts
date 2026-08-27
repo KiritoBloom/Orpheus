@@ -21,6 +21,7 @@ export type Phase = "title" | "boot" | "briefing" | "desktop" | "ending";
 const DEFAULT_GEOMS: Record<WinId, WinState> = {
   files: { open: false, minimized: false, maximized: false, z: 1, geom: { x: 60, y: 48, w: 720, h: 470 } },
   mail: { open: false, minimized: false, maximized: false, z: 1, geom: { x: 90, y: 40, w: 820, h: 520 } },
+  messages: { open: false, minimized: false, maximized: false, z: 1, geom: { x: 100, y: 54, w: 740, h: 500 } },
   photos: { open: false, minimized: false, maximized: false, z: 1, geom: { x: 80, y: 44, w: 640, h: 480 } },
   browser: { open: false, minimized: false, maximized: false, z: 1, geom: { x: 110, y: 36, w: 780, h: 540 } },
   terminal: { open: false, minimized: false, maximized: false, z: 1, geom: { x: 140, y: 90, w: 640, h: 400 } },
@@ -45,6 +46,8 @@ interface OSState {
   clockStart: number;
   overlayPanel: "settings" | "archives" | "credits" | null;
   endingStep: number;
+  readMailIds: Set<string>;
+  readThreadIds: Set<string>;
 
   hydrate: (opts: { hasProgress: boolean }) => void;
   setPhase: (p: Phase) => void;
@@ -64,6 +67,10 @@ interface OSState {
   countVaultAttempt: () => number;
   setOverlayPanel: (p: OSState["overlayPanel"]) => void;
   setEndingStep: (n: number) => void;
+  markMailRead: (id: string) => void;
+  markThreadRead: (id: string) => void;
+  markAllMailRead: () => void;
+  markAllThreadsRead: () => void;
 }
 
 let toastSeq = 1;
@@ -86,6 +93,8 @@ export const useOS = create<OSState>((set, get) => ({
   clockStart: Date.now(),
   overlayPanel: null,
   endingStep: 0,
+  readMailIds: new Set<string>(),
+  readThreadIds: new Set<string>(),
 
   hydrate: ({ hasProgress }) =>
     set({ hydrated: true, hasSaveProgress: hasProgress }),
@@ -189,6 +198,35 @@ export const useOS = create<OSState>((set, get) => ({
   setOverlayPanel: (p) => set({ overlayPanel: p }),
 
   setEndingStep: (n) => set({ endingStep: n }),
+
+  markMailRead: (id) =>
+    set((s) => {
+      if (s.readMailIds.has(id)) return s;
+      const next = new Set(s.readMailIds);
+      next.add(id);
+      return { readMailIds: next };
+    }),
+
+  markThreadRead: (id) =>
+    set((s) => {
+      if (s.readThreadIds.has(id)) return s;
+      const next = new Set(s.readThreadIds);
+      next.add(id);
+      return { readThreadIds: next };
+    }),
+
+  markAllMailRead: () =>
+    set((s) => {
+      // collect all mail ids known at this point
+      const { EMAILS } = require("@/game/data/emails") as { EMAILS: { id: string }[] };
+      return { readMailIds: new Set(EMAILS.map((e) => e.id)) };
+    }),
+
+  markAllThreadsRead: () =>
+    set((s) => {
+      const { THREADS } = require("@/game/data/chatMessages") as { THREADS: { id: string }[] };
+      return { readThreadIds: new Set(THREADS.map((t) => t.id)) };
+    }),
 }));
 
 /* convenience selectors used across the app */

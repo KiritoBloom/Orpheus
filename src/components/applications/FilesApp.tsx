@@ -22,6 +22,7 @@ const QUICK: { label: string; path: string }[] = [
 export default function FilesApp() {
   const [cwd, setCwd] = useState("/");
   const [sel, setSel] = useState<string | null>(null);
+  const [seeking, setSeeking] = useState(false);
   const os = useOS();
   const items = S.fsChildren(cwd).sort((a, b) => {
     if (a.kind === "dir" && b.kind !== "dir") return -1;
@@ -30,16 +31,31 @@ export default function FilesApp() {
   });
   const selectedNode = items.find((item) => item.path === sel);
 
+  // subtle seek delay — sells that this is a real volume, not instant web nav
+  function seekTo(path: string) {
+    if (path === cwd) return;
+    setSeeking(true);
+    setTimeout(() => {
+      setCwd(path);
+      setSel(null);
+      setSeeking(false);
+    }, 90 + Math.random() * 40);
+  }
+
   // service-driven navigation (open_directory)
   useEffect(() => {
     return S.filesNavigateBus.on((p) => {
       const path = String(p);
       if (S.fsGet(path)) {
-        setCwd(path);
-        setSel(null);
-        sfx.click();
+        setSeeking(true);
+        setTimeout(() => {
+          setCwd(path);
+          setSeeking(false);
+          sfx.click();
+        }, 90 + Math.random() * 40);
       }
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function open(node: FsNode) {
@@ -49,7 +65,7 @@ export default function FilesApp() {
       sfx.error();
       return;
     }
-    if (node.kind === "dir") { setCwd(node.path); setSel(null); return; }
+    if (node.kind === "dir") { seekTo(node.path); return; }
     if (node.kind === "img" && node.photoId) { S.openPhoto(node.photoId); return; }
     S.openFile(node.path);
   }
@@ -57,8 +73,7 @@ export default function FilesApp() {
   function up() {
     if (cwd === "/") return;
     const parent = cwd.slice(0, cwd.lastIndexOf("/")) || "/";
-    setCwd(parent);
-    setSel(null);
+    seekTo(parent);
     sfx.click();
   }
 
@@ -72,8 +87,8 @@ export default function FilesApp() {
         {QUICK.map((q) => (
           <button
             key={q.path}
-            className={`block w-full text-left px-2.5 py-[3px] text-[11px] ${cwd === q.path ? "bg-sel text-accent" : "text-dim hover:text-txt"}`}
-            onClick={() => { setCwd(q.path); setSel(null); sfx.click(); }}
+            className={`block w-full text-left px-2.5 py-[3px] text-[11px] cursor-pointer ${cwd === q.path ? "bg-sel text-accent" : "text-dim hover:text-txt"}`}
+            onClick={() => { seekTo(q.path); sfx.click(); }}
           >
             ▤ {q.label}
           </button>
@@ -82,14 +97,14 @@ export default function FilesApp() {
           <>
             <div className="mono-xs text-faint px-2 pt-2 pb-1">DISCOVERED</div>
             <button
-              className={`block w-full text-left px-2.5 py-[3px] text-[11px] ${cwd.startsWith("/Private") ? "bg-sel text-accent" : "text-amber hover:text-txt"}`}
-              onClick={() => { setCwd("/Private"); setSel(null); sfx.click(); }}
+              className={`block w-full text-left px-2.5 py-[3px] text-[11px] cursor-pointer ${cwd.startsWith("/Private") ? "bg-sel text-accent" : "text-amber hover:text-txt"}`}
+              onClick={() => { seekTo("/Private"); sfx.click(); }}
             >
               ▨ PRIVATE
             </button>
             {os.flags.has("VAULT_DECOY") && (
-              <button className="block w-full text-left px-2.5 py-[3px] text-[10px] text-dim hover:text-txt"
-                onClick={() => { setCwd("/Private/_fragments_recovered"); setSel(null); sfx.click(); }}>
+              <button className="block w-full text-left px-2.5 py-[3px] text-[10px] text-dim hover:text-txt cursor-pointer"
+                onClick={() => { seekTo("/Private/_fragments_recovered"); sfx.click(); }}>
                 └ _fragments…
               </button>
             )}
@@ -99,11 +114,12 @@ export default function FilesApp() {
 
       {/* main */}
       <div className="flex-1 min-w-0 flex flex-col">
-        {/* toolbar */}
+        {/* toolbar — breadcrumb that sells a real FS */}
         <div className="shrink-0 h-[30px] flex items-center gap-2 px-2 border-b border-line bg-surface">
-          <button className="btn-bevel text-[10px]" onClick={up} disabled={cwd === "/"}>▲ UP</button>
-          <button className="btn-bevel text-[10px]" onClick={() => selectedNode && open(selectedNode)} disabled={!selectedNode}>OPEN</button>
-          <span className="text-[11px] tracking-wide text-txt truncate">{cwd}</span>
+          <button className="btn-bevel text-[10px] cursor-pointer" onClick={up} disabled={cwd === "/"}>▲ UP</button>
+          <button className="btn-bevel text-[10px] cursor-pointer" onClick={() => selectedNode && open(selectedNode)} disabled={!selectedNode}>OPEN</button>
+          <span className="text-[11px] tracking-wide text-txt truncate flex-1">{cwd}</span>
+          {seeking && <span className="text-[9px] tracking-[0.14em] text-amber animate-pulse shrink-0">SEEK…</span>}
         </div>
 
         {/* column header */}

@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AppId } from "@/types/game";
 import { APP_LABELS, ALL_APPS } from "@/types/game";
 import { useOS } from "@/game/state/osStore";
 import { useAria } from "@/game/state/ariaStore";
 import { sfx } from "@/audio/engine";
 import AgentLinkPanel from "@/components/AgentLinkPanel";
+import { TOOL_DEFS } from "@/webmcp/register";
+import { EMAILS } from "@/game/data/emails";
+import { THREADS } from "@/game/data/chatMessages";
 import { APP_ICONS, IconCrt, IconLink, IconSoundOff, IconSoundOn } from "@/components/icons/WorkstationIcons";
 
 /* ============================================================
@@ -21,6 +24,12 @@ export default function Taskbar() {
   const [linkOpen, setLinkOpen] = useState(false);
 
   const hasLinkHint = !os.flags.has("COLLABORATED_WITH_ARIA") && !os.flags.has("DISCOVERED_ORPHEUS") && !linkOpen;
+
+  // unread badges — reactive via osStore so marking read clears the dot
+  const readMailIds = useOS((s) => s.readMailIds);
+  const readThreadIds = useOS((s) => s.readThreadIds);
+  const unreadMail = useMemo(() => EMAILS.filter((e) => e.unread && !readMailIds.has(e.id)).length, [readMailIds]);
+  const unreadThreads = useMemo(() => THREADS.length - readThreadIds.size, [readThreadIds]);
 
   // listen for LINK hotkey dispatch from GameRoot
   useEffect(() => {
@@ -79,16 +88,26 @@ export default function Taskbar() {
             const running = w.open;
             const isFocused = os.focused === app && running;
             const Icon = APP_ICONS[app];
+            const badge =
+              app === "mail" && unreadMail > 0 ? unreadMail :
+              app === "messages" && unreadThreads > 0 ? unreadThreads :
+              0;
+            const showBadge = badge > 0 && !running;
             return (
               <button
                 key={app}
                 onClick={() => launch(app)}
                 title={`${APP_LABELS[app]} — ${running ? "running" : "launch"}`}
                 aria-label={`open ${APP_LABELS[app]}`}
-                className={`task-btn-90s relative w-[32px] h-[22px] grid place-items-center ${isFocused ? "is-active" : ""}`}
+                className={`task-btn-90s relative w-[32px] h-[22px] grid place-items-center cursor-pointer ${isFocused ? "is-active" : ""}`}
               >
                 <Icon size={14} className={isFocused ? "text-accent" : running ? "text-txt" : "text-faint"} />
                 {running && !isFocused && <span className="absolute -bottom-[1px] left-1/2 -translate-x-1/2 w-[14px] h-[2px] bg-faint/60" />}
+                {showBadge && (
+                  <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-0.5 grid place-items-center bg-amber text-black text-[8px] font-bold leading-none border border-black">
+                    {badge}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -126,8 +145,8 @@ export default function Taskbar() {
 
           <button
             onClick={() => setLinkOpen(true)}
-            title="Agent Link — WebMCP (Ctrl+`) — 23 tools"
-            className={`h-[22px] px-2 flex items-center gap-1 task-btn-90s text-[9px] tracking-[0.14em] ${hasLinkHint ? "!border-amber/50 !text-amber bg-amber/10" : ""}`}
+            title={`Agent Link — WebMCP (Ctrl+\`) — ${TOOL_DEFS.length} tools`}
+            className={`h-[22px] px-2 flex items-center gap-1 task-btn-90s text-[9px] tracking-[0.14em] cursor-pointer ${hasLinkHint ? "!border-amber/50 !text-amber bg-amber/10" : ""}`}
           >
             <IconLink size={11} />
             LINK

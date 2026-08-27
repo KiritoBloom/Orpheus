@@ -33,23 +33,27 @@ Directorate Liaison, Kestrel Institute`,
     from: "Sarah Okafor",
     fromEmail: "s.okafor@physics.upenn.edu",
     to: "d.mcduff@physics.upenn.edu",
-    date: "2026-02-28 23:38",
-    subject: "Stack reproduces — all five",
-    attachments: [{ name: "stacked_residuals_v7.png" }],
-    body: `Professor,
+    date: "2026-02-28 23:41",
+    subject: "Stack reproduces — all five (formal record)",
+    attachments: [{ name: "stacked_residuals_v7.png" }, { name: "cold_copy_manifest.txt" }],
+    body: `Professor McDuff —
 
-It reproduces. All five datasets, e-fold 9.1 ± 0.4. Zero-lag cross-correlation
-0.93. I've beaten the analysis half to death — different windowing, different
-detrending, leave-one-out on every program.
+Following up on chat (23:38): the formal run is done and attached.
+All five datasets, e-fold 9.1 ± 0.4, zero-lag cross-correlation 0.93.
+Leave-one-out, different detrending — it holds. Lab notebook
+photos are on the bench drive, not this machine.
 
-It's not the instruments. It was never the instruments.
+Per your protocol: two cold copies made, disguised as discussed.
+Manifest attached. Chat has the informal thread; this is the
+record copy for the file.
 
-I made two cold copies as discussed. They're disguised (one as genealogy
-files, one as tax receipts — my finest work).
+What do we do now? I can be in lab early tomorrow if you want
+to decide before it decides.
 
-What do we do now?
+— Sarah
+Graduate Student, McDuff Group
 
-— Sarah`,
+[Forwarded from chat: "one reads like a genealogy file, one reads like tax receipts :)"]`,
     unread: true,
   },
   {

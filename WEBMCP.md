@@ -10,7 +10,7 @@ The integration is **visible to the player** (windows open and scroll), **inspec
 
 ---
 
-## Tools (23)
+## Tools (25)
 
 ### Investigation — read-only
 
@@ -21,6 +21,7 @@ The integration is **visible to the player** (windows open and scroll), **inspec
 | `read_file` | Full text of a file by exact path (prefers `find_text_in_document` → `scroll_document_to_line` for long files). | `{ path }` | r.o.h |
 | `search_messages` | Full-text search over Daniel's on-device chat threads (`t_sarah`, `t_mom`, `t_voss`, `t_W`, `t_lab`, `t_it`). | `{ query }` | r.o.h |
 | `get_message_thread` | Entire thread by id. | `{ threadId }` | r.o.h |
+| `open_messages_thread` | Open Messages on screen at that thread (visible to player). | `{ threadId }` | — |
 | `search_emails` | Search inbox/sent/drafts/archive/trash by sender/subject/body. | `{ query }` | r.o.h |
 | `get_email` | One mail by id. | `{ emailId }` | r.o.h |
 | `get_image_metadata` | EXIF-style metadata (timestamps, GPS, camera, software, hash, file note) — the only thing the agent can know about a photo. | `{ photoId }` | r.o.h |
@@ -33,7 +34,7 @@ The integration is **visible to the player** (windows open and scroll), **inspec
 
 | Tool | Description | Input |
 |---|---|---|
-| `open_application` | Open one of `{ files, mail, photos, browser, terminal, systemlog, evidence }`. | `{ application }` |
+| `open_application` | Open one of `{ files, mail, messages, photos, browser, terminal, systemlog, evidence }`. | `{ application }` |
 | `focus_application` | Bring an already-open window foreground. | `{ application }` |
 | `open_file` | Open text/csv/sys/pdf-extract/image in the viewer. | `{ path }` |
 | `open_directory` | Navigate File Manager to a directory. | `{ path }` |
@@ -72,7 +73,7 @@ Errors are `{ ok: false, error: "<human>" }` — never a throw that drops state.
 | `open_file` | Text viewer appears with the doc loaded |
 | `scroll_document_to_line` | That line scrolls into view; `line-flash` + top-to-bottom `nav-sweep` overlay |
 | `open_image` | Photo viewer opens at that id |
-| `open_email` / `open_browser_entry` / `open_directory` | Corresponding app opens and navigates to that item |
+| `open_email` / `open_browser_entry` / `open_directory` / `open_messages_thread` | Corresponding app opens and navigates to that item |
 | `highlight_evidence` | Evidence card pulses amber 3× (`ev-highlight`) and board focuses |
 | `terminal_command` | Terminal focuses and prints the command's output on screen |
 
@@ -100,4 +101,4 @@ Errors are `{ ok: false, error: "<human>" }` — never a throw that drops state.
 
 - `src/webmcp/register.ts` — registry, lifecycle, tool list, schemas
 - `src/game/services.ts` — capability layer that makes WebMCP fundamental rather than decorative
-- `src/components/GameRoot.tsx` — hydration and the 23-tool audit surface (`LINK` console)
+- `src/components/GameRoot.tsx` — hydration and the 25-tool audit surface (`LINK` console)

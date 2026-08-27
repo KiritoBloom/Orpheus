@@ -56,6 +56,20 @@ export default function WindowFrame({
     [id, win, focusWindow, setGeom]
   );
 
+  // app-specific subtle tint — same OS, slightly different personality
+  const appTint: Record<string, string> = {
+    files: "#1e2e2a",
+    mail: "#1c2a28",
+    messages: "#1a2622",
+    photos: "#1a1e1c",
+    browser: "#16201e",
+    terminal: "#0a140f",
+    systemlog: "#121a18",
+    evidence: "#1f2a26",
+    textviewer: "#141e1c",
+    imageviewer: "#0f1412",
+  };
+
   // 90s open ghost + scan when win just opened
   useEffect(() => {
     if (win.open && !win.minimized) {
@@ -136,8 +150,9 @@ export default function WindowFrame({
         width: geom.w as number,
         height: geom.h as number,
         zIndex: win.z,
-        background: "#1e2e2a",
+        background: appTint[id] ?? "#1e2e2a",
         boxShadow: focused ? "4px 4px 0 rgba(0,0,0,0.35), 0 0 0 1px #000" : "3px 3px 0 rgba(0,0,0,0.28), 0 0 0 1px #000",
+        cursor: "default",
       }}
       onPointerDown={() => focusWindow(id)}
       role="dialog"

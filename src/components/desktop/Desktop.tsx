@@ -8,6 +8,7 @@ import DesktopIcons from "@/components/desktop/DesktopIcons";
 import ChecklistHUD from "@/components/desktop/ChecklistHUD";
 import FilesApp from "@/components/applications/FilesApp";
 import MailApp from "@/components/applications/MailApp";
+import MessagesApp from "@/components/applications/MessagesApp";
 import BrowserApp from "@/components/applications/BrowserApp";
 import TerminalApp from "@/components/applications/TerminalApp";
 import SystemLogApp from "@/components/applications/SystemLogApp";
@@ -89,6 +90,7 @@ export default function Desktop() {
       {/* windows */}
       <WindowFrame id="files" title="FILE MANAGER"><FilesApp /></WindowFrame>
       <WindowFrame id="mail" title="MAIL"><MailApp /></WindowFrame>
+      <WindowFrame id="messages" title="MESSAGES — ON-DEVICE"><MessagesApp /></WindowFrame>
       <WindowFrame id="photos" title="PHOTOS"><PhotosApp /></WindowFrame>
       <WindowFrame id="browser" title="BROWSER (OFFLINE)"><BrowserApp /></WindowFrame>
       <WindowFrame id="terminal" title="TERMINAL"><TerminalApp /></WindowFrame>

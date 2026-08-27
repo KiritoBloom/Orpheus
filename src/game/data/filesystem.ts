@@ -501,30 +501,28 @@ If true: 02:13 is not a time of day. It is a bearing.
 Recommendation to self: STOP logging this conclusion on internet-connected
 machines. This machine has no line. This note stays air-gapped or nowhere.`;
 
-const EXPORTED_TRANSCRIPT = `EXPORTED TRANSCRIPT (partial) — thread: SARAH OKAFOR
-source: messages database, table threads/22 — exported by DM 2026-03-08
+const EXPORTED_TRANSCRIPT = `MESSAGES DATABASE — EXPORT MANIFEST
+generated: 2026-03-08 12:00:45 by user DANIEL (manual trigger)
+source:   /Messages/ — on-device store, 6 threads, 31 messages
+note:     live threads are in the Messages app (full body).
+          this file is the manifest Daniel saved to disk before
+          the network was cut. It records thread counts and the
+          last message per thread — not the bodies.
 
-[feb 28, 23:41] S.OKAFOR: professor the stack reproduces. all five datasets.
-[feb 28, 23:44] S.OKAFOR: e-fold 9.1. it's real. i've rerun it sober this time
-[feb 28, 23:47] D.MCDUFF: i never doubted sober-you. keep the raw frames
-                somewhere that isn't this machine.
-[feb 28, 23:52] S.OKAFOR: already done. two cold copies. one reads like a
-                genealogy file, one reads like tax receipts :)
-[mar 02, 08:15] D.MCDUFF: sarah. if anything odd happens — and i mean anything,
-                lost keys, strange visitors, my behaving strangely —
-                check the TIMESTAMPS against the building access log before
-                you check your own memory.
-[mar 02, 08:19] S.OKAFOR: that's an alarming sentence for a tuesday morning
-[mar 02, 08:21] D.MCDUFF: it was an alarming monday.
-[mar 06, 16:02] S.OKAFOR: a man was asking the dept admin for your home
-                address today. said he was from your insurance.
-[mar 06, 16:02] S.OKAFOR: i gave him the dept fax number and watched him walk
-[mar 06, 16:09] D.MCDUFF: description?
-[mar 06, 16:11] S.OKAFOR: tall. grey coat. visitor badge on a lanyard but the
-                badge was turned backwards. calm as sunday.
-[mar 07, 09:30] D.MCDUFF: thank you. keep the copies close, not hidden.
-                hidden things are found. CLOSE things are kept.
-[end of partial export — remainder requires live database]`;
+THREAD              MESSAGES  LAST ACTIVITY         LAST PREVIEW
+─────────────────────────────────────────────────────────────────
+Sarah Okafor        12        2026-03-09 00:05      "i'm coming by tomorrow 9am…"
+Ruth McDuff         4         2026-03-08 08:20      "Mom, thank you…"
+Klaus Voss          4         2026-02-19 10:00      "then hypothetically — publish…"
+W —                 4         2026-03-03 11:05      "Thursday, Professor…"
+Bench B — lab group 5         2026-03-07 10:22      "video retention is 72h…"
+Penn IT — Help Desk 2         2026-03-09 14:30      "Shared ASN…"
+
+integrity: SHA-256 manifest hash a44f…9be2 — matches Messages store
+open Messages to read threads. ARIA can search them via tools.
+
+[DM note, handwritten on printout, photographed: "if i go dark,
+ Sarah knows where the cold copies are. check the mail too."]`;
 
 const PHOTO_INDEX = `PHOTO INDEX — camera roll digest (generated)
 

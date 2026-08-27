@@ -215,14 +215,21 @@ export default function GameRoot() {
         // wipe both persistent + live state before leaving title
         const { wipeSave, getSave: _g } = await import("@/game/state/persistence");
         await wipeSave();
+        // reset mutated data arrays to original unread state
+        const { EMAILS: _emails } = await import("@/game/data/emails");
+        const origUnread = new Set(["mail_102", "mail_104", "mail_106", "mail_107"]);
+        for (const em of _emails) em.unread = origUnread.has(em.id);
         // reset live stores to their empty snapshots
         useOS.setState({
           flags: new Set(),
           vaultUnlocked: false,
           vaultAttempts: 0,
+          readMailIds: new Set(),
+          readThreadIds: new Set(),
           windows: {
             files: { open: false, minimized: false, maximized: false, z: 1, geom: { x: 60, y: 48, w: 720, h: 470 } },
             mail: { open: false, minimized: false, maximized: false, z: 1, geom: { x: 90, y: 40, w: 820, h: 520 } },
+            messages: { open: false, minimized: false, maximized: false, z: 1, geom: { x: 100, y: 54, w: 740, h: 500 } },
             photos: { open: false, minimized: false, maximized: false, z: 1, geom: { x: 80, y: 44, w: 640, h: 480 } },
             browser: { open: false, minimized: false, maximized: false, z: 1, geom: { x: 110, y: 36, w: 780, h: 540 } },
             terminal: { open: false, minimized: false, maximized: false, z: 1, geom: { x: 140, y: 90, w: 640, h: 400 } },

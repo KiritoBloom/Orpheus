@@ -178,6 +178,17 @@ const get_message_thread: ToolDef = {
   },
 };
 
+const open_messages_thread: ToolDef = {
+  name: "open_messages_thread",
+  description: "Open the Messages app on screen and show a specific chat thread (ids like t_sarah, t_W). Visible to the player — they can then read the bubbles.",
+  inputSchema: {
+    type: "object",
+    properties: { threadId: str("Thread id, e.g. t_sarah") },
+    required: ["threadId"],
+  },
+  execute: ({ threadId }) => S.openMessagesThread(String(threadId)),
+};
+
 const search_emails: ToolDef = {
   name: "search_emails",
   description: "Search Daniel's mail (inbox/sent/drafts/archive/trash) by sender, subject or body text.",
@@ -453,6 +464,7 @@ export const TOOL_DEFS: ToolDef[] = [
   read_file,
   search_messages,
   get_message_thread,
+  open_messages_thread,
   search_emails,
   get_email,
   get_image_metadata,

@@ -168,10 +168,23 @@ export function IconLink({ size = 14, className }: IconProps) {
     </svg>
   );
 }
+export function IconMessages({ size = 18, className }: IconProps) {
+  return (
+    <svg {...base} width={size} height={size} className={className} aria-hidden>
+      <rect x={4} y={6.5} width={16} height={11} rx={1.4} />
+      <path d="M7.5 9.8 H16.2" opacity={0.9} />
+      <path d="M7.5 12.4 H13.2" opacity={0.6} />
+      <path d="M7.5 14.8 H11" opacity={0.35} />
+      <path d="M8.5 17.5 L10 15.8 H10.5" fill="currentColor" stroke="none" opacity={0.9} />
+      <circle cx={17} cy={7.2} r={1.6} fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
 
 export const APP_ICONS: Record<string, React.FC<IconProps>> = {
   files: IconFiles,
   mail: IconMail,
+  messages: IconMessages,
   photos: IconPhotos,
   browser: IconBrowser,
   terminal: IconTerminal,

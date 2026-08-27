@@ -226,6 +226,13 @@ export const mailSelectBus = new SimpleBus();
 export function markEmailRead(id: string) {
   const em = EMAILS.find((e) => e.id === id);
   if (em) em.unread = false;
+  useOS.getState().markMailRead(id);
+}
+export function isMailUnread(id: string): boolean {
+  const os = useOS.getState();
+  if (os.readMailIds.has(id)) return false;
+  const em = EMAILS.find((e) => e.id === id);
+  return !!em?.unread;
 }
 
 /* ---------------- messages / chat search ---------------- */
@@ -245,6 +252,21 @@ export function getMessageThread(threadId: string): { name: string; messages: Ch
     name: t?.name ?? threadId,
     messages: CHAT_MESSAGES.filter((m) => m.threadId === threadId),
   };
+}
+export function openMessagesThread(threadId: string): { ok: boolean; error?: string } {
+  const t = THREADS.find((x) => x.id === threadId);
+  if (!t) return { ok: false, error: `no thread: ${threadId}` };
+  openApplication("messages");
+  setTimeout(() => messagesThreadBus.emit(threadId), 60);
+  useOS.getState().markThreadRead(threadId);
+  return { ok: true };
+}
+export const messagesThreadBus = new SimpleBus();
+export function markThreadRead(id: string) {
+  useOS.getState().markThreadRead(id);
+}
+export function isThreadUnread(id: string): boolean {
+  return !useOS.getState().readThreadIds.has(id);
 }
 
 /* ---------------- browser history ---------------- */

@@ -38,7 +38,7 @@ src/
       investigationStore.ts  evidence set + highlight + four-question evaluation
     services.ts          THE capability layer — every UI and tool goes through here
   webmcp/
-    register.ts          23 TOOL_DEFS + registration + host detection + TermBus
+    register.ts          25 TOOL_DEFS + registration + host detection + TermBus
   components/
     title/IrisTitle.tsx  diegetic aperture mechanism + orbiting menu + pre-menu calibration
     boot/{BootSequence,MissionBriefing}.tsx  full-screen POST + briefing with Cherry MX soundpack
@@ -46,10 +46,10 @@ src/
     desktop/{Desktop,DesktopIcons}.tsx
     taskbar/Taskbar.tsx  app buttons + agent status + LINK console
     notifications/Toasts.tsx
-    applications/{ Files, Mail, Photos+ImageViewer, Browser, Terminal,
+    applications/{ Files, Mail, Messages, Photos+ImageViewer, Browser, Terminal,
                     SystemLog, Evidence, TextViewer}.tsx
     art/photos.tsx       procedural SVG photographs (every clue is vector & zoomable)
-    AgentLinkPanel.tsx   judge console for all 23 tools (LINK)
+    AgentLinkPanel.tsx   judge console for all 25 tools (LINK)
     GameRoot.tsx         lifecycle: title→boot→briefing→desktop→ending + hydration +
                          WebMCP polling + hum/focus wiring
     EndingSequence.tsx   staggered closes → iris → black
@@ -89,14 +89,14 @@ open an app, focus, open a file, scroll to a line, find text, open a dir/email/h
 
 Both the React UI and the WebMCP tools import and call this module. If you removed WebMCP, the external agent would lose every ability to operate the machine — investigation would be manual and incomplete. The audit trail of visible effects (window opens, sweeps, flashes, toasts) lives here.
 
-Event wiring `UI ↔ services` uses four tiny single-channel buses (`SimpleBus` — `on(fn) → unsubscribe, emit(payload)`) for: File Manager navigation, photo focus, Mail selection, Browser history navigation, plus a `TermBus` for the terminal. The text viewer listens via `setDocListener` for `scroll_document_to_line`.
+Event wiring `UI ↔ services` uses five tiny single-channel buses (`SimpleBus` — `on(fn) → unsubscribe, emit(payload)`) for: File Manager navigation, photo focus, Mail selection, Messages thread selection, Browser history navigation, plus a `TermBus` for the terminal. The text viewer listens via `setDocListener` for `scroll_document_to_line`.
 
 ---
 
 ## WebMCP lifecycle
 
 - `GameRoot` hydrates from IndexedDB, then calls `registerWebMCPTools()` once and polls every 1.2 s for late `modelContext` attachment; it observes `toolchange`.
-- On success the 23 `TOOL_DEFS` are registered; input schemas are pure JSON Schema; `execute` handlers delegate to `services.ts` and return MCP-shaped objects (`{ ok, error? }` or typed results).
+- On success the 25 `TOOL_DEFS` are registered; input schemas are pure JSON Schema; `execute` handlers delegate to `services.ts` and return MCP-shaped objects (`{ ok, error? }` or typed results).
 - No fallback assistant — WebMCP *is* the agent interface. During development the game remains playable without a host, but investigation is intentionally slower without an agent that can bulk-search and correlate.
 
 ---
@@ -118,7 +118,7 @@ All colours derive from `--bg`/`--accent`/`--amber`/`--alert` variables; reduced
 
 ## Photos
 
-`src/components/art/photos.tsx` renders twelve "photographs" as inline SVG at 800×600-class viewBoxes. Vector rendering means crisp zoom to 9×. Clues are placed at realistic sizes — dim background detail at `zoom=1` that becomes clear when manually zoomed (reflection figure, badge clip glint, whiteboard micro-handwriting, clock hands, door-case, watch mid-beat truncation, etc.). No PNG assets are required for play.
+Twelve photographs live as PNG assets under `public/Images/` (rendered via `PhotoAsset` in `PhotosApp.tsx`). An earlier SVG fallback remains in `src/components/art/photos.tsx` but is not required for play. Clues are placed at realistic sizes — dim background detail at `zoom=1` that becomes legible when manually zoomed (reflection figure, badge clip glint, whiteboard micro-handwriting, clock hands, door-case, watch mid-beat truncation, etc.) and remain crisp to 9×.
 
 The viewer (`ImageViewerApp`) handles `wheel` zoom (1–9×) + pan drag; `PhotosApp` is a grid. The agent has no zoom tools by design — enforced by absence, not policy.
 

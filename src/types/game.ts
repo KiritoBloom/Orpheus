@@ -5,6 +5,7 @@
 export type AppId =
   | "files"
   | "mail"
+  | "messages"
   | "photos"
   | "browser"
   | "terminal"
@@ -14,6 +15,7 @@ export type AppId =
 export const ALL_APPS: AppId[] = [
   "files",
   "mail",
+  "messages",
   "photos",
   "browser",
   "terminal",
@@ -24,6 +26,7 @@ export const ALL_APPS: AppId[] = [
 export const APP_LABELS: Record<AppId, string> = {
   files: "FILES",
   mail: "MAIL",
+  messages: "MESSAGES",
   photos: "PHOTOS",
   browser: "BROWSER",
   terminal: "TERMINAL",
@@ -130,9 +133,20 @@ export interface CachedPage {
     | "kestrel-home"
     | "kestrel-program"
     | "kestrel-people"
+    | "kestrel-contact"
     | "forum-thread"
     | "arxiv"
     | "obituary"
+    | "observatory"
+    | "nist"
+    | "homelock-docs"
+    | "manpage"
+    | "recipe"
+    | "medical"
+    | "parking"
+    | "search-results"
+    | "weather"
+    | "local-file"
     | "generic";
   body: string[]; // paragraphs
 }

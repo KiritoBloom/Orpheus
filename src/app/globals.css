@@ -800,6 +800,25 @@ html, body {
 @keyframes faintPulse { 0%,100% { opacity:0.42 } 50% { opacity:0.72 } }
 .watermark-pulse { animation: faintPulse 4.2s ease-in-out infinite; }
 
+/* ---------- cursor polish — sell that this is a real pointer, not a browser default ---------- */
+button, a { cursor: pointer; }
+button:disabled { cursor: default; }
+.cursor-grab { cursor: grab; }
+.cursor-grabbing { cursor: grabbing; }
+.cursor-text { cursor: text; }
+.cursor-col-resize { cursor: col-resize; }
+.cursor-zoom-in { cursor: zoom-in; }
+.cursor-zoom-out { cursor: zoom-out; }
+.win-active-titlebar, .taskbar-90s, .task-btn-90s { cursor: default; }
+
+/* subtle loading shimmer for file seek / app open */
+@keyframes seekShimmer { from { opacity: 0.6; } to { opacity: 1; } }
+.seek-pulse { animation: seekShimmer 0.12s steps(2) infinite alternate; }
+
+/* window focus transition — make focus change feel like CRT redraw */
+.win-bevel { transition: border-color 80ms steps(2), box-shadow 80ms steps(2); }
+.win-bevel-inactive { transition: border-color 80ms steps(2), box-shadow 80ms steps(2); }
+
 /* utility */
 .no-select { user-select: none; }
 .mono-xs { font-size: 10px; letter-spacing: .08em; }

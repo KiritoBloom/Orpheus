@@ -134,3 +134,47 @@ The case reconstruction UI (`Evidence → CASE RECONSTRUCTION`) asks four questi
 - Not a Three-Bodies pastiche: scientific dread without aliens, sophons, or copied mechanisms.
 - Humane: the chili recipe, the porch-rail wobble, Sarah's farewell cake, the field-trip fragment — the machine also preserves love with a timestamp.
 - Quiet in sound and color (charcoal, grey-green, phosphor green, trace amber, rust) — horror is proportionate, not loud.
+
+---
+
+## Design audit — how the brief is satisfied
+
+### Every clue has a purpose; clues connect rather than sit isolated
+
+All 21 evidence items derive from at least two independent sources. No entry exists for flavor alone.
+
+| Example | Connects |
+|---|---|
+| Reflection in `DSC04821` | `t_sarah` line 16:11 (badge turned backwards) + browser history Kestrel badge program + `/Private/photo_backup/badge_scan.png` |
+| Stopped clock `DSC04655` 02:13 | `log_014` + `log_034` 40 ms brown-outs + `threshold_analysis.txt` 02:13 scan cycle |
+| Watch gap `IMG_0103` 01:52 | `log_031` health band last poll + `vestibule_decrypted.txt` §2 + `IMG_0103` optical trace ends mid-beat |
+| Door at 02:07 | `IMG_0044` 02:07:33 + `log_032` LOCAL EVENT WINDOW + `mail_108` WONTFIX ticket |
+| Passphrase `lantern → orpheus → echo` | `IMG_0022` sticky card + `journal_february` photo habit + `brass_plate.jpg` `LANTERN · [worn] · ECHO` + draft note |
+
+### Several possible investigation paths
+
+The evidence board has no required order. The seven checklist steps are a HUD suggestion, not a gate. Valid alternative sequences include `Browser → ORPHEUS docs → System Log`, or `Photos zoom first → tell ARIA → let ARIA surface logs`. The only hard gate is the vestibule passphrase; every other thread is reachable in multiple orders. The 90-second idle hint is non-blocking.
+
+### Red herrings (falsifiable, not frustrating)
+
+These exist to be eliminated by cross-reference, not to gate progress:
+
+- Cardiology follow-up `mail_106` (bradycardia note) — suggests natural death, falsified by watch `ends mid-beat` + door exploit.
+- `phys512_problem_set.txt` — teaches error-character reasoning but is not a clue.
+- Penn parking `hist_013`, recipe search `hist_011`, `spectrometer_driver/bench_notes.txt` firmware bug — ambient life that rewards dismissal.
+- The WONTFIX door vendor resolution — reads as IT trivia until the 02:07 exploit.
+
+All are logically excludable by orthogonal evidence (time, mechanism, source).
+
+### Player before ARIA / ARIA before player
+
+- *Player first*: the reflection, the stopped clock, handwriting on the whiteboard margin, the glyph row, the brass-plate wear — all require human eyes. ARIA has no zoom tool by absence; she can only react after the player describes.
+- *ARIA first*: exact EXIF timestamps, GPS, hash, building-access gait mismatch, `.onion` resolver attempt, satellite uplink daemon entry, recurrence counts of `02:13`. The player would not think to search 51 log lines for a brown-out pattern; ARIA surfaces it via `get_system_logs` with filter.
+
+### The final explanation feels earned; there is a proper ending
+
+The four-question `CASE RECONSTRUCTION` is evaluated by keyword density plus prerequisite flags (≥3 `SUPPORTED`, ≤1 `INSUFFICIENT`). Wording need not be exact; evidence linkage matters. A partial file returns per-question verdicts with no penalty — keep investigating. A supported case triggers staggered window closes, screen fade, ARIA's last three messages ("The first anomaly was recorded before Daniel began the research. He didn't discover it."), black, then **"It may have been looking for him."** Title returns with `CASE 001 — CLOSED` archived. No "congratulations, you solved it."
+
+### The human and AI genuinely need each other
+
+This is architectural, not rhetorical. See `ARCHITECTURE.md` § Service layer: both UI and WebMCP call `services.ts`. Remove WebMCP and the agent loses every capability; remove the player's eyes and ARIA is blind to pixels. `COLLABORATED_WITH_ARIA` is required before `CASE_RECONSTRUCTION_AVAILABLE` — the case cannot close without the loop `human sees → tells ARIA → ARIA searches → opens → human inspects → repeat`.
