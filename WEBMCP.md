@@ -100,8 +100,13 @@ Errors are `{ ok: false, error: "<human>" }` — never a throw that drops state.
 
 ---
 
+## Evals
+
+Six evals covering isolation → ambiguous → ordered chain → end-to-end per https://developer.chrome.com/docs/ai/webmcp/evals: `src/webmcp/evals.md`. Run via `document.modelContext.executeTool` (deterministic) or Inspector (probabilistic). Includes budgets + security negative test for `terminal_command`.
+
 ## Files that matter to a judge
 
 - `src/webmcp/register.ts` — registry, lifecycle, tool list, schemas
+- `src/webmcp/evals.md` — 6 evals with messages/expectedCall/state
 - `src/game/services.ts` — capability layer that makes WebMCP fundamental rather than decorative
 - `src/components/GameRoot.tsx` — hydration and the 25-tool audit surface (`LINK` console)
