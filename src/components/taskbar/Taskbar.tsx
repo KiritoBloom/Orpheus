@@ -115,6 +115,14 @@ export default function Taskbar() {
 
         {/* right: tray — 90s inset + chunky buttons */}
         <div className="flex items-center gap-1 shrink-0">
+          {os.obsWindow.open && (
+            <span
+              className="hidden lg:inline text-[8px] tracking-[0.14em] text-amber mr-1 border border-amber/40 px-1 bg-amber/10"
+              style={{ animation: "evHighlight 1.6s ease-in-out infinite" }}
+            >
+              02:13 WINDOW
+            </span>
+          )}
           {os.flags.has("CASE_RECONSTRUCTION_AVAILABLE") && !os.flags.has("CASE_COMPLETE") && (
             <span className="hidden lg:inline text-[8px] tracking-[0.14em] text-amber mr-1 border border-amber/40 px-1 bg-amber/10">READY</span>
           )}

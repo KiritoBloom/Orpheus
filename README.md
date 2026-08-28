@@ -156,7 +156,7 @@ src/
     services.ts                 # single source-of-truth capability layer
   webmcp/
     register.ts                 # 26 tools, registration, host detection
-    evals.md                    # 6 evals per Chrome guide
+    evals.md                    # 7 evals per Chrome guide
   components/
     title/IrisTitle             # diegetic circular opening (not an eyeball; see below)
     boot/                       # POST + mission briefing

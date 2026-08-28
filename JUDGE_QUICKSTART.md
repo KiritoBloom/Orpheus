@@ -29,6 +29,8 @@ You just verified: read-only search at scale + visible navigation that moves the
 5. Say: *“What happened at 02:13?”* → agent must call `get_system_logs({"filter":"02:13"})` → count >= 8, includes `log_035` gait-mismatch reveal
 6. Say: *“Show me where Daniel says 02:13 is not a time.”* → agent must call `find_text_in_document` → `open_file` → `scroll_document_to_line({"line":184})` → document scrolls *on your screen*, not dumped in chat
 
+**Bonus set piece — the 02:13 Window (the Keep-Talking moment):** after the vault, the machine opens a 90-second observability window every ~2.5 min (amber pulse + `02:13 WINDOW` taskbar badge). Inside it, zoom `DSC04655` past 2.5× **while** the agent calls `get_system_logs` — synchronized, `/Private/window_echo.txt` appears. Neither side counts alone; the clock is real.
+
 This is the new era loop: `human sees → describes → agent searches & opens → human inspects → repeat`. Neither side can do it alone. `COLLABORATED_WITH_ARIA` flag and Evidence Board progress prove the collaboration was required.
 
 ## 2) What to open in code (60 seconds)
@@ -36,7 +38,7 @@ This is the new era loop: `human sees → describes → agent searches & opens �
 - `src/webmcp/register.ts` — 26 `TOOL_DEFS`, single registry, budgets `MAX_QUERY_LEN=200` / `MAX_OUTPUT_CHARS=1500`, `readOnlyHint` + `untrustedContentHint` per secure-tools guide, `AbortSignal`, `toolchange` lifecycle
 - `src/game/services.ts` —single source-of-truth capability layer both UI and tools call (remove WebMCP and agent loses every capability)
 - `src/components/GameRoot.tsx` — hydration + `registerWebMCPTools()` poll 800ms + 1.2s re-attach for Atlas + declarative `<form toolname="record_evidence">` (Declarative API)
-- `src/webmcp/evals.md` — 6 evals per https://developer.chrome.com/docs/ai/webmcp/evals
+- `src/webmcp/evals.md` — 7 evals per https://developer.chrome.com/docs/ai/webmcp/evals
 
 ## 3) Why this is the new era (not just a game)
 
@@ -57,6 +59,7 @@ Self-hosted, no backend, no env keys, `idb-keyval` persistence, headers `Origin-
 - [ ] Evidence Board `CASE RECONSTRUCTION` lights only after collaboration (≥4 milestones + `COLLABORATED_WITH_ARIA`)
 - [ ] `terminal_command "rm -rf /"` returns `{ok:false, error:"unsupported command"}` (allowlist check)
 - [ ] Live URL is `https://orpheus-mcduff.vercel.app/` on Vercel + HSTS, 7117 bytes static shell, headers verified in `next.config.ts`
+- [ ] (Set piece) After `terminal_command "unlock lantern orpheus echo"`: within ~2.5 min the `02:13 WINDOW` badge appears; zoom `DSC04655` ≥2.5× + `get_system_logs` inside 90 s → `WINDOW_SYNCHRONIZED`, `/Private/window_echo.txt` + evidence `ev_window_echo`
 
 Video (public YouTube, <3 min, audio) covers this loop. If you are short on time, the `LINK` 30-sec path is sufficient for a Pass on WebMCP Leverage + Execution.
 

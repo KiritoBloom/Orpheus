@@ -59,6 +59,7 @@ export default function FilesApp() {
   }, []);
 
   function open(node: FsNode) {
+    S.noteHumanAction(); // human-driven navigation — synchrony rhythm
     sfx.click();
     if (node.encrypted) {
       os.pushToast({ app: "FILES", title: node.name, body: "ACCESS DENIED — encrypted container (3-word passphrase)" });

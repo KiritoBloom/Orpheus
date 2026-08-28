@@ -348,7 +348,10 @@ const get_system_logs: ToolDef = {
     useAria.getState().setStatus("investigating", "scanning system logs…");
     const f = filter ? clampStr(filter) : undefined;
     const logs = S.getSystemLogs(f);
-    if (logs.some((l) => l.time.startsWith("02:13"))) S.flagLogDiscovery();
+    if (logs.some((l) => l.time.startsWith("02:13"))) {
+      S.flagLogDiscovery();
+      S.noteWindowAgent(); // 02:13 window — agent side of the co-op set piece
+    }
     return { count: logs.length, logs: logs.slice(0, 50) };
   },
 };
@@ -674,6 +677,7 @@ export function registerWebMCPTools(): boolean {
             execute: async (input: Record<string, unknown>, opts?: { signal?: AbortSignal }) => {
               // respect cancellation
               if (opts?.signal?.aborted) return { ok: false, error: "cancelled" };
+              S.noteAgentAction(); // synchrony rhythm — real WebMCP host invocations
               try {
                 return await def.execute(input ?? {});
               } catch (err) {

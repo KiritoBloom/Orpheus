@@ -25,6 +25,7 @@ import { PhotosApp, ImageViewerApp } from "@/components/applications/PhotosApp";
 export default function Desktop() {
   const crt = useOS((s) => s.settings.crt);
   const textScale = useOS((s) => s.settings.textScale);
+  const obsOpen = useOS((s) => s.obsWindow.open);
   const [flicker, setFlicker] = useState(false);
 
   // subtle 02:13 intrigue pulse — brief horizontal scan, every ~38s, only when no window has focus (not distracting)
@@ -102,6 +103,9 @@ export default function Desktop() {
       <WindowFrame id="evidence" title="EVIDENCE BOARD"><EvidenceApp /></WindowFrame>
       <WindowFrame id="textviewer" title="DOCUMENT VIEWER"><TextViewerApp /></WindowFrame>
       <WindowFrame id="imageviewer" title="PHOTO VIEWER"><ImageViewerApp /></WindowFrame>
+
+      {/* 02:13 window — amber observability pulse (time-boxed co-op set piece) */}
+      {obsOpen && <div className="window-pulse" />}
 
       {/* subtle 90s CRT retrace — gray, not green */}
       {flicker && <div className="absolute inset-0 pointer-events-none z-[5] bg-white/[0.03]" style={{ height: "2px", top: "34%", boxShadow: "0 1px 0 rgba(255,255,255,0.04)" }} />}

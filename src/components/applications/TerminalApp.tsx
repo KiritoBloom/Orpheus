@@ -45,9 +45,9 @@ export default function TerminalApp() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [lines]);
 
-  // service-driven runs (WebMCP terminal_command)
+  // service-driven runs (WebMCP terminal_command) — fromAgent: don't count as human action
   useEffect(() => {
-    return termRunBus.on((cmd) => runLine(String(cmd), true));
+    return termRunBus.on((cmd) => runLine(String(cmd), true, true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -106,9 +106,10 @@ export default function TerminalApp() {
     }
   }
 
-  function runLine(raw: string, echo = true) {
+  function runLine(raw: string, echo = true, fromAgent = false) {
     const cmd = raw.trim();
     if (!cmd) { if (echo) push({ text: "" }); return; }
+    if (!fromAgent) S.noteHumanAction(); // human-typed commands feed the synchrony rhythm
     if (echo) {
       push({ text: `investigator@mcduff-wks01:${cwd}$ ${cmd}`, cls: "text-accentdim" });
       setHist((h) => [...h, cmd]);

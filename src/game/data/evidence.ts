@@ -78,6 +78,16 @@ export const EVIDENCE: EvidenceItem[] = [
     autoUnlockFlag: "SEEN_DOORCAM",
   },
   {
+    id: "ev_window_echo",
+    section: "events",
+    title: "THE 02:13 WINDOW — SYNCHRONIZED",
+    summary:
+      "Human eyes on the stopped clock while ARIA queried the logs — both observers inside the same 47-second window. The residual paused mid-growth, the five instruments briefly agreed, and the machine wrote down that it had been seen.",
+    sources: ["/Private/window_echo.txt", "DSC04655", "system logs 02:13"],
+    confidence: "low",
+    autoUnlockFlag: "WINDOW_SYNCHRONIZED",
+  },
+  {
     id: "ev_0213_login",
     section: "events",
     title: "THE 02:13 LOGIN",

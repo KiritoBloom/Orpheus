@@ -67,6 +67,14 @@ Three words in a fixed order:
 
 A correct `unlock lantern orpheus echo` in Terminal mounts the vestibule. Any other sequence mounts an adjacent fragment (`_fragments_recovered`) containing a warm archival note — reward for curiosity rather than punishment. Repeated wrong attempts escalate gentle recovery hints in the terminal output (4+: a fragment about the first word; 7+: the first word confirmed; 10+: the second) so a stuck investigator is guided, never stalled.
 
+### The 02:13 window — the Keep-Talking set piece
+
+After the vault, the machine re-opens its observability window roughly every 2.5 minutes: 90 seconds of amber pulse, a taskbar badge, a deadline that is felt rather than shown. Inside it, exactly one co-op action pair completes the beat — the **human** zooms the stopped clock (`DSC04655`) past 2.5× while **ARIA** queries the logs from the same minute (`get_system_logs`). Neither action counts outside the window; neither side suffices alone. Synchronized, the machine writes `/Private/window_echo.txt` and unlocks evidence `ev_window_echo`. Miss it and 02:13 comes again — thematically inevitable, mechanically forgiving. (Design per *Keep Talking and Nobody Explodes*: asymmetric roles + shared time pressure = the loop both players must run together.)
+
+### SYNCHRONY — scoring the handoff rhythm
+
+The game's central loop — human looks → agent searches → human decides — is itself scored. Alternating clean handoffs inside 45 seconds build a SYNCHRONY streak, surfaced live in the checklist footer and celebrated by ARIA at ×4/×6/×8. The collaboration is not a premise the player is told about; it is a rhythm the game notices, rewards, and tempo-sets. The desk feels alive exactly when the partnership is real.
+
 ### The reflection
 `DSC04821.JPG` — the office window glass, lower half, contains a dim figure holding a phone with a reversed visitor-badge glint. Visible at normal scale only to the attentive; sharp under manual zoom. The player tells ARIA; ARIA pulls message `t_sarah` line 16:11 ("badge was turned backwards") and browser history (Kestrel visitor badge program page) to identify the org. No tool performs that identification for the player.
 
@@ -110,6 +118,7 @@ IDENTIFIED_CONTACT            read Haldane correspondence
 DISCOVERED_SURVEILLANCE       found combined photo+badge evidence triggering the location boards
 VAULT_OPENED / VAULT_DECOY
 FOUND_HIDDEN_ARCHIVE          vestibule decrypted
+WINDOW_HUMAN / WINDOW_AGENT / WINDOW_SYNCHRONIZED   02:13 window co-op set piece (clock zoom + log query, inside 90s)
 DISCOVERED_ARIA_DIRECTIVE     read /Private/aria_directive.sys
 RECONSTRUCTED_FINAL_HOURS     conditional on 02:13 log + watch gap + door cam
 CASE_RECONSTRUCTION_AVAILABLE 4 of 5 major milestones, gated board button

@@ -351,6 +351,116 @@ export function attemptVault(words: string[]): { result: "success" | "decoy" | "
   };
 }
 
+/* ---------------- the 02:13 window — time-boxed co-op set piece ---------------- */
+// After the vault, the machine keeps Daniel's habits: 02:13 recurs. For 90 seconds the
+// workstation becomes observable (Keep-Talking-style: BOTH sides must act inside the
+// window — human eyes on the stopped clock, ARIA in the logs — to synchronize).
+
+const OBS_WINDOW_MS = 90_000;
+const OBS_REARM_MS = 150_000;
+
+export function isObsWindowOpen(): boolean {
+  return useOS.getState().obsWindow.open;
+}
+
+/** Called on a short interval (GameRoot) — opens, closes, and re-arms the window. */
+export function tickObservabilityWindow(): void {
+  const os = useOS.getState();
+  if (os.phase !== "desktop") return;
+  if (!os.vaultUnlocked || os.flags.has("WINDOW_SYNCHRONIZED")) return;
+  const now = Date.now();
+  if (os.obsWindow.open) {
+    if (now >= os.obsWindow.endsAt) closeObsWindow(false);
+    return;
+  }
+  if (os.obsWindow.lastClosedAt === 0 || now - os.obsWindow.lastClosedAt >= OBS_REARM_MS) openObsWindow();
+}
+
+function openObsWindow() {
+  useOS.setState((s) => ({ obsWindow: { open: true, endsAt: Date.now() + OBS_WINDOW_MS, lastClosedAt: s.obsWindow.lastClosedAt } }));
+  useOS.getState().pushToast({
+    app: "SYSTEM",
+    title: "02:13 RECURS — WINDOW OPEN",
+    body: "The room it is not looking at can be seen. 90 seconds: open the study photo and zoom into the wall clock — and have ARIA pull the logs from that minute. Together, inside the window.",
+  });
+  sfx.deepThud();
+  checkWindowSync(); // both sides may have acted before this window opened
+}
+
+function closeObsWindow(synced: boolean) {
+  useOS.setState({ obsWindow: { open: false, endsAt: 0, lastClosedAt: Date.now() } });
+  if (!synced) {
+    useOS.getState().pushToast({ app: "SYSTEM", title: "WINDOW CLOSED", body: "02:13 comes again. It always does." });
+  }
+}
+
+/** Human side — the player zooms the stopped clock (DSC04655) while the window holds. */
+export function noteWindowHuman(): void {
+  const os = useOS.getState();
+  if (!os.obsWindow.open || os.flags.has("WINDOW_HUMAN")) return;
+  os.addFlag("WINDOW_HUMAN");
+  os.pushToast({ app: "PHOTOS", title: "THE CLOCK SAW YOU", body: "02:13:00 — both hands stopped mid-beat. Now have ARIA pull the logs from the same minute, while the window holds." });
+  checkWindowSync();
+}
+
+/** Agent side — ARIA reads the logs during the window (get_system_logs). */
+export function noteWindowAgent(): void {
+  const os = useOS.getState();
+  if (!os.obsWindow.open || os.flags.has("WINDOW_AGENT")) return;
+  os.addFlag("WINDOW_AGENT");
+  checkWindowSync();
+}
+
+function checkWindowSync() {
+  const os = useOS.getState();
+  if (!os.obsWindow.open) return;
+  if (os.flags.has("WINDOW_HUMAN") && os.flags.has("WINDOW_AGENT")) {
+    os.addFlag("WINDOW_SYNCHRONIZED");
+    closeObsWindow(true);
+    os.pushToast({
+      app: "ARIA",
+      title: "SYNCHRONIZED — 47 SECONDS",
+      body: "Your eyes on the clock, my query in the logs — for 47 seconds we watched the same window. Something was written to /Private.",
+    });
+    sfx.chime();
+    checkReconstructionAvailable();
+  }
+}
+
+/* ---------------- synchrony — reward the handoff rhythm ---------------- */
+// The core loop is human-looks → agent-searches. Alternating clean handoffs inside
+// 45 seconds build a SYNCHRONY streak — the game quietly celebrates real collaboration.
+
+let lastSyncToastAt = 0;
+
+export function noteAgentAction(): void {
+  noteSync("agent");
+}
+
+export function noteHumanAction(): void {
+  noteSync("human");
+}
+
+function noteSync(actor: "human" | "agent") {
+  const os = useOS.getState();
+  const now = Date.now();
+  const streak =
+    os.syncLastActor && os.syncLastActor !== actor && now - os.syncLastAt < 45_000
+      ? os.syncStreak + 1
+      : 1;
+  useOS.setState({ syncLastActor: actor, syncLastAt: now, syncStreak: streak });
+  if (streak >= 4 && streak % 2 === 0 && now - lastSyncToastAt > 90_000) {
+    lastSyncToastAt = now;
+    os.pushToast({
+      app: "ARIA",
+      title: `SYNCHRONY ×${streak}`,
+      body: streak >= 6
+        ? "We're finishing each other's searches now. Keep the handoff going."
+        : "Clean handoffs — you look, I search, you decide. This is what the desk is for.",
+    });
+  }
+}
+
 /* ---------------- evidence ---------------- */
 
 import { EVIDENCE as EVIDENCE_DATA } from "@/game/data/evidence";

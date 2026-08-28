@@ -829,3 +829,17 @@ button:disabled { cursor: default; }
 /* utility */
 .no-select { user-select: none; }
 .mono-xs { font-size: 10px; letter-spacing: .08em; }
+
+/* ---------- the 02:13 window — amber observability pulse (co-op set piece) ---------- */
+@keyframes windowPulse {
+  0%, 100% { opacity: 0.05; }
+  50% { opacity: 0.18; }
+}
+.window-pulse {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  background: radial-gradient(ellipse at 50% 45%, rgba(240, 180, 90, 0.35), transparent 62%);
+  animation: windowPulse 2.6s ease-in-out infinite;
+}

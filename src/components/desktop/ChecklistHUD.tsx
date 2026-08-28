@@ -78,6 +78,15 @@ const STEPS: Step[] = [
     actionLabel: "UNLOCK",
   },
   {
+    id: "window",
+    label: "The Window",
+    desc: "02:13 comes again",
+    done: (f) => f.has("WINDOW_SYNCHRONIZED"),
+    hint: "After the vault, the machine keeps his habits. When the room opens — 90 seconds, amber pulse, taskbar badge — look where the clock stopped, and have ARIA watch the logs in the same minute. Together, inside the window.",
+    action: () => S.openApplication("photos"),
+    actionLabel: "LOOK",
+  },
+  {
     id: "case",
     label: "The Verdict",
     desc: "Four questions",
@@ -91,6 +100,7 @@ const STEPS: Step[] = [
 export default function ChecklistHUD() {
   const flags = useOS((s) => s.flags);
   const evidenceIds = useInvestigation((s) => s.evidenceIds);
+  const syncStreak = useOS((s) => s.syncStreak);
   const [minimized, setMinimized] = useState(false);
   const [hintOpen, setHintOpen] = useState<string | null>(null);
   const [prevDone, setPrevDone] = useState<Record<string, boolean>>({});
@@ -304,6 +314,7 @@ export default function ChecklistHUD() {
           <span className="w-1.5 h-1.5 rounded-full bg-amber/70 shrink-0" />
           <span className="text-[9px] tracking-[0.12em] text-faint leading-tight">
             ARIA sees the machine. You see the room. Neither alone is enough.
+            {syncStreak >= 2 && <span className="text-amber"> · SYNCHRONY ×{syncStreak}</span>}
           </span>
         </div>
       </div>

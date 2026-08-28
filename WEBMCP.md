@@ -117,7 +117,7 @@ Errors are `{ ok: false, error: "<human>" }` — never a throw that drops state.
 
 ## Evals
 
-Six evals covering isolation → ambiguous → ordered chain → end-to-end per https://developer.chrome.com/docs/ai/webmcp/evals: `src/webmcp/evals.md`. Run via `document.modelContext.executeTool` (deterministic) or Inspector (probabilistic). Includes budgets + security negative test for `terminal_command`.
+Seven evals covering isolation → ambiguous → ordered chain → end-to-end → the 02:13 co-op window per https://developer.chrome.com/docs/ai/webmcp/evals: `src/webmcp/evals.md`. Run via `document.modelContext.executeTool` (deterministic) or Inspector (probabilistic). Includes budgets + security negative test for `terminal_command`.
 
 ## Judge path — 90 seconds
 
@@ -137,6 +137,6 @@ Replace `src/game/data/*` with your corpus, keep the 26 tool shapes, deploy one 
 
 - `JUDGE_QUICKSTART.md` — 90-second verification path (copy-paste for judging)
 - `src/webmcp/register.ts` — registry, lifecycle, tool list, schemas
-- `src/webmcp/evals.md` — 6 evals with messages/expectedCall/state
+- `src/webmcp/evals.md` — 7 evals with messages/expectedCall/state
 - `src/game/services.ts` — capability layer that makes WebMCP fundamental rather than decorative
 - `src/components/GameRoot.tsx` — hydration and the 26-tool audit surface (`LINK` console)

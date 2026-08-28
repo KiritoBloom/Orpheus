@@ -32,11 +32,11 @@ src/
       chatMessages.ts    THREADS (6) + CHAT_MESSAGES (31) — Daniel's historic threads, readable via tools
       browserHistory.ts  HISTORY (18) + CACHED_PAGES (17) — every history entry has a cached page
       systemLogs.ts      LOGS (51: log_001–051, final night 02:13 fully logged)
-      evidence.ts        EVIDENCE[] (20: people 5 / events 5 / locations 2 / documents 5 / hypotheses 3)
+      evidence.ts        EVIDENCE[] (21: people 5 / events 6 / locations 2 / documents 5 / hypotheses 3)
       photos.ts          PhotoMeta[] (12: 9 main + 3 private backup) + registry
     state/
       persistence.ts     idb-keyval single-record SaveData (version 1, debounced writes)
-      osStore.ts         phase/windows/focus/z/toasts/flags/vault/clock/settings
+      osStore.ts         phase/windows/focus/z/toasts/flags/vault/clock/settings + obsWindow/synchrony (transient)
       ariaStore.ts       agent status (idle/reading/investigating/responding) for WebMCP feedback
       investigationStore.ts  evidence set + highlight + four-question evaluation
     services.ts          THE capability layer — every UI and tool goes through here
@@ -124,7 +124,7 @@ All colours derive from `--bg`/`--accent`/`--amber`/`--alert` variables; reduced
 
 ## Photos
 
-Twelve photographs live as PNG assets under `public/Images/` (rendered via `PhotoAsset` in `PhotosApp.tsx`). An earlier SVG fallback remains in `src/components/art/photos.tsx` but is not required for play. Clues are placed at realistic sizes — dim background detail at `zoom=1` that becomes legible when manually zoomed (reflection figure, badge clip glint, whiteboard micro-handwriting, clock hands, door-case, watch mid-beat truncation, etc.) and remain crisp to 9×.
+Twelve photographs live as PNG assets under `public/Images/` (rendered via `PhotoAsset` in `PhotosApp.tsx`). The three private-backup photos (`badge_scan`, `brass_plate`, `campus_map`) are file-system-only: the camera roll never lists them, and they open through `/Private/photo_backup` in Files (or via `open_image` once the vault is open). An earlier SVG fallback remains in `src/components/art/photos.tsx` but is not required for play. Clues are placed at realistic sizes — dim background detail at `zoom=1` that becomes legible when manually zoomed (reflection figure, badge clip glint, whiteboard micro-handwriting, clock hands, door-case, watch mid-beat truncation, etc.) and remain crisp to 9×.
 
 The viewer (`ImageViewerApp`) handles `wheel` zoom (1–9×) + pan drag; `PhotosApp` is a grid. The agent has no zoom tools by design — enforced by absence, not policy.
 

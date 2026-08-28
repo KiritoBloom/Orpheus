@@ -208,7 +208,10 @@ export type StoryFlag =
   | "RECONSTRUCTED_FINAL_HOURS"
   | "CASE_RECONSTRUCTION_AVAILABLE"
   | "CASE_COMPLETE"
-  | "COLLABORATED_WITH_ARIA";
+  | "COLLABORATED_WITH_ARIA"
+  | "WINDOW_HUMAN"
+  | "WINDOW_AGENT"
+  | "WINDOW_SYNCHRONIZED";
 
 /* ---------- agent status ---------- */
 

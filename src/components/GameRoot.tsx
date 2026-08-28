@@ -128,6 +128,14 @@ export default function GameRoot() {
     return () => clearInterval(id);
   }, []);
 
+  /* ---------- the 02:13 window — recurring co-op set piece after the vault ---------- */
+  useEffect(() => {
+    const id = setInterval(() => {
+      void import("@/game/services").then((m) => m.tickObservabilityWindow());
+    }, 4000);
+    return () => clearInterval(id);
+  }, []);
+
   /* ---------- first desktop entry — greet + auto-open Field Guide ---------- */
   // Desktop entry handled once; avoids re-trigger on settings changes and skips auto-open for returning users.
   const desktopEntryHandled = useRef(false);
@@ -280,6 +288,10 @@ export default function GameRoot() {
           },
           focused: null,
           zTop: 10,
+          obsWindow: { open: false, endsAt: 0, lastClosedAt: 0 },
+          syncStreak: 0,
+          syncLastActor: null,
+          syncLastAt: 0,
         });
         useAria.setState({ status: "idle", statusDetail: "" });
         useInvestigation.setState({ evidenceIds: new Set(["ev_daniel"]), caseReport: {}, caseVerdicts: {}, caseCompleteAt: null });

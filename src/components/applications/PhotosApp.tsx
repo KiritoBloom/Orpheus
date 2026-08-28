@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import Image from "next/image";
 import type { PhotoMeta } from "@/types/game";
 import { PHOTOS, getPhoto } from "@/game/data/photos";
-import { getCurrentPhotoId, openPhoto, photoFocusBus } from "@/game/services";
+import { getCurrentPhotoId, noteHumanAction, noteWindowHuman, openPhoto, photoFocusBus } from "@/game/services";
 import { useOS } from "@/game/state/osStore";
 import { sfx } from "@/audio/engine";
 
@@ -28,6 +28,12 @@ const PHOTO_SOURCES: Record<string, string> = {
   brass_plate: "/Images/PhotoBrassPlate.png",
   campus_map: "/Images/PhotoCampusMap.png",
 };
+
+/* Private-backup photos live ONLY in /Private/photo_backup (Files app) — never in the camera roll. */
+const SEALED_COUNT = PHOTOS.filter((p) => p.inPrivateBackup).length;
+
+// cooldown for ARIA's reactive zoom toast — presence, not nagging
+let lastAriaZoomToastAt = 0;
 
 function PhotoAsset({
   id,
@@ -84,7 +90,7 @@ function PhotoViewerImage({ id }: { id: string }) {
 
 export function PhotosApp() {
   const os = useOS();
-  const visible = PHOTOS.filter((p) => !p.inPrivateBackup || os.vaultUnlocked);
+  const visible = PHOTOS.filter((p) => !p.inPrivateBackup);
   if (visible.length === 0) {
     return (
       <div className="flex flex-col h-full">
@@ -105,7 +111,11 @@ export function PhotosApp() {
     <div className="flex flex-col h-full">
       <div className="shrink-0 h-[28px] px-2 flex items-center justify-between border-b border-line bg-surface text-[10px] text-faint tracking-[0.14em]">
         <span>CAMERA ROLL — {visible.length} ITEM(S)</span>
-        <span>DOUBLE-CLICK TO OPEN · ZOOM IS MANUAL</span>
+        <span>
+          {os.vaultUnlocked
+            ? `${SEALED_COUNT} SEALED → /PRIVATE/PHOTO_BACKUP (FILES)`
+            : `${SEALED_COUNT} ITEMS SEALED — VESTIBULE REQUIRED`}
+        </span>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto p-2 grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2 content-start">
         {visible.map((p) => (
@@ -185,23 +195,30 @@ export function ImageViewerApp() {
   // zoom milestone hook for story flags (e.g., reflection discovery) + detent bump
   useEffect(() => {
     const crossed = prevZoomRef.current < 2.5 && zoom >= 2.5;
-    if (crossed) {
-      sfx.typeTick();
-      setBump(true);
-      setTimeout(() => setBump(false), 40);
-    }
     prevZoomRef.current = zoom;
-    if (zoom >= 2.5 && photoId === "DSC04821") {
-      import("@/game/services").then((S) => {
-        // reuse the same flag logic as the service layer
-        S.fsList(); // warm
-        const osApi = useOS.getState();
-        osApi.addFlag("FOUND_PHOTO_017");
-        osApi.pushToast({
-          app: "PHOTOS",
-          title: "DSC04821.JPG",
-          body: "Something is reflected in the glass.",
-        });
+    if (!crossed) return;
+    sfx.typeTick();
+    setBump(true);
+    setTimeout(() => setBump(false), 40);
+    noteHumanAction(); // the human is inspecting — synchrony rhythm
+    if (photoId === "DSC04821") {
+      // reuse the same flag logic as the service layer
+      const osApi = useOS.getState();
+      osApi.addFlag("FOUND_PHOTO_017");
+      osApi.pushToast({
+        app: "PHOTOS",
+        title: "DSC04821.JPG",
+        body: "Something is reflected in the glass.",
+      });
+    } else if (photoId === "DSC04655") {
+      noteWindowHuman(); // 02:13 window — human side (the stopped clock)
+    } else if (Date.now() - lastAriaZoomToastAt > 180_000) {
+      // ARIA reacts when the human goes quiet over a photo — presence, not automation
+      lastAriaZoomToastAt = Date.now();
+      useOS.getState().pushToast({
+        app: "ARIA",
+        title: "ZOOM NOTED",
+        body: "You've gone quiet. Describe what you see — I'll find what it connects to.",
       });
     }
   }, [zoom, photoId]);

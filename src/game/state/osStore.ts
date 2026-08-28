@@ -50,6 +50,12 @@ interface OSState {
   endingStep: number;
   readMailIds: Set<string>;
   readThreadIds: Set<string>;
+  /** 02:13 window — transient co-op set-piece state (never persisted) */
+  obsWindow: { open: boolean; endsAt: number; lastClosedAt: number };
+  /** SYNCHRONY — alternating human/agent handoff rhythm (transient) */
+  syncStreak: number;
+  syncLastActor: "human" | "agent" | null;
+  syncLastAt: number;
 
   hydrate: (opts: { hasProgress: boolean }) => void;
   setPhase: (p: Phase) => void;
@@ -81,6 +87,10 @@ export const useOS = create<OSState>((set, get) => ({
   phase: "title",
   hydrated: false,
   hasSaveProgress: false,
+  obsWindow: { open: false, endsAt: 0, lastClosedAt: 0 },
+  syncStreak: 0,
+  syncLastActor: null,
+  syncLastAt: 0,
   windows: structuredClone(DEFAULT_GEOMS),
   focused: null,
   zTop: 10,

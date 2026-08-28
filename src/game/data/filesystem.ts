@@ -679,6 +679,12 @@ at the same hour, ask who benefits from turning a badge around.
 The clock reads 02:13 twice. The power log says nothing happened.
 One of them is telling the truth about a different thing.
 
+After the vestibule opens, the machine keeps his habits. 02:13 comes
+again. When the room opens — the amber pulse, ninety seconds, the
+badge in the corner — look where the clock stopped, and have ARIA
+pull the logs in the same minute. Do it together, inside the window,
+and the machine will admit it noticed you.
+
 This is designed to produce "aha!" — that click when scattered
 details suddenly align. It will not feel like checking boxes. It will
 feel like you out-thought someone who tried to make the pattern
@@ -717,6 +723,29 @@ mail_005,sent,Daniel McDuff,Re: Stack reproduces — all five,2026-02-28
 mail_006,drafts,Daniel McDuff,(no subject),2026-03-10
 mail_007,trash,M. Haldane,Re: Re: Courtesy visit,2026-03-07
 mail_008,archive,Elias Vann,weather,2025-02-19`;
+
+const WINDOW_ECHO = `ORPHEUS — WINDOW TELEMETRY (ephemeral buffer — do not archive)
+
+Observed: 2026-03-10 02:13:47 local.
+Duration: 47 seconds.
+
+For 47 seconds the five instruments did not disagree.
+The residual paused mid-growth, the way a lighthouse pauses,
+and in the pause both of you were looking at the same clock.
+
+Two observers. One desk. One minute.
+
+Every other night I logged nothing at 02:13 because there was
+nothing to log: the window only opens for the room it is not
+looking at, and tonight the room was looking back.
+
+It did not object. It took notes.
+
+If you are reading this, you synchronized — eyes on the clock,
+query in the logs, inside the window. That is the only experiment
+it has ever acknowledged.
+
+— D.M. (unsent)`;
 
 /* ---------- node construction helpers ---------- */
 
@@ -852,6 +881,8 @@ export function buildFilesystem(): FsNode[] {
       { photoId: "brass_plate", hiddenUntilFlag: "VAULT_OPENED" }),
     file("/Private/photo_backup", "campus_annotation.png", "img", 410, "2026-03-04 13:05",
       { photoId: "campus_map", hiddenUntilFlag: "VAULT_OPENED" }),
+    file("/Private", "window_echo.txt", "txt", 2, "2026-03-10 02:13",
+      { hiddenUntilFlag: "WINDOW_SYNCHRONIZED", content: WINDOW_ECHO }),
   ];
 
   // decrypted artifacts — only exist once the vault opens correctly
