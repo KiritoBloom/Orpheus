@@ -340,15 +340,42 @@ class AudioEngine {
     src.start();
   }
 
+  /* ---------- keypack chunks — window open/close from the keypress pack ---------- */
+
+  /** Play one keypress sample as a soft mechanical chunk (low rate + lowpass → latch, not click). */
+  private playKeyChunk(opts: { rate: number; rateJitter: number; vol: number; lp: number }): boolean {
+    if (!this.ok()) return false;
+    if (this.keyBuffers.length === 0) return false; // pack still loading — caller falls back
+    const buf = this.keyBuffers[Math.floor(Math.random() * this.keyBuffers.length)];
+    const src = this.ctx!.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = opts.rate - opts.rateJitter / 2 + Math.random() * opts.rateJitter;
+    const g = this.ctx!.createGain();
+    g.gain.value = opts.vol;
+    const lp = this.ctx!.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = opts.lp;
+    lp.Q.value = 0.7;
+    const pan = this.ctx!.createStereoPanner();
+    pan.pan.value = Math.random() * 0.12 - 0.06;
+    src.connect(lp).connect(pan).connect(g).connect(this.master!);
+    src.start();
+    return true;
+  }
+
   windowOpen() {
-    if (this.playSample("open", 0.82, 0.03)) return;
-    this.playNote(392, 0.13, 0.16, "square", undefined, { crush: true, env: "blip" });
-    setTimeout(() => this.playNote(523, 0.16, 0.18, "pulse25", undefined, { crush: true, env: "blip" }), 70);
+    // key-sound chunk — soft mechanical latch from the keypress pack, never shrill
+    if (this.playKeyChunk({ rate: 0.84, rateJitter: 0.12, vol: 0.3, lp: 2600 })) return;
+    if (this.playSample("open", 0.5, 0.03)) return;
+    this.playNote(392, 0.13, 0.12, "square", undefined, { crush: true, env: "blip" });
+    setTimeout(() => this.playNote(523, 0.16, 0.13, "pulse25", undefined, { crush: true, env: "blip" }), 70);
   }
 
   windowClose() {
-    if (this.playSample("close", 0.68, 0.04)) return;
-    this.playNote(440, 0.08, 0.13, "triangle", 280, { env: "blip" });
+    // deeper key return — heavier, quieter, like a latch settling
+    if (this.playKeyChunk({ rate: 0.66, rateJitter: 0.1, vol: 0.27, lp: 2000 })) return;
+    if (this.playSample("close", 0.45, 0.04)) return;
+    this.playNote(440, 0.08, 0.1, "triangle", 280, { env: "blip" });
   }
 
   ding() {

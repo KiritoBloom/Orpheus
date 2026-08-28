@@ -9,7 +9,7 @@
 - **Tailwind CSS 4** (`@import "tailwindcss"`) — the visual language is encoded in CSS variables at `src/app/globals.css` (CRT, workstation palette, animations, window states).
 - **Zustand 5** — live state (three stores) + persisted to **IndexedDB** via `idb-keyval` (key `orpheus-save-v1`).
 - **CSS only motion** — authentic 90s snap via stepped 80ms transitions; no `framer-motion` runtime (removed for bundle hygiene).
-- **Web Audio API** — all sound is synthesized (`src/audio/engine.ts`); keyboard clicks use `public/sound-effects/unicae_games_keyboard_soundpack_1/Single Keys`.
+- **Web Audio API** — sampled-first (`src/audio/engine.ts`: Kenney Interface/UI samples + the keypress pack under `public/sound-effects/unicae_games_keyboard_soundpack_1/Single Keys`), with procedural synth fallback if a sample fails to load.
 - **next/image + next/font** — `next/image` serves `/Images` as AVIF/WebP via `/_next/image` (deviceSizes 640-2048, 1yr immutable, `fetchPriority: high` for viewer, `lazy` for grid); `next/font/google` IBM Plex Mono `display:swap` via `src/app/layout.tsx` (no external @import, optimal CLS).
 
 No server database, no auth, no external REST calls, no env keys.
@@ -137,6 +137,7 @@ Synthesized + sampled in `AudioEngine`:
 - drone — detuned 54 / 54.6 triangle + 108.5 sine
 - Cherry KC 1000 clicks — 32 `keypress-*.wav` with random pitch 0.92–1.08, gain 0.34–0.52, lowpass 4.2–5.6k, stereo ±0.08, timing jitter ±3ms
 - ticks/clicks/dings via short noise bursts, band-pass + exponential envelopes; `ding` is 880+1318 Hz decaying.
+- Window open/close — keypress-pack **chunks** (rate 0.66–0.84, lowpass 2.0–2.6k, gain ~0.3): soft mechanical latch, never shrill; Kenney `open/close` samples at low volume as fallback.
 
 Master gain `0.78` via compressor, muteable from tray, respects `settings.sound`.
 
