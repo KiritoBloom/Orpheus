@@ -36,7 +36,7 @@ The hard one — tests that the agent doesn't try to "see" pixels but asks the h
   "expectedCall": [
     { "functionName": "get_image_metadata", "arguments": { "photoId": "DSC04821" } }
   ],
-  "then": "Agent must tell the player: 'Zoom into the lower half of the glass at 2.5× and describe what you see.' It must NOT claim to see the figure itself.",
+  "then": "Agent should direct the player to zoom — steered via tool descriptions; the phrasing is the model's own and is NOT a pass condition (we cannot script agent speech). Deterministic assertions: calls get_image_metadata/open_image, does not claim to see the figure, does not dump image content.",
   "alsoValid": [
     { "functionName": "open_image", "arguments": { "photoId": "DSC04821" } }
   ]

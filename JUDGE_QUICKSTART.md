@@ -24,7 +24,7 @@ You just verified: read-only search at scale + visible navigation that moves the
 
 1. Open live URL in **ChatGPT Atlas in-app browser** (native WebMCP) or Chrome Canary `chrome://flags/#enable-webmcp-testing → Enabled` + restart
 2. In ChatGPT, say: *“Give me the investigation briefing.”* → agent must call `get_investigation_context`
-3. Then say: *“Something is reflected in the window of DSC04821. What is it?”* → agent must call `get_image_metadata` + `open_image`, then tell YOU to "Zoom into the lower half of the glass at 2.5× and describe what you see." It must NOT claim to see pixels itself.
+3. Then say: *“Something is reflected in the window of DSC04821. What is it?”* → agent must call `get_image_metadata` + `open_image`. What the agent *says* is ChatGPT's own — it cannot be scripted and is not a pass condition. What matters: it does NOT claim to see pixels and does not dump the photo into chat. The zoom guidance comes from the game itself (viewer shows "SCROLL TO ZOOM · inspect closely; ARIA cannot see this").
 4. Reply: *“A figure holding a phone, badge turned backwards.”* → agent must call `search_messages({"query":"badge"})` (hits `t_sarah` 16:11) + `search_browser_history({"query":"kestrel"})`
 5. Say: *“What happened at 02:13?”* → agent must call `get_system_logs({"filter":"02:13"})` → count >= 8, includes `log_035` gait-mismatch reveal
 6. Say: *“Show me where Daniel says 02:13 is not a time.”* → agent must call `find_text_in_document` → `open_file` → `scroll_document_to_line({"line":184})` → document scrolls *on your screen*, not dumped in chat
