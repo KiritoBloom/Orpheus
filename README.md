@@ -12,7 +12,7 @@ document.modelContext.registerTool({
   inputSchema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
   execute: async (input) => { /* ... */ }
 });
-// Real tools: 25 narrow tools (get_investigation_context, search_files, open_file, scroll_document_to_line, …)
+// Real tools: 26 narrow tools (get_investigation_context, search_files, open_file, scroll_document_to_line, get_timeline, …)
 // See src/webmcp/register.ts for full registration with title, description, inputSchema, annotations, execute + AbortSignal
 ```
 
@@ -81,7 +81,7 @@ Semantic, restricted WebMCP tools (not generic automation):
 
 | Category | Tools |
 |---|---|
-| Investigation | `get_investigation_context`, `search_files`, `read_file`, `search_messages`, `get_message_thread`, `open_messages_thread`, `search_emails`, `get_email`, `get_image_metadata`, `open_image`, `search_browser_history`, `get_system_logs`, `get_case_evidence` |
+| Investigation | `get_investigation_context`, `search_files`, `read_file`, `search_messages`, `get_message_thread`, `open_messages_thread`, `search_emails`, `get_email`, `get_image_metadata`, `open_image`, `search_browser_history`, `get_system_logs`, `get_timeline`, `get_case_evidence` |
 | Navigation | `open_application`, `focus_application`, `open_file`, `open_directory`, `open_email`, `open_browser_entry`, `scroll_document_to_line`, `find_text_in_document`, `terminal_command` |
 | Evidence | `record_evidence`, `highlight_evidence`, `open_evidence_board` |
 
@@ -107,12 +107,13 @@ No backend, no database, no authentication. Persistence is IndexedDB (`orpheus-s
 
 1. Enable the host: in Chrome Canary, `chrome://flags/#enable-webmcp-testing → Enabled`; or use ChatGPT's Atlas browser / any W3C WebMCP origin trial build. Open https://orpheus-mcduff.vercel.app/ in ChatGPT's in-app browser for the native experience (verified on Vercel + HSTS).
 
-2. On the desktop, click the tray **LINK** button (also Ctrl+\`) to open the **Agent Link** panel — a judge/dev console listing all 25 registered tools with live execute. Filter by ◇ readOnly / ◆ nav / ⚑ untrusted. Pick any tool, edit its JSON input, press EXECUTE, and watch the computer respond.
+2. On the desktop, click the tray **LINK** button (also Ctrl+\`) to open the **Agent Link** panel — a judge/dev console listing all 26 registered tools with live execute. Filter by ◇ readOnly / ◆ nav / ⚑ untrusted. Pick any tool, edit its JSON input, press EXECUTE, and watch the computer respond.
 
    - `get_investigation_context` — briefing + current flags, people, key paths
    - `open_file` + `scroll_document_to_line` — visible document navigation (1.5k output budget, line-flash + nav-sweep)
    - `get_image_metadata` — machine-readable EXIF the player can't see in the viewer (agent cannot zoom — enforced by absence)
    - `get_system_logs` with filter `02:13` — the final-night reveal (50-log cap, untrustedContentHint)
+   - `get_timeline` — merged 01:45–02:40 timeline (logs + photos + messages) that humans would need 5 apps to build manually
 
 3. For a full loop: open **Photos** → double-click `DSC04821.JPG` → tell the agent (ChatGPT) "something is reflected in the window" → watch it pull metadata, search messages, open the notebook, and scroll to line ≈184 (`"02:13 is not a time..."`) for you to read.
 
@@ -144,7 +145,7 @@ src/
     state/ osStore, ariaStore (agent status), investigationStore, persistence
     services.ts                 # single source-of-truth capability layer
   webmcp/
-    register.ts                 # 25 tools, registration, host detection
+    register.ts                 # 26 tools, registration, host detection
   components/
     title/IrisTitle             # diegetic circular opening (not an eyeball; see below)
     boot/                       # POST + mission briefing

@@ -41,6 +41,22 @@ function PhotoAsset({ id, className = "" }: { id: string; className?: string }) 
 export function PhotosApp() {
   const os = useOS();
   const visible = PHOTOS.filter((p) => !p.inPrivateBackup || os.vaultUnlocked);
+  if (visible.length === 0) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="shrink-0 h-[28px] px-2 flex items-center justify-between border-b border-line bg-surface text-[10px] text-faint tracking-[0.14em]">
+          <span>CAMERA ROLL — 0 ITEM(S)</span>
+          <span>PRIVATE BACKUP SEALED</span>
+        </div>
+        <div className="flex-1 grid place-items-center p-8 text-center">
+          <div>
+            <div className="text-[11px] tracking-[0.22em] text-faint">PRIVATE BACKUP SEALED</div>
+            <div className="text-[10px] tracking-[0.14em] text-dim mt-1 leading-relaxed">unlock via terminal: <span className="text-accent">unlock lantern orpheus echo</span><br />order is light → name → echo</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col h-full">
       <div className="shrink-0 h-[28px] px-2 flex items-center justify-between border-b border-line bg-surface text-[10px] text-faint tracking-[0.14em]">
@@ -75,8 +91,10 @@ export function ImageViewerApp() {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [showInfo, setShowInfo] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [bump, setBump] = useState(false);
   const dragRef = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const prevZoomRef = useRef(1);
   const os = useOS();
 
   useEffect(() => {
@@ -119,8 +137,15 @@ export function ImageViewerApp() {
     window.addEventListener("pointerup", up);
   };
 
-  // zoom milestone hook for story flags (e.g., reflection discovery)
+  // zoom milestone hook for story flags (e.g., reflection discovery) + detent bump
   useEffect(() => {
+    const crossed = prevZoomRef.current < 2.5 && zoom >= 2.5;
+    if (crossed) {
+      sfx.typeTick();
+      setBump(true);
+      setTimeout(() => setBump(false), 40);
+    }
+    prevZoomRef.current = zoom;
     if (zoom >= 2.5 && photoId === "DSC04821") {
       import("@/game/services").then((S) => {
         // reuse the same flag logic as the service layer
@@ -172,7 +197,7 @@ export function ImageViewerApp() {
       >
         <div
           className="absolute inset-0 grid place-items-center"
-          style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transition: dragging ? "none" : "transform .12s ease-out" }}
+          style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom * (bump ? 1.02 : 1)})`, transition: dragging ? "none" : bump ? "transform 40ms ease-out" : "transform .12s ease-out" }}
         >
           <div className="relative" style={{ width: "min(100%, 900px)", aspectRatio: `${meta.width}/${meta.height}` }}>
             <PhotoAsset id={photoId} className="object-contain" />

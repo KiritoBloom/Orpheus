@@ -3,7 +3,7 @@
 ## Current implementation
 
 - **Entry point:** `document.modelContext ?? navigator.modelContext` (feature-detected at load and re-checked for late injection). Poll 800 ms + `toolchange` re-attach for Atlas async injection.
-- **Registration:** `registerTool({ name, title, description, inputSchema, annotations, execute }, { signal? })` per the Aug 26 2026 W3C Draft; `navigator.modelContext` kept as compat alias. Chrome 150 requires `document.modelContext`. All 25 tools include `title`, budgets enforced.
+- **Registration:** `registerTool({ name, title, description, inputSchema, annotations, execute }, { signal? })` per the Aug 26 2026 W3C Draft; `navigator.modelContext` kept as compat alias. Chrome 150 requires `document.modelContext`. All 26 tools include `title`, budgets enforced.
 - **Secure context required** (HTTPS). `registerWebMCPTools()` bails cleanly if no host; the game remains playable but most efficient with an agent. Headers `Origin-Agent-Cluster: ?1` + `Permissions-Policy: tools=self` set in `next.config.ts`.
 - **Budgets per Chrome best practices:** 500 char desc / 150 param / 30 name / 1.5k output. `MAX_QUERY_LEN=200`, `MAX_OUTPUT_CHARS=1500`, `clampStr()` + `truncate()` on every path.
 
@@ -11,7 +11,7 @@ The integration is **visible to the player** (windows open and scroll), **inspec
 
 ---
 
-## Tools (25)
+## Tools (26)
 
 ### Investigation — read-only (flat, always available — Alex Nahas)
 
@@ -29,6 +29,7 @@ The integration is **visible to the player** (windows open and scroll), **inspec
 | `open_image` | Open the image on screen (the player must zoom). | `{ photoId }` | — (nav) |
 | `search_browser_history` | Search fictional history by title/URL. | `{ query }` | `readOnly + untrusted` |
 | `get_system_logs` | Append-only logs; optional filter (date, time like `02:13`, category, free text). The final night is fully logged. 50 max. | `{ filter? }` | `readOnly + untrusted` |
+| `get_timeline` | Merged 01:45–02:40 chronological timeline of logs, photo timestamps, and message saliency (30 max, 120-char detail). Use after 02:13 discovery — human would need 5 apps manually. | `{ window? }` | `readOnly + untrusted` |
 | `get_case_evidence` | Evidence board as recorded so far. | `{}` | `readOnly` |
 
 ### Navigation — mutating, **visible**
@@ -109,4 +110,4 @@ Six evals covering isolation → ambiguous → ordered chain → end-to-end per 
 - `src/webmcp/register.ts` — registry, lifecycle, tool list, schemas
 - `src/webmcp/evals.md` — 6 evals with messages/expectedCall/state
 - `src/game/services.ts` — capability layer that makes WebMCP fundamental rather than decorative
-- `src/components/GameRoot.tsx` — hydration and the 25-tool audit surface (`LINK` console)
+- `src/components/GameRoot.tsx` — hydration and the 26-tool audit surface (`LINK` console)

@@ -325,7 +325,9 @@ notes anyway. Or pretending to.
 
 I photographed my monitor reminder card tonight. Old habit: if I write it
 on paper AND photograph it, the paper can burn and the pixels remember.
-LANTERN. ORPHEUS. ECHO. If you know, you know. Nobody knows. Good.`;
+Three words. One is light, one is the ghost, one is what's left after.
+  Order is how I think -- first, name, what remains. If you know, you know.
+  Nobody knows. Good.`;
 
 const JOURNAL_MAR = `March, final week — journal
 

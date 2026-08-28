@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { EvidenceSection } from "@/types/game";
 import { useInvestigation } from "@/game/state/investigationStore";
 import { useOS } from "@/game/state/osStore";
+import { EVIDENCE } from "@/game/data/evidence";
 import { sfx } from "@/audio/engine";
 
 /* ============================================================
@@ -25,7 +26,7 @@ export default function EvidenceApp() {
   const [tab, setTab] = useState<EvidenceSection>("people");
   const [recon, setRecon] = useState(false);
   const items = inv.getVisibleEvidence().filter((e) => e.section === tab);
-  const totalEvidence = 21; // total unlockable
+  const totalEvidence = EVIDENCE.length; // dynamic 20 -> 100% now reachable
   const collected = inv.getVisibleEvidence().length;
   const progress = Math.round((collected / totalEvidence) * 100);
   const collaborated = os.flags.has("COLLABORATED_WITH_ARIA");
@@ -36,7 +37,7 @@ export default function EvidenceApp() {
       <div className="shrink-0 h-[22px] flex items-center gap-2 px-3 bg-surface2 border-b border-line">
         <span className="text-[9.5px] tracking-[0.16em] text-accent">◆ {collected}/{totalEvidence} COLLECTED</span>
         <div className="flex-1 h-[4px] bg-bg border border-line overflow-hidden mx-2">
-          <div className="h-full bg-accent transition-all duration-700" style={{ width: `${progress}%` }} />
+          <div className="h-full bg-accent" style={{ width: `${progress}%`, transition: "width 240ms steps(3)", background: "repeating-linear-gradient(90deg, var(--accent) 0 6px, #b6e0bf 6px 7px)" }} />
         </div>
         <span className="text-[9px] tracking-[0.12em] text-faint">{progress}%</span>
         <span className="hidden sm:inline text-[9px] tracking-[0.12em] text-faint">· {collaborated ? "WebMCP + eyes" : "ask ARIA to correlate"}</span>
@@ -144,6 +145,7 @@ function CaseReconstruction({ onClose }: { onClose: () => void }) {
     setResult({ complete: r.complete });
     if (r.complete) sfx.chime(); else sfx.error();
     if (r.complete) {
+      try { os.addFlag("CASE_COMPLETE"); } catch {}
       setTimeout(() => {
         os.pushToast({ app: "EVIDENCE", title: "CASE ACCEPTED", body: "Reconstruction matches the evidence — archived." });
         window.dispatchEvent(new CustomEvent("orpheus:case-complete"));

@@ -146,7 +146,8 @@ export default function Taskbar() {
           <button
             onClick={() => setLinkOpen(true)}
             title={`Agent Link — WebMCP (Ctrl+\`) — ${TOOL_DEFS.length} tools`}
-            className={`h-[22px] px-2 flex items-center gap-1 task-btn-90s text-[9px] tracking-[0.14em] cursor-pointer ${hasLinkHint ? "!border-amber/50 !text-amber bg-amber/10" : ""}`}
+            className={`h-[22px] px-2 flex items-center gap-1 task-btn-90s text-[9px] tracking-[0.14em] cursor-pointer ${hasLinkHint ? "!border-amber/50 !text-amber bg-amber/10 ev-highlight" : ""}`}
+            style={hasLinkHint ? { animation: "evHighlight 2.2s ease-in-out infinite" } : undefined}
           >
             <IconLink size={11} />
             LINK

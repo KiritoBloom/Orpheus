@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useOS } from "@/game/state/osStore";
+import { sfx } from "@/audio/engine";
 import WindowFrame from "@/components/windows/WindowFrame";
 import Taskbar from "@/components/taskbar/Taskbar";
 import DesktopIcons from "@/components/desktop/DesktopIcons";
@@ -64,7 +65,11 @@ export default function Desktop() {
         }}
       />
       {/* diegetic sticky — human trace that makes ORPHEUS personal, not just numbers */}
-      <div className="absolute left-[108px] bottom-[64px] w-[148px] pointer-events-none select-none hidden lg:block rotate-[-1.2deg]">
+      <div
+        className="absolute left-[108px] bottom-[64px] w-[148px] select-none hidden lg:block rotate-[-1.2deg] hover:rotate-[0.2deg] transition-transform duration-150 cursor-pointer"
+        onMouseEnter={() => sfx.typeTick()}
+        onClick={() => sfx.click()}
+      >
         <div className="bg-[#f4edd6] text-[#2b241e] p-2.5 shadow-[0_2px_10px_rgba(0,0,0,0.35),0_0_0_1px_rgba(0,0,0,0.12)] relative">
           <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-amber/80 shadow-[0_1px_3px_rgba(0,0,0,0.4)]" />
           <div className="text-[9px] tracking-[0.14em] text-[#8a7a5a]">MAYA — RECITAL</div>

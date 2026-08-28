@@ -173,8 +173,8 @@ export default function ChecklistHUD() {
         {/* progress bar */}
         <div className="h-[3px] bg-bg">
           <div
-            className="h-full bg-accent transition-all duration-700 ease-out"
-            style={{ width: `${pct}%`, boxShadow: pct > 0 ? "0 0 8px rgba(143,202,160,.5)" : undefined }}
+            className="h-full bg-accent"
+            style={{ width: `${pct}%`, boxShadow: pct > 0 ? "0 0 8px rgba(143,202,160,.5)" : undefined, transition: "width 240ms steps(3)" }}
           />
         </div>
 

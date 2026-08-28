@@ -175,6 +175,11 @@ let photoListener: ((photoId: string, zoom: number) => void) | null = null;
 export function setPhotoListener(fn: typeof photoListener) {
   photoListener = fn;
 }
+function checkReconstructed() {
+  const f = useOS.getState().flags;
+  if (f.has("FOUND_0213_LOG") && f.has("SEEN_WATCH_GAP") && f.has("SEEN_DOORCAM")) useOS.getState().addFlag("RECONSTRUCTED_FINAL_HOURS");
+}
+
 function onPhotoViewed(photoId: string, zoom = 1) {
   photoListener?.(photoId, zoom);
   // story hooks
@@ -193,6 +198,7 @@ function onPhotoViewed(photoId: string, zoom = 1) {
       body: "The badge clip matches the reflection and observatory attendee.",
     });
   }
+  checkReconstructed();
   checkReconstructionAvailable();
 }
 
@@ -282,6 +288,7 @@ export function openBrowserEntry(entryId: string): { ok: boolean; error?: string
   if (!entry) return { ok: false, error: `no history entry: ${entryId}` };
   openApplication("browser");
   setTimeout(() => browserNavBus.emit(entry.pageId ?? entry.id), 60);
+  if (entry.pageId === "arxiv_withdrawn" || entry.pageId === "obituary_vann" || entryId === "hist_003" || entryId === "hist_007") useOS.getState().addFlag("FOUND_CERN_CONNECTION");
   return { ok: true };
 }
 export const browserNavBus = new SimpleBus();
@@ -301,6 +308,7 @@ export function getSystemLogs(filter?: string): LogEntry[] {
 }
 export function flagLogDiscovery() {
   useOS.getState().addFlag("FOUND_0213_LOG");
+  checkReconstructed();
   checkReconstructionAvailable();
 }
 
@@ -379,10 +387,7 @@ export function onFileOpened(path: string) {
     os.addFlag("VAULT_OPENED");
     os.addFlag("FOUND_HIDDEN_ARCHIVE");
   }
-  // RECONSTRUCTED_FINAL_HOURS composite
-  const f = os.flags;
-  if (f.has("FOUND_0213_LOG") && f.has("SEEN_WATCH_GAP") && f.has("SEEN_DOORCAM"))
-    os.addFlag("RECONSTRUCTED_FINAL_HOURS");
+  checkReconstructed();
   checkReconstructionAvailable();
 }
 

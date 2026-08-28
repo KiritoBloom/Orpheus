@@ -162,7 +162,12 @@ export default function FilesApp() {
               </span>
             </button>
           ))}
-          {items.length === 0 && <div className="p-4 text-faint text-[11px]">directory empty</div>}
+          {items.length === 0 && (
+            <div className="p-8 text-center">
+              <div className="text-[11px] tracking-[0.22em] text-faint">THIS FOLDER IS EMPTY</div>
+              <div className="text-[10px] tracking-[0.14em] text-dim mt-1">no objects — try another location or check Private after vault</div>
+            </div>
+          )}
         </div>
 
         {/* status bar */}

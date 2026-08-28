@@ -62,32 +62,41 @@ export default function TextViewerApp() {
       {/* nav sweep effect when ARIA scrolls */}
       <div className="flex-1 min-h-0 relative overflow-hidden">
         {sweep > 0 && <div key={sweep} className="nav-sweep" style={{ top: 0 }} />}
-        <div ref={containerRef} className="absolute inset-0 overflow-auto">
-          <div className="min-h-full py-1">
-            {lines.map((l, i) => {
-              const n = i + 1;
-              const isMatch = query && l.toLowerCase().includes(query.toLowerCase());
-              return (
-                <div
-                  key={n}
-                  ref={(el) => { if (el) lineRefs.current.set(n, el); else lineRefs.current.delete(n); }}
-                  className={`flex ${flashLine === n ? "line-flash" : ""}`}
-                >
-                  <div className="w-[46px] shrink-0 text-right pr-2 select-none text-[10.5px] text-faint pt-[1px]"
-                    style={{ userSelect: "none" }}>
-                    {n}
-                  </div>
-                  <div
-                    className={`flex-1 pr-3 whitespace-pre-wrap leading-[1.5] ${isMatch ? "text-accent" : "text-txt"}`}
-                    style={isMatch ? { background: "rgba(127,174,139,.08)" } : undefined}
-                  >
-                    {l || "\u00A0"}
-                  </div>
-                </div>
-              );
-            })}
+        {!path ? (
+          <div className="absolute inset-0 grid place-items-center p-8 text-center pointer-events-none">
+            <div>
+              <div className="text-[11px] tracking-[0.22em] text-faint">OPEN A DOCUMENT FROM FILES</div>
+              <div className="text-[10px] tracking-[0.14em] text-dim mt-1">double-click a file or ask ARIA to open one</div>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div ref={containerRef} className="absolute inset-0 overflow-auto">
+            <div className="min-h-full py-1">
+              {lines.map((l, i) => {
+                const n = i + 1;
+                const isMatch = query && l.toLowerCase().includes(query.toLowerCase());
+                return (
+                  <div
+                    key={n}
+                    ref={(el) => { if (el) lineRefs.current.set(n, el); else lineRefs.current.delete(n); }}
+                    className={`flex ${flashLine === n ? "line-flash" : ""}`}
+                  >
+                    <div className="w-[46px] shrink-0 text-right pr-2 select-none text-[10.5px] text-faint pt-[1px]"
+                      style={{ userSelect: "none" }}>
+                      {n}
+                    </div>
+                    <div
+                      className={`flex-1 pr-3 whitespace-pre-wrap leading-[1.5] ${isMatch ? "text-accent" : "text-txt"}`}
+                      style={isMatch ? { background: "rgba(127,174,139,.08)" } : undefined}
+                    >
+                      {l || "\u00A0"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

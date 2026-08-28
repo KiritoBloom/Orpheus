@@ -271,11 +271,12 @@ D.A. McDuff`,
 LANTERN — begin with the light. the lamp on the porch sensor. the first
 word of the passphrase.
 
-ORPHEUS — the name of course.
+— the name we gave the ghost. it's on every folder we touched, every page
+that mattered. you know it, even if you think you don't.
 
 ECHO — what remains when a sound has stopped. the thing the room keeps.
 
-order matters. lantern, name, echo. if i forget everything else i will
+order matters. first, name, what remains. if i forget everything else i will
 not forget the order because the order is how i think.
 
 if someone is reading this instead of me — the words were never hidden.

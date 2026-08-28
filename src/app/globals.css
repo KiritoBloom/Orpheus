@@ -121,7 +121,7 @@ html, body {
   border-radius: 0;
 }
 .btn-bevel:hover { background: #32423d; color: #d7e2d8; }
-.btn-bevel:active { background: #1a2420; border-top: 2px solid #0a0f0e; border-left: 2px solid #0a0f0e; border-right: 2px solid #4a5a53; border-bottom: 2px solid #4a5a53; box-shadow: inset 1px 1px 2px rgba(0,0,0,0.4); transform: none; }
+.btn-bevel:active { background: #1a2420; border-top: 2px solid #0a0f0e; border-left: 2px solid #0a0f0e; border-right: 2px solid #4a5a53; border-bottom: 2px solid #4a5a53; box-shadow: inset 1px 1px 2px rgba(0,0,0,0.4); transform: translate(1px,1px); }
 .btn-bevel:disabled { opacity: 0.45; cursor: default; }
 
 .field-dark {
@@ -151,9 +151,6 @@ html, body {
 
 /* ---------- boot — 90s workstation POST / briefing (unified chrome) ---------- */
 .boot-line { white-space: pre-wrap; }
-@keyframes bootDot { from { opacity:.25 } to { opacity:1 } }
-.boot-line-in { animation: bootLineIn 0.12s ease-out; }
-@keyframes bootLineIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
 
 .boot-fade { animation: bootFade 0.68s ease-out both; }
 @keyframes bootFade { from { opacity: 0; letter-spacing: 0.75em; } to { opacity: 1; } }
@@ -776,10 +773,7 @@ html, body {
 .nav-sweep { position:absolute; left:0; right:0; height:28%;
   background: linear-gradient(180deg, transparent, rgba(127,174,139,.07), transparent);
   animation: navSweep 1s ease-in-out forwards; pointer-events:none; }
-@keyframes scanWipe { 0% { transform: translateY(-100%); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(340%); opacity: 0; } }
-
-/* ---------- ending fade ---------- */
-@keyframes slowFade { to { opacity: 0; } }
+/* scanWipe/slowFade removed — dead CSS (plan group 3) */
 
 /* ---------- 90s micro-interactions — instant, no modern lift ---------- */
 @media (prefers-reduced-motion: no-preference) {
@@ -796,9 +790,7 @@ html, body {
   .hud-enter { animation: hudIn 160ms steps(2) both; }
 }
 
-/* ---------- fun intrigue — subtle 02:13 pulse on watermark ---------- */
-@keyframes faintPulse { 0%,100% { opacity:0.42 } 50% { opacity:0.72 } }
-.watermark-pulse { animation: faintPulse 4.2s ease-in-out infinite; }
+/* faintPulse/watermark-pulse removed — dead CSS */
 
 /* ---------- cursor polish — sell that this is a real pointer, not a browser default ---------- */
 button, a { cursor: pointer; }
@@ -811,9 +803,7 @@ button:disabled { cursor: default; }
 .cursor-zoom-out { cursor: zoom-out; }
 .win-active-titlebar, .taskbar-90s, .task-btn-90s { cursor: default; }
 
-/* subtle loading shimmer for file seek / app open */
-@keyframes seekShimmer { from { opacity: 0.6; } to { opacity: 1; } }
-.seek-pulse { animation: seekShimmer 0.12s steps(2) infinite alternate; }
+/* seekShimmer removed — dead CSS */
 
 /* window focus transition — make focus change feel like CRT redraw */
 .win-bevel { transition: border-color 80ms steps(2), box-shadow 80ms steps(2); }

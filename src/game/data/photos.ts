@@ -42,7 +42,7 @@ export const PHOTOS: PhotoMeta[] = [
       orientation: "landscape",
       fileSizeMb: 26.8,
       hash: "77d0aa31…41cc",
-      note: "Wall clock visible above desk reads 02:13. Power log shows no overnight interruption.",
+      note: "Frame shows study interior. Check upper wall — timepiece faint at this distance.",
     },
   },
   {
@@ -129,7 +129,7 @@ export const PHOTOS: PhotoMeta[] = [
       orientation: "landscape",
       fileSizeMb: 1.1,
       hash: "de44a001…b3f7",
-      note: "Sync normal until 01:52. Optical cache ends mid-beat.",
+      note: "Band trace — look closely past 01:50. Beat shape matters at scale.",
     },
   },
   {
@@ -181,7 +181,7 @@ export const PHOTOS: PhotoMeta[] = [
       orientation: "landscape",
       fileSizeMb: 2.8,
       hash: "aa19f0c2…661e",
-      note: "M. HALDANE — KESTREL INSTITUTE — VISITOR. Lanyard clip matches the reversed badge in DSC04821's reflection.",
+      note: "Lanyard and clip detail — compare strap orientation to other photos when vault opens.",
     },
   },
   {
@@ -198,7 +198,7 @@ export const PHOTOS: PhotoMeta[] = [
       orientation: "landscape",
       fileSizeMb: 3.1,
       hash: "b7702d1a…90af",
-      note: "Engraving reads LANTERN · [worn] · ECHO.",
+      note: "Brass plate — three slots. Outer two legible, middle worn smooth. Bring light close.",
     },
   },
   {

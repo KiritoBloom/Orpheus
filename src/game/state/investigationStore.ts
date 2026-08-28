@@ -117,6 +117,9 @@ export const useInvestigation = create<InvestState>((set, get) => ({
     const complete = supportedCount >= 3 && insufficient <= 1;
 
     updatePersist(answers, verdicts, complete);
+    if (complete) {
+      import("@/game/state/osStore").then(({ useOS }) => useOS.getState().addFlag("CASE_COMPLETE")).catch(() => {});
+    }
     set({
       caseReport: answers,
       caseVerdicts: verdicts,

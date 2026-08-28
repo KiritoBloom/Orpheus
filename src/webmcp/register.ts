@@ -3,7 +3,9 @@
 import type { AppId } from "@/types/game";
 import { ALL_APPS } from "@/types/game";
 import * as S from "@/game/services";
-import { getPhoto } from "@/game/data/photos";
+import { getPhoto, PHOTOS } from "@/game/data/photos";
+import { LOGS } from "@/game/data/systemLogs";
+import { CHAT_MESSAGES } from "@/game/data/chatMessages";
 import { useOS } from "@/game/state/osStore";
 import { useAria } from "@/game/state/ariaStore";
 import { useInvestigation } from "@/game/state/investigationStore";
@@ -340,6 +342,62 @@ const get_system_logs: ToolDef = {
   },
 };
 
+const get_timeline: ToolDef = {
+  name: "get_timeline",
+  title: "Get correlated timeline",
+  description:
+    "Get a merged chronological timeline of system logs, photo timestamps, and message saliency around the final night. Humans would need to open 5 apps manually; this synthesizes it. Use after 02:13 discovery.",
+  inputSchema: {
+    type: "object",
+    properties: { window: str("Time window e.g. 02:00-03:00, default 01:45-02:40") },
+    required: [],
+  },
+  annotations: { readOnlyHint: true, untrustedContentHint: true },
+  execute: ({ window }) => {
+    S.markAgentCollaboration();
+    const w = clampStr((window as string) ?? "01:45-02:40", 40) || "01:45-02:40";
+    // parse window like "01:45-02:40"
+    let startMin = 105, endMin = 160; // defaults 01:45, 02:40
+    const m = w.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+    if (m) {
+      startMin = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+      endMin = parseInt(m[3], 10) * 60 + parseInt(m[4], 10);
+      if (endMin < startMin) endMin += 24 * 60;
+    }
+    const toMin = (t: string) => {
+      const p = t.split(":");
+      return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+    };
+    const inWindow = (t: string) => {
+      const mm = toMin(t.slice(0, 5));
+      if (endMin >= 24 * 60) return mm >= startMin || mm <= endMin - 24 * 60;
+      return mm >= startMin && mm <= endMin;
+    };
+    type Item = { time: string; source: "log" | "photo" | "message"; detail: string; anomaly: boolean };
+    const items: Item[] = [];
+    for (const l of LOGS) {
+      if (!inWindow(l.time)) continue;
+      const anomaly = l.time.startsWith("02:13") || l.severity === "alert" || l.detail.toLowerCase().includes("gait mismatch");
+      items.push({ time: `${l.date} ${l.time}`, source: "log", detail: truncate(l.detail).slice(0, 120), anomaly });
+    }
+    for (const p of PHOTOS) {
+      const t = p.exif.dateOriginal.slice(11, 19); // HH:MM:SS
+      if (!t || !inWindow(t)) continue;
+      items.push({ time: p.exif.dateOriginal.replace("T", " "), source: "photo", detail: truncate(`${p.id} ${p.filename} — ${p.caption}`).slice(0, 120), anomaly: p.id === "IMG_0044" || p.id === "IMG_0103" });
+    }
+    for (const mm of CHAT_MESSAGES) {
+      // mm.time is like "2026-03-09 00:05" or "22:15"? actual is HH:MM? check shape and filter
+      const timePart = mm.time.includes(" ") ? mm.time.split(" ")[1] : mm.time;
+      if (!inWindow(timePart)) continue;
+      items.push({ time: mm.time, source: "message", detail: truncate(`${mm.threadName}: ${mm.body}`).slice(0, 120), anomaly: false });
+    }
+    items.sort((a, b) => a.time.localeCompare(b.time));
+    const capped = items.slice(0, 30);
+    const has0213 = capped.some((x) => x.time.includes("02:13"));
+    return { window: w, count: capped.length, totalInWindow: items.length, has0213Cluster: has0213, timeline: capped, note: has0213 ? "02:13 cluster present — correlate with watch gap and doorcam" : "no 02:13 cluster in this window, try 01:45-02:40" };
+  },
+};
+
 const get_case_evidence: ToolDef = {
   name: "get_case_evidence",
   title: "Get case evidence",
@@ -534,6 +592,7 @@ export const TOOL_DEFS: ToolDef[] = [
   open_image,
   search_browser_history,
   get_system_logs,
+  get_timeline,
   get_case_evidence,
   // navigation — visible destructive (taught as app blueprint)
   open_application,

@@ -399,7 +399,7 @@ export default function IrisTitle({ onLaunch }: { onLaunch: (mode: "new" | "cont
             width: "min(64vmin, 560px)",
             height: "min(64vmin, 560px)",
             transform: "translate(-50%, -50%)",
-            willChange: "transform",
+            willChange: stage < 6 ? "transform" : "auto",
             top: "46%",
             left: "50%",
             position: "absolute",

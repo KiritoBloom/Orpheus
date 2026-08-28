@@ -211,5 +211,6 @@ export const EVIDENCE: EvidenceItem[] = [
       "The earliest anomaly predates Daniel's research by months. Hourly connection attempts began while he was mid-Atlantic. The clock stops at 02:13 whether wound or replaced. The smoothing pauses over his address at 02:13 local. He did not discover the pattern. The pattern completed him.",
     sources: ["network_disabled.log", "journal_march_final", "threshold_analysis"],
     confidence: "low",
+    autoUnlockFlag: "RECONSTRUCTED_FINAL_HOURS",
   },
 ];

@@ -74,7 +74,7 @@ export default function WindowFrame({
   useEffect(() => {
     if (win.open && !win.minimized) {
       setJustOpened(true);
-      const t = setTimeout(() => setJustOpened(false), 420);
+      const t = setTimeout(() => setJustOpened(false), 220);
       return () => clearTimeout(t);
     }
   }, [win.open, win.minimized]);
@@ -122,7 +122,7 @@ export default function WindowFrame({
     setTimeout(() => {
       setIsShading(false);
       minimizeWindow(id);
-    }, 200);
+    }, 140);
   };
 
   const handleMaximize = (e: React.MouseEvent) => {

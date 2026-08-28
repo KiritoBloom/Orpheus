@@ -171,6 +171,7 @@ export default function GameRoot() {
   /* ---------- case complete → ending ---------- */
   useEffect(() => {
     const onComplete = () => {
+      try { useOS.getState().addFlag("CASE_COMPLETE"); } catch {}
       // give the last ARIA message a moment, then end
       setTimeout(() => setEndingRequested(true), 1600);
     };
