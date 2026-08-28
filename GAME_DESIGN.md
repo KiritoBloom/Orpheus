@@ -71,6 +71,10 @@ A correct `unlock lantern orpheus echo` in Terminal mounts the vestibule. Any ot
 
 After the vault, the machine re-opens its observability window roughly every 2.5 minutes: 90 seconds of amber pulse, a taskbar badge, a deadline that is felt rather than shown. Inside it, exactly one co-op action pair completes the beat — the **human** zooms the stopped clock (`DSC04655`) past 2.5× while **ARIA** queries the logs from the same minute (`get_system_logs`). Neither action counts outside the window; neither side suffices alone. Synchronized, the machine writes `/Private/window_echo.txt` and unlocks evidence `ev_window_echo`. Miss it and 02:13 comes again — thematically inevitable, mechanically forgiving. (Design per *Keep Talking and Nobody Explodes*: asymmetric roles + shared time pressure = the loop both players must run together.)
 
+### The living machine — a property, not a demo
+
+A laptop that was someone's should *breathe*. Jacket details were added with that in mind: the desk hums and a drive churns faintly every ~40–80 seconds; a Maya recital sticky, a chili recipe, a bucket list, and a photographed field trip sit beside source code; the wall clock runs. Then there is the thing that is not his: **a message with no sender arrives in Messages about two minutes into the session** — `NO SENDER`, three lines, prompting the investigator not to find the door, mentioning *the one who used to sit here is not the first one we lost*, and signing off `we are counting`. It is received with a toast and its own quiet, unsettling two-tone; it is never resolved, never explained, and is machine-readable — the agent can search and find it too. Nobody on the desk knows who sent it. That is the point.
+
 ### SYNCHRONY — scoring the handoff rhythm
 
 The game's central loop — human looks → agent searches → human decides — is itself scored. Alternating clean handoffs inside 45 seconds build a SYNCHRONY streak, surfaced live in the checklist footer and celebrated by ARIA at ×4/×6/×8. The collaboration is not a premise the player is told about; it is a rhythm the game notices, rewards, and tempo-sets. The desk feels alive exactly when the partnership is real.
@@ -120,6 +124,7 @@ VAULT_OPENED / VAULT_DECOY
 FOUND_HIDDEN_ARCHIVE          vestibule decrypted
 WINDOW_HUMAN / WINDOW_AGENT / WINDOW_SYNCHRONIZED   02:13 window co-op set piece (clock zoom + log query, inside 90s)
 DISCOVERED_ARIA_DIRECTIVE     read /Private/aria_directive.sys
+MYSTERY_MESSAGE               the received thread (NO SENDER) — arrives mid-session ~2 min in, never resolved
 RECONSTRUCTED_FINAL_HOURS     conditional on 02:13 log + watch gap + door cam
 CASE_RECONSTRUCTION_AVAILABLE 4 of 5 major milestones, gated board button
 CASE_COMPLETE                 reconstruction verdicts ≥3 SUPPORTED and ≤1 INSUFFICIENT

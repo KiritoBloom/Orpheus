@@ -128,6 +128,24 @@ export default function GameRoot() {
     return () => clearInterval(id);
   }, []);
 
+  /* ---------- the unexplained message — a thread arrives while you read the desk ---------- */
+  useEffect(() => {
+    if (phase !== "desktop") return;
+    if (useOS.getState().flags.has("MYSTERY_MESSAGE")) return;
+    const id = setTimeout(() => {
+      const os = useOS.getState();
+      if (os.phase !== "desktop" || os.flags.has("MYSTERY_MESSAGE")) return;
+      os.addFlag("MYSTERY_MESSAGE");
+      os.pushToast({
+        app: "MESSAGES",
+        title: "NEW MESSAGE — NO SENDER",
+        body: "Received while you were reading the desk. It answers nothing.",
+      });
+      sfx.mysteryArrive();
+    }, 110_000 + Math.random() * 30_000);
+    return () => clearTimeout(id);
+  }, [phase]);
+
   /* ---------- the 02:13 window — recurring co-op set piece after the vault ---------- */
   useEffect(() => {
     const id = setInterval(() => {

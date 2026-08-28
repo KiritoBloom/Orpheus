@@ -29,7 +29,7 @@ src/
     data/
       filesystem.ts      FsNode[] + all text/csv bodies (+ computed key lines)
       emails.ts          Email[] (17: inbox 8 / sent 4 / drafts 2 / archive 2 / trash 1)
-      chatMessages.ts    THREADS (6) + CHAT_MESSAGES (31) — Daniel's historic threads, readable via tools
+      chatMessages.ts    THREADS (7: 6 historic + hidden t_observer) + CHAT_MESSAGES (34) — the 3 t_observer lines arrive mid-session (MYSTERY_MESSAGE)
       browserHistory.ts  HISTORY (18) + CACHED_PAGES (17) — every history entry has a cached page
       systemLogs.ts      LOGS (51: log_001–051, final night 02:13 fully logged)
       evidence.ts        EVIDENCE[] (21: people 5 / events 6 / locations 2 / documents 5 / hypotheses 3)

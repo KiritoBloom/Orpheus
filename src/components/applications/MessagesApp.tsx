@@ -13,6 +13,7 @@ import { sfx } from "@/audio/engine";
    ============================================================ */
 
 const THREAD_META: Record<string, { status: string; color: string }> = {
+  t_observer: { status: "▮ received · no source", color: "text-alert" },
   t_sarah: { status: "● grad student — active", color: "text-accent" },
   t_mom: { status: "○ family", color: "text-faint" },
   t_voss: { status: "○ CERN — Geneva", color: "text-faint" },
@@ -26,16 +27,21 @@ export default function MessagesApp() {
   const [filter, setFilter] = useState("");
   const scroller = useRef<HTMLDivElement>(null);
   const readThreadIds = useOS((s) => s.readThreadIds);
+  const flags = useOS((s) => s.flags);
 
-  const threads = THREADS.filter(
+  // hiddenUntilFlag gating — e.g., the unexplained thread only appears once MYSTERY_MESSAGE is set
+  const visibleMsgs = CHAT_MESSAGES.filter((m) => !(m.hiddenUntilFlag && !flags.has(m.hiddenUntilFlag)));
+  const visibleThreads = THREADS.filter((t) => !(t.hiddenUntilFlag && !flags.has(t.hiddenUntilFlag)));
+
+  const threads = visibleThreads.filter(
     (t) =>
       !filter ||
       t.name.toLowerCase().includes(filter.toLowerCase()) ||
-      CHAT_MESSAGES.some((m) => m.threadId === t.id && m.body.toLowerCase().includes(filter.toLowerCase()))
+      visibleMsgs.some((m) => m.threadId === t.id && m.body.toLowerCase().includes(filter.toLowerCase()))
   );
 
-  const activeMessages = CHAT_MESSAGES.filter((m) => m.threadId === active);
-  const activeThread = THREADS.find((t) => t.id === active);
+  const activeMessages = visibleMsgs.filter((m) => m.threadId === active);
+  const activeThread = visibleThreads.find((t) => t.id === active);
 
   function openThread(id: string) {
     setActive(id);
@@ -82,8 +88,8 @@ export default function MessagesApp() {
           {threads.map((t) => {
             const isActive = t.id === active;
             const isUnread = !readThreadIds.has(t.id);
-            const count = CHAT_MESSAGES.filter((m) => m.threadId === t.id).length;
-            const last = CHAT_MESSAGES.filter((m) => m.threadId === t.id).slice(-1)[0];
+            const count = visibleMsgs.filter((m) => m.threadId === t.id).length;
+            const last = visibleMsgs.filter((m) => m.threadId === t.id).slice(-1)[0];
             const meta = THREAD_META[t.id];
             return (
               <button
@@ -106,17 +112,18 @@ export default function MessagesApp() {
                   <span className={`text-[10px] truncate mt-0.5 ${isUnread ? "text-dim" : "text-faint opacity-70"}`}>{last.body.slice(0, 44)}</span>
                 )}
                 {t.id === "t_W" && <span className="text-[8px] tracking-[0.12em] text-amber mt-0.5">UNVERIFIED CONTACT</span>}
+                {t.id === "t_observer" && <span className="text-[8px] tracking-[0.12em] text-alert mt-0.5">◇ UNEXPLAINED</span>}
               </button>
             );
           })}
         </div>
         <div className="shrink-0 border-t border-line bg-surface2 px-2 py-1.5 flex flex-col gap-1">
           <div className="flex items-center justify-between">
-            <span className="text-[9px] text-faint">DEVICE · {CHAT_MESSAGES.length} MSGS · OFFLINE</span>
-            {(() => { const u = THREADS.length - readThreadIds.size; return u > 0 ? <span className="text-[8px] bg-amber text-black px-1 font-bold">{u} NEW</span> : <span className="text-[8px] text-faint">ALL READ</span>; })()}
+            <span className="text-[9px] text-faint">DEVICE · {visibleMsgs.length} MSGS · OFFLINE</span>
+            {(() => { const u = visibleThreads.length - readThreadIds.size; return u > 0 ? <span className="text-[8px] bg-amber text-black px-1 font-bold">{u} NEW</span> : <span className="text-[8px] text-faint">ALL READ</span>; })()}
           </div>
-          {THREADS.length - readThreadIds.size > 0 && (
-            <button onClick={() => THREADS.forEach((t) => markThreadRead(t.id))} className="btn-bevel text-[9px] py-0.5 text-faint hover:text-txt w-full">
+          {visibleThreads.length - readThreadIds.size > 0 && (
+            <button onClick={() => visibleThreads.forEach((t) => markThreadRead(t.id))} className="btn-bevel text-[9px] py-0.5 text-faint hover:text-txt w-full">
               MARK ALL READ
             </button>
           )}
@@ -135,7 +142,7 @@ export default function MessagesApp() {
             <div className="text-[10px] text-faint">{activeThread?.handle} · {activeMessages.length} messages</div>
           </div>
           <span className="text-[9px] tracking-[0.14em] text-faint border border-line px-1.5 py-0.5 hidden sm:block">
-            {active === "t_W" ? "UNTRUSTED · NO CONTACT CARD" : "ON-DEVICE HISTORY"}
+            {active === "t_W" ? "UNTRUSTED · NO CONTACT CARD" : active === "t_observer" ? "NO SOURCE · NOT A CONTACT" : "ON-DEVICE HISTORY"}
           </span>
         </div>
 

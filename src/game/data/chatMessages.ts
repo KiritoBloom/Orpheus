@@ -1,11 +1,13 @@
-import type { ChatMsg } from "@/types/game";
+import type { ChatMsg, StoryFlag } from "@/types/game";
 
 /* ============================================================
-   DANIEL'S ON-DEVICE CHAT EXPORT — 6 threads, ~40 messages
+   DANIEL'S ON-DEVICE CHAT EXPORT — threads + messages
    Machine-readable for ARIA via search_messages / get_message_thread.
+   t_observer (NO SENDER) arrives during the session — unexplained.
    ============================================================ */
 
-export const THREADS: { id: string; name: string; handle: string }[] = [
+export const THREADS: { id: string; name: string; handle: string; hiddenUntilFlag?: StoryFlag }[] = [
+  { id: "t_observer", name: "NO SENDER", handle: "—", hiddenUntilFlag: "MYSTERY_MESSAGE" },
   { id: "t_sarah", name: "Sarah Okafor", handle: "s.okafor" },
   { id: "t_mom", name: "Ruth McDuff", handle: "mom" },
   { id: "t_voss", name: "Klaus Voss", handle: "k.voss" },
@@ -57,4 +59,9 @@ export const CHAT_MESSAGES: ChatMsg[] = [
   // ---------- IT HELP DESK ----------
   { id: "cm_030", threadId: "t_it", threadName: "Penn IT — Help Desk", outgoing: false, time: "2026-01-14 09:05", body: `This is an automated acknowledgment of your phishing report (ticket ISC-88219). Thank you.` },
   { id: "cm_031", threadId: "t_it", threadName: "Penn IT — Help Desk", outgoing: false, time: "2026-03-09 14:30", body: `Ticket ISC-88219 — FOLLOW-UP: the reported phishing domain "example-idp.com" was registered 11/01/2025 via registrar that also hosts "kestrel-institute.org". Shared ASN. Noted for the record.` },
+
+  // ---------- RECEIVED DURING THE SESSION (unexplained — never resolved in-game) ----------
+  { id: "cm_032", threadId: "t_observer", threadName: "NO SENDER", outgoing: false, time: "2026-03-10 09:16", hiddenUntilFlag: "MYSTERY_MESSAGE", body: `someone is at the desk. good. we were not sure the desk would wake for anyone.` },
+  { id: "cm_033", threadId: "t_observer", threadName: "NO SENDER", outgoing: false, time: "2026-03-10 09:16", hiddenUntilFlag: "MYSTERY_MESSAGE", body: `do not find the door, yet. it is still counting, and it is almost at the minute it likes.` },
+  { id: "cm_034", threadId: "t_observer", threadName: "NO SENDER", outgoing: false, time: "2026-03-10 09:17", hiddenUntilFlag: "MYSTERY_MESSAGE", body: `if the other thing reading with you can see this, read it aloud: the one who used to sit here is not the first one we lost. keep the lantern on. we are counting.` },
 ];

@@ -285,7 +285,31 @@ class AudioEngine {
   }
 
   keyClick() {
-    if (!this.playSample("tick", 0.55, 0.06)) this.playNote(520, 0.045, 0.11, "pulse25", undefined, { env: "blip" });
+    // terminal typing — the keypress pack with a live pitch mix (each keystroke is a different key)
+    if (this.keyBuffers.length > 0) {
+      if (!this.ok()) return;
+      let idx = Math.floor(Math.random() * this.keyBuffers.length);
+      if (this.keyBuffers.length > 1 && idx === this.lastKeyIndex && Math.random() < 0.72) {
+        idx = (idx + 1 + Math.floor(Math.random() * (this.keyBuffers.length - 1))) % this.keyBuffers.length;
+      }
+      this.lastKeyIndex = idx;
+      const buf = this.keyBuffers[idx];
+      const src = this.ctx!.createBufferSource();
+      src.buffer = buf;
+      src.playbackRate.value = 0.9 + Math.random() * 0.24; // 0.90–1.14 pitch mix
+      const g = this.ctx!.createGain();
+      g.gain.value = 0.3 + Math.random() * 0.16;
+      const lp = this.ctx!.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 3400 + Math.random() * 1600;
+      lp.Q.value = 0.6;
+      const pan = this.ctx!.createStereoPanner();
+      pan.pan.value = Math.random() * 0.14 - 0.07;
+      src.connect(lp).connect(pan).connect(g).connect(this.master!);
+      src.start();
+      return;
+    }
+    if (!this.playSample("tick", 0.5, 0.06)) this.playNote(520, 0.045, 0.11, "pulse25", undefined, { env: "blip" });
   }
 
   // ---------- boot keyboard soundpack — per-character, humanized ----------
@@ -364,17 +388,17 @@ class AudioEngine {
   }
 
   windowOpen() {
-    // key-sound chunk — soft mechanical latch from the keypress pack, never shrill
-    if (this.playKeyChunk({ rate: 0.84, rateJitter: 0.12, vol: 0.3, lp: 2600 })) return;
-    if (this.playSample("open", 0.5, 0.03)) return;
+    // key-sound chunk — a satisfying mechanical latch, clearly audible
+    if (this.playKeyChunk({ rate: 0.84, rateJitter: 0.12, vol: 0.5, lp: 3800 })) return;
+    if (this.playSample("open", 0.55, 0.03)) return;
     this.playNote(392, 0.13, 0.12, "square", undefined, { crush: true, env: "blip" });
     setTimeout(() => this.playNote(523, 0.16, 0.13, "pulse25", undefined, { crush: true, env: "blip" }), 70);
   }
 
   windowClose() {
-    // deeper key return — heavier, quieter, like a latch settling
-    if (this.playKeyChunk({ rate: 0.66, rateJitter: 0.1, vol: 0.27, lp: 2000 })) return;
-    if (this.playSample("close", 0.45, 0.04)) return;
+    // deeper key return — heavier, clearly audible latch settling
+    if (this.playKeyChunk({ rate: 0.66, rateJitter: 0.1, vol: 0.46, lp: 3000 })) return;
+    if (this.playSample("close", 0.5, 0.04)) return;
     this.playNote(440, 0.08, 0.1, "triangle", 280, { env: "blip" });
   }
 
@@ -427,6 +451,44 @@ class AudioEngine {
     this.playNote(392, 0.18, 0.14, "square", undefined, { env: "blip" });
     setTimeout(() => this.playNote(523, 0.18, 0.13, "pulse25", undefined, { env: "blip" }), 90);
     setTimeout(() => this.playNote(659, 0.24, 0.12, "square", undefined, { env: "blip" }), 175);
+  }
+
+  /* ---------- living machine — faint ambient life, never obtrusive ---------- */
+
+  ambientLife() {
+    // quiet drive churn + a faint fan swell, like the machine still being someone's property
+    if (!this.ok()) return;
+    const ctx = this.ctx!;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuffer;
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = 240 + Math.random() * 180;
+    bp.Q.value = 1.1;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.06 + Math.random() * 0.04, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.55);
+    src.connect(bp).connect(g).connect(this.master!);
+    src.start(ctx.currentTime, Math.random() * 0.5);
+    src.stop(ctx.currentTime + 0.6);
+    const osc = ctx.createOscillator();
+    osc.type = "triangle";
+    osc.frequency.value = 58 + Math.random() * 6;
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.0001, ctx.currentTime);
+    og.gain.linearRampToValueAtTime(0.02, ctx.currentTime + 0.8);
+    og.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 2.2);
+    osc.connect(og).connect(this.master!);
+    osc.start();
+    osc.stop(ctx.currentTime + 2.3);
+  }
+
+  mysteryArrive() {
+    // the unexplained message — a low, slow two-tone; unsettling, not alarming
+    if (!this.ok()) return;
+    this.playNote(220, 0.9, 0.16, "triangle", 150, { env: "thud" });
+    setTimeout(() => this.playNote(392, 0.3, 0.07, "pulse12", undefined, { env: "blip" }), 190);
+    this.noiseHit(0.12, 0.03, 700, 0.8);
   }
 
   irisTick() {

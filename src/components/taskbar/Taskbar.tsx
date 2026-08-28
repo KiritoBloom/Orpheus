@@ -29,7 +29,14 @@ export default function Taskbar() {
   const readMailIds = useOS((s) => s.readMailIds);
   const readThreadIds = useOS((s) => s.readThreadIds);
   const unreadMail = useMemo(() => EMAILS.filter((e) => e.unread && !readMailIds.has(e.id)).length, [readMailIds]);
-  const unreadThreads = useMemo(() => THREADS.length - readThreadIds.size, [readThreadIds]);
+  // count only threads currently visible — the hidden unexplained thread is not unread until it arrives
+  const unreadThreads = useMemo(
+    () =>
+      THREADS.filter(
+        (t) => !(t.hiddenUntilFlag && !os.flags.has(t.hiddenUntilFlag)) && !readThreadIds.has(t.id)
+      ).length,
+    [readThreadIds, os.flags]
+  );
 
   // listen for LINK hotkey dispatch from GameRoot
   useEffect(() => {

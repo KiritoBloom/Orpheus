@@ -243,9 +243,13 @@ export function isMailUnread(id: string): boolean {
 
 /* ---------------- messages / chat search ---------------- */
 
+function msgVisible(m: { hiddenUntilFlag?: import("@/types/game").StoryFlag }): boolean {
+  return !(m.hiddenUntilFlag && !useOS.getState().flags.has(m.hiddenUntilFlag));
+}
+
 export function searchMessages(query: string): { threadId: string; threadName: string; time: string; body: string }[] {
   const q = query.toLowerCase();
-  return CHAT_MESSAGES.filter((m) => m.body.toLowerCase().includes(q)).map((m) => ({
+  return CHAT_MESSAGES.filter((m) => msgVisible(m) && m.body.toLowerCase().includes(q)).map((m) => ({
     threadId: m.threadId,
     threadName: m.threadName,
     time: m.time,
@@ -256,12 +260,13 @@ export function getMessageThread(threadId: string): { name: string; messages: Ch
   const t = THREADS.find((x) => x.id === threadId);
   return {
     name: t?.name ?? threadId,
-    messages: CHAT_MESSAGES.filter((m) => m.threadId === threadId),
+    messages: CHAT_MESSAGES.filter((m) => m.threadId === threadId && msgVisible(m)),
   };
 }
 export function openMessagesThread(threadId: string): { ok: boolean; error?: string } {
   const t = THREADS.find((x) => x.id === threadId);
   if (!t) return { ok: false, error: `no thread: ${threadId}` };
+  if (t.hiddenUntilFlag && !useOS.getState().flags.has(t.hiddenUntilFlag)) return { ok: false, error: `no thread: ${threadId}` };
   openApplication("messages");
   setTimeout(() => messagesThreadBus.emit(threadId), 60);
   useOS.getState().markThreadRead(threadId);

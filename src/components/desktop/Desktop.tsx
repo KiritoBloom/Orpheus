@@ -45,6 +45,20 @@ export default function Desktop() {
     return () => clearTimeout(id);
   }, []);
 
+  // ambient machine life — faint churn/fan every ~40-80s, like a drive still alive
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let id: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      id = setTimeout(() => {
+        if (document.visibilityState === "visible") sfx.ambientLife();
+        schedule();
+      }, 40000 + Math.random() * 40000);
+    };
+    schedule();
+    return () => clearTimeout(id);
+  }, []);
+
   return (
     <div
       className={`absolute inset-0 overflow-hidden ${textScale === "lg" ? "data-textscale-lg" : ""}`}
