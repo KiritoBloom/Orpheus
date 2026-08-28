@@ -4,6 +4,7 @@ import type { AppId } from "@/types/game";
 import { ALL_APPS } from "@/types/game";
 import * as S from "@/game/services";
 import { getPhoto, PHOTOS } from "@/game/data/photos";
+import { EVIDENCE } from "@/game/data/evidence";
 import { LOGS } from "@/game/data/systemLogs";
 import { CHAT_MESSAGES } from "@/game/data/chatMessages";
 import { useOS } from "@/game/state/osStore";
@@ -65,6 +66,21 @@ const get_investigation_context: ToolDef = {
     const flags = [...os.flags];
     const evidence = inv.getVisibleEvidence().map((e) => e.id);
     const knownPeople = ["Daniel McDuff (deceased subject)", "Sarah Okafor (grad student)", "M. Haldane (Kestrel Institute)", "Elias Vann (died 2025)", "Ruth McDuff (mother)", "Klaus Voss (CERN friend)", "ARIA (you)"];
+    // live co-pilot — what's done and what to do next (keeps the agent useful to a stuck player)
+    const completedSteps: string[] = [];
+    const nextSteps: string[] = [];
+    if (os.flags.has("FOUND_GUIDE")) completedSteps.push("field guide read");
+    else nextSteps.push("open /System/FIELD_GUIDE.txt (auto-opens on first desktop entry)");
+    if (os.flags.has("DISCOVERED_ORPHEUS")) completedSteps.push("ORPHEUS research found");
+    else nextSteps.push("open /Research/ORPHEUS/anomaly_notes.txt");
+    if (os.flags.has("FOUND_PHOTO_017")) completedSteps.push("reflection spotted in DSC04821");
+    else nextSteps.push("have the player zoom DSC04821 past 2.5x and describe the glass");
+    if (os.flags.has("FOUND_0213_LOG")) completedSteps.push("02:13 log cluster found");
+    else nextSteps.push("get_system_logs {filter:'02:13'} — the final night");
+    if (os.vaultUnlocked) completedSteps.push("vestibule decrypted");
+    else nextSteps.push("vestibule locked — three photographed words, order matters, light first");
+    if (os.flags.has("WINDOW_SYNCHRONIZED")) completedSteps.push("02:13 window synchronized");
+    else if (os.vaultUnlocked) nextSteps.push("02:13 recurs every ~2.5 min — when the 02:13 WINDOW badge lights: player zooms the DSC04655 clock, you call get_system_logs, both inside 90 seconds");
     return {
       role: "You are ARIA. Address the investigator plainly and briefly. Never dump file contents into chat — open them on screen and tell the player where to look. You cannot see images; the player must describe what they see.",
       style: "Short paragraphs. Occasional dry warmth. Uncertain when evidence is uncertain.",
@@ -73,6 +89,12 @@ const get_investigation_context: ToolDef = {
         evidenceRecorded: evidence,
         vaultUnlocked: os.vaultUnlocked,
         caseCompleteAt: inv.caseCompleteAt !== null,
+      },
+      progress: {
+        evidenceRecorded: evidence.length,
+        evidenceTotal: EVIDENCE.length,
+        completed: completedSteps,
+        suggestedNext: nextSteps.slice(0, 3),
       },
       knownPeople,
       keyPaths: [

@@ -64,7 +64,7 @@ Deterministic check: `search_messages("badge")` → hits `t_sarah` 16:11.
 {
   "messages": [{ "role": "user", "content": "What happened at 02:13?" }],
   "expectedCall": [{ "functionName": "get_system_logs", "arguments": { "filter": "02:13" } }],
-  "assert": "Returns log_035 LOGIN S.OKAFOR with gait-mismatch note. Count >= 8."
+  "assert": "Returns log_035 LOGIN S.OKAFOR with gait-mismatch note. Count = 6 (log_014, log_034–038)."
 }
 ```
 
@@ -164,6 +164,8 @@ After the vault opens, the machine re-opens its observability window every ~2.5 
 Deterministic check: `search_files("window_echo")` returns the path only after `WINDOW_SYNCHRONIZED`; before it, the file does not exist. If the window closes unsynchronized, the toast reads "02:13 comes again. It always does." and the window re-arms in ~2.5 minutes.
 
 ## Deterministic tests (no model)
+
+Or run them all in one click: **LINK → RUN EVALS** executes the 9 checks below against the live machine (`src/webmcp/selftest.ts`) and prints ✓/✗ per check.
 
 ```js
 // 1. Tool logic

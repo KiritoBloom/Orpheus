@@ -17,6 +17,7 @@ Orpheus is verifiable without any AI host. The `LINK` console *is* the agent int
 4. Pick `get_timeline` — prefilled window `01:45-02:40` → **EXECUTE** → see merged `01:45–02:40` chronology (logs + photos + messages) that would take a human 5 apps
 5. Pick `open_file` — prefilled with `/Research/ORPHEUS/anomaly_notes.txt` → **EXECUTE** → watch document open on YOUR screen
 6. Pick `scroll_document_to_line` — prefilled `{"path":"...anomaly_notes.txt","line":184}` → **EXECUTE** → watch line 184 scroll into view with `line-flash` + `nav-sweep` — the visible actuation proof
+7. Or press **RUN EVALS** — 9 deterministic checks (budgets, security, search, briefing) pass/fail in one click, per `src/webmcp/evals.md`
 
 You just verified: read-only search at scale + visible navigation that moves the human's screen + budgets + security — all without a host.
 
@@ -26,7 +27,7 @@ You just verified: read-only search at scale + visible navigation that moves the
 2. In ChatGPT, say: *“Give me the investigation briefing.”* → agent must call `get_investigation_context`
 3. Then say: *“Something is reflected in the window of DSC04821. What is it?”* → agent must call `get_image_metadata` + `open_image`. What the agent *says* is ChatGPT's own — it cannot be scripted and is not a pass condition. What matters: it does NOT claim to see pixels and does not dump the photo into chat. The zoom guidance comes from the game itself (viewer shows "SCROLL TO ZOOM · inspect closely; ARIA cannot see this").
 4. Reply: *“A figure holding a phone, badge turned backwards.”* → agent must call `search_messages({"query":"badge"})` (hits `t_sarah` 16:11) + `search_browser_history({"query":"kestrel"})`
-5. Say: *“What happened at 02:13?”* → agent must call `get_system_logs({"filter":"02:13"})` → count >= 8, includes `log_035` gait-mismatch reveal
+5. Say: *“What happened at 02:13?”* → agent must call `get_system_logs({"filter":"02:13"})` → count = 6, includes `log_035` gait-mismatch reveal
 6. Say: *“Show me where Daniel says 02:13 is not a time.”* → agent must call `find_text_in_document` → `open_file` → `scroll_document_to_line({"line":184})` → document scrolls *on your screen*, not dumped in chat
 
 **Bonus set piece — the 02:13 Window (the Keep-Talking moment):** after the vault, the machine opens a 90-second observability window every ~2.5 min (amber pulse + `02:13 WINDOW` taskbar badge). Inside it, zoom `DSC04655` past 2.5× **while** the agent calls `get_system_logs` — synchronized, `/Private/window_echo.txt` appears. Neither side counts alone; the clock is real.

@@ -115,7 +115,7 @@ No backend, no database, no authentication. Persistence is IndexedDB (`orpheus-s
 
 1. Enable the host: in Chrome Canary, `chrome://flags/#enable-webmcp-testing → Enabled`; or use ChatGPT's Atlas browser / any W3C WebMCP origin trial build. Open https://orpheus-mcduff.vercel.app/ in ChatGPT's in-app browser for the native experience (verified on Vercel + HSTS).
 
-**Fastest verification (30 sec, no agent):** tray **LINK** (or `Ctrl+``) → pick `get_system_logs` → `{"filter":"02:13"}` → **EXECUTE** → watch the 02:13 login block appear. Then `get_timeline` → `scroll_document_to_line` with line 184 → watch the document scroll and flash on screen.
+**Fastest verification (30 sec, no agent):** tray **LINK** (or `Ctrl+``) → pick `get_system_logs` → `{"filter":"02:13"}` → **EXECUTE** → watch the 02:13 login block appear. Then `get_timeline` → `scroll_document_to_line` with line 184 → watch the document scroll and flash on screen. Or press **RUN EVALS** for the 9-check deterministic pass.
 
 2. On the desktop, click the tray **LINK** button (also Ctrl+\`) to open the **Agent Link** panel — a judge/dev console listing all 26 registered tools with live execute. Filter by ◇ readOnly / ◆ nav / ⚑ untrusted. Pick any tool — headline tools arrive with example inputs prefilled — press EXECUTE, and watch the computer respond.
 

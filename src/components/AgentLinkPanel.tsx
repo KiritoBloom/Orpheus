@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAria } from "@/game/state/ariaStore";
 import { TOOL_DEFS, webmcpAvailable } from "@/webmcp/register";
+import { runDeterministicSelfTests } from "@/webmcp/selftest";
 
 /* ============================================================
    AGENT LINK PANEL — judge/dev console.
@@ -31,6 +32,22 @@ export default function AgentLinkPanel({ onClose }: { onClose: () => void }) {
       const input = JSON.parse(args || "{}");
       const result = await def.execute(input as Record<string, unknown>);
       setOutput(JSON.stringify(result, null, 2).slice(0, 4000));
+    } catch (e) {
+      setOutput(`ERROR: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    setBusy(false);
+  }
+
+  function runEvals() {
+    setBusy(true);
+    try {
+      const rs = runDeterministicSelfTests();
+      const passed = rs.filter((r) => r.pass).length;
+      setOutput(
+        `DETERMINISTIC EVALS — ${passed}/${rs.length} PASSED  (src/webmcp/evals.md)\n\n` +
+          rs.map((r) => `${r.pass ? "✓" : "✗"} ${r.name}${r.detail ? `  —  ${r.detail}` : ""}`).join("\n") +
+          `\n\nnote: some checks advance investigation state (same as the LINK path).`,
+      );
     } catch (e) {
       setOutput(`ERROR: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -94,6 +111,14 @@ export default function AgentLinkPanel({ onClose }: { onClose: () => void }) {
             <div className="flex items-center gap-2">
               <button className="btn-bevel text-[11px] px-4" disabled={busy} onClick={run}>
                 {busy ? "RUNNING…" : "EXECUTE"}
+              </button>
+              <button
+                className="btn-bevel text-[11px] px-3"
+                disabled={busy}
+                onClick={runEvals}
+                title="9 deterministic checks per src/webmcp/evals.md — no host needed"
+              >
+                RUN EVALS
               </button>
               <span className="text-faint text-[10px]">result →</span>
             </div>
