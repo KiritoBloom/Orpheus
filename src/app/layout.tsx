@@ -14,11 +14,12 @@ const plex = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "ORPHEUS — The McDuff Investigation",
   description:
-    "An authorized investigation into the computer of Dr. Daniel McDuff. A WebMCP experiment: you and an onboard AI, investigating the same machine from two different perspectives.",
+    "A new horizon for human-agent co-presence: a co-op mystery you can play at 10pm when your friends are offline and still feel accompanied — you see what the agent cannot, it remembers what you cannot. Not a replacement for people, just presence.",
   metadataBase: new URL("https://orpheus-mcduff.vercel.app"),
   openGraph: {
     title: "ORPHEUS — The McDuff Investigation",
-    description: "A WebMCP experiment: human + agent investigate the same dead scientist's computer. 26 tools, visible actuation, no generic automation.",
+    description:
+      "Co-op for the nights your friends are offline: 26 WebMCP tools, visible actuation, no generic automation. Human eyes + machine recall at one desk.",
     url: "https://orpheus-mcduff.vercel.app/",
     siteName: "ORPHEUS",
     type: "website",

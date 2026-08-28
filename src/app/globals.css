@@ -145,7 +145,11 @@ html, body {
 :focus-visible { outline: 1px dashed var(--accent); outline-offset: 1px; }
 
 /* ---------- declarative WebMCP focus indicator ---------- */
-/* When agent invokes declarative form, browser applies :tool-form-active + :tool-submit-active */
+/* Chrome WebMCP Declarative API — :tool-form-active / :tool-submit-active are emerging-spec
+   pseudo-classes (Chrome 149+, https://developer.chrome.com/docs/ai/webmcp/declarative-api).
+   Build warnings from PostCSS/LightningCSS ("not recognized as valid pseudo-class") are expected
+   until parsers update — the @supports guard ensures no runtime impact in other browsers.
+   When agent invokes declarative form, browser applies :tool-form-active + :tool-submit-active */
 @supports selector(:tool-form-active) {
   form:tool-form-active {
     outline: 1px dashed var(--accent);

@@ -1,10 +1,12 @@
-# GAME DESIGN — Orpheus: The McDuff Investigation
+# GAME DESIGN — Orpheus: The McDuff Investigation — the new collaborative computer, told as a story
+
+> Orpheus is a game that proves a pattern. The pattern is the era: **human eyes + machine recall, at one desk, with the browser as arbiter.** Before WebMCP, the agent guessed at pixels and the human drowned in data. After WebMCP, they share one computer with complementary senses — and the fiction makes you *feel* it in one sitting. Every choice below serves that feeling.
 
 ## The proposition
 
 Someone handed you a dead scientist's computer. You turn it on. A briefing authorizes you. An onboard assistant wakes after 74 hours of abeyance and says Daniel expected someone to come. From there you investigate together, operating the same machine from genuinely different vantage points.
 
-The player remains responsible for visual inspection, interpretation, and conclusions. ARIA remains responsible for searching, cross-referencing, and bringing evidence to attention. Neither replaces the other.
+The player remains responsible for visual inspection, interpretation, and conclusions. ARIA remains responsible for searching, cross-referencing, and bringing evidence to attention. Neither replaces the other. That asymmetry *is* the new era WebMCP enables — not automation, but collaboration — and the puzzle design enforces it architecturally (see `ARCHITECTURE.md` § Service layer).
 
 ---
 

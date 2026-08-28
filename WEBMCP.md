@@ -1,13 +1,17 @@
-# WEBMCP — Orpheus integration
+# WEBMCP — Orpheus integration — a new horizon for human-agent co-presence
 
-## Current implementation
+> Orpheus is a co-op game for the nights your friends are offline — and a proof that WebMCP makes co-presence real. Before, "playing with an AI" meant a chatbot beside your game, guessing at pixels while you drowned alone. After, you share one computer with complementary senses: **human eyes + machine recall, at one desk, with the browser as arbiter.** Not a replacement for people — just presence that eases strain when you're the only human in the room.
+
+## Current implementation — why co-op needs a shared desk
 
 - **Entry point:** `document.modelContext ?? navigator.modelContext` (feature-detected at load and re-checked for late injection). Poll 800 ms + `toolchange` re-attach for Atlas async injection.
 - **Registration:** `registerTool({ name, title, description, inputSchema, annotations, execute }, { signal? })` per the Aug 26 2026 W3C Draft; `navigator.modelContext` kept as compat alias. Chrome 150 requires `document.modelContext`. All 26 tools include `title`, budgets enforced.
 - **Secure context required** (HTTPS). `registerWebMCPTools()` bails cleanly if no host; the game remains playable but most efficient with an agent. Headers `Origin-Agent-Cluster: ?1` + `Permissions-Policy: tools=self` set in `next.config.ts`.
 - **Budgets per Chrome best practices:** 500 char desc / 150 param / 30 name / 1.5k output. `MAX_QUERY_LEN=200`, `MAX_OUTPUT_CHARS=1500`, `clampStr()` + `truncate()` on every path.
 
-The integration is **visible to the player** (windows open and scroll), **inspectable by a judge** (`src/webmcp/register.ts` is a single, readable module), and **manually runnable** without a host (tray **LINK** — the Agent Link console — calls `document.modelContext.executeTool` when available, the underlying service otherwise). Also includes an offscreen declarative `<form toolname="record_evidence" tooldescription="...">` in `GameRoot.tsx` for the Declarative API (correct per `developer.chrome.com/docs/ai/webmcp/declarative-api`, with `toolparamdescription`, `agentInvoked` + `respondWith`, and `:tool-form-active` CSS).
+The integration is **visible to the player** (windows open and scroll — trust-through-actuation per Sarah Drasner, so accompanied play *feels* accompanied), **inspectable by a judge** (`src/webmcp/register.ts` is a single, readable module), and **manually runnable** without a host (tray **LINK** — the Agent Link console — calls `document.modelContext.executeTool` when available, the underlying service otherwise). Also includes an offscreen declarative `<form toolname="record_evidence" tooldescription="...">` in `GameRoot.tsx` for the Declarative API (correct per `developer.chrome.com/docs/ai/webmcp/declarative-api`, with `toolparamdescription`, `agentInvoked` + `respondWith`, and `:tool-form-active` CSS).
+
+This is the horizon: not "agent automates your clicks" but **26 narrow, auditable tools that make a site operable by an external mind** while the human stays in control — so co-op doesn't require a second human online to feel like co-op. See `JUDGE_QUICKSTART.md` for the 90-second verification path (30s without an agent, 60s with Atlas/Chrome flag).
 
 ---
 
@@ -115,8 +119,23 @@ Errors are `{ ok: false, error: "<human>" }` — never a throw that drops state.
 
 Six evals covering isolation → ambiguous → ordered chain → end-to-end per https://developer.chrome.com/docs/ai/webmcp/evals: `src/webmcp/evals.md`. Run via `document.modelContext.executeTool` (deterministic) or Inspector (probabilistic). Includes budgets + security negative test for `terminal_command`.
 
+## Judge path — 90 seconds
+
+See `JUDGE_QUICKSTART.md`. Fastest path without an agent: `LINK` → `get_system_logs {"filter":"02:13"}` → `get_timeline` → `scroll_document_to_line {"path":"/Research/ORPHEUS/anomaly_notes.txt","line":184}` — watch the desktop move on your screen. With an agent (Atlas or Chrome flag): say "Something is reflected in DSC04821 — what is it?" and watch the handoff.
+
+## Pattern — beyond the game (co-op anywhere solo work strains people)
+
+The McDuff case is Instance 1 for gaming. The `src/game/services.ts` + `src/webmcp/register.ts` split ports anywhere a solo human would feel less strain with a partner at the desk:
+
+- **Co-op games & puzzle hunts** — your instance: mystery where solo players have a companion that remembers everything while they look closer
+- **Co-learning:** classroom archive digs — students describe visuals, agent surfaces context
+- **Co-investigation:** newsroom leak review, SOC night shift, research-integrity, e-discovery — same shape, an analyst alone on shift is not alone on the desk
+
+Replace `src/game/data/*` with your corpus, keep the 26 tool shapes, deploy one static site. No backend, no env keys, `idb-keyval` persistence — a community can self-host an accompanied desk in an afternoon. That's the horizon: not AI replacing people, but presence when people aren't there — because even light, honestly built co-presence eases the strain of doing hard things alone.
+
 ## Files that matter to a judge
 
+- `JUDGE_QUICKSTART.md` — 90-second verification path (copy-paste for judging)
 - `src/webmcp/register.ts` — registry, lifecycle, tool list, schemas
 - `src/webmcp/evals.md` — 6 evals with messages/expectedCall/state
 - `src/game/services.ts` — capability layer that makes WebMCP fundamental rather than decorative

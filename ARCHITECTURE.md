@@ -1,4 +1,6 @@
-# ARCHITECTURE — Orpheus / The McDuff Investigation
+# ARCHITECTURE — Orpheus / The McDuff Investigation — a blueprint for accompanied play and work
+
+> Before WebMCP, browsers were solo canvases and co-op without a friend was just solo. After, they are shared desks: **human eyes + machine recall, at one desk, with the interface as arbiter.** Orpheus proves it with a mystery you can play at 10pm when no one else is online — not AI friends, just presence that makes solitary sessions less straining. The fiction is Instance 1; the architecture is the horizon.
 
 ## Stack
 
@@ -83,22 +85,25 @@ src/
 
 ---
 
-## Service layer — why WebMCP is fundamental
+## Service layer — why WebMCP is fundamental (the blueprint for the era)
 
 `src/game/services.ts` is the only place that knows how to:
 open an app, focus, open a file, scroll to a line, find text, open a dir/email/history entry, manage photos and email read-state, search collections, get logs, record/highlight/open evidence, attempt the vault, and fire story hooks (`FOUND_PHOTO_017` on zoom≥2.5, `FOUND_PRIVATE_HINT` on reminder-card view, etc.).
 
-Both the React UI and the WebMCP tools import and call this module. If you removed WebMCP, the external agent would lose every ability to operate the machine — investigation would be manual and incomplete. The audit trail of visible effects (window opens, sweeps, flashes, toasts) lives here.
+Both the React UI and the WebMCP tools import and call this module. If you removed WebMCP, the external agent would lose every ability to operate the machine — investigation would be manual and incomplete. The audit trail of visible effects (window opens, sweeps, flashes, toasts) lives here. That is what makes this *agent-native* rather than agent-assisted: the UI and the agent share one capability layer, with the interface visibly mediating.
+
+**Reusable pattern for the new era:** Replace `src/game/data/*` with your corpus (leak docs, incident logs, medical images, archive scans), keep the `services.ts` + `register.ts` split, and you have an accompanied desk for newsrooms, SOCs, oversight boards, or classrooms in an afternoon. No backend, no env keys, `idb-keyval` persistence — self-hostable in one static site.
 
 Event wiring `UI ↔ services` uses five tiny single-channel buses (`SimpleBus` — `on(fn) → unsubscribe, emit(payload)`) for: File Manager navigation, photo focus, Mail selection, Messages thread selection, Browser history navigation, plus a `TermBus` for the terminal. The text viewer listens via `setDocListener` for `scroll_document_to_line`.
 
 ---
 
-## WebMCP lifecycle
+## WebMCP lifecycle — built for the new fragmented host era
 
 - `GameRoot` hydrates from IndexedDB, then calls `registerWebMCPTools()` once and polls every 800 ms for late `modelContext` (+ 1.2 s re-attach for late Atlas injection); it observes `toolchange`.
-- On success the 26 `TOOL_DEFS` are registered; input schemas are pure JSON Schema; `execute` handlers delegate to `services.ts` and return MCP-shaped objects (`{ ok, error? }` or typed results).
-- No fallback assistant — WebMCP *is* the agent interface. During development the game remains playable without a host, but investigation is intentionally slower without an agent that can bulk-search and correlate. 26 tools: 14 read-only + 9 visible nav + 3 evidence (guarded).
+- On success the 26 `TOOL_DEFS` are registered; input schemas are pure JSON Schema (`type: object` + `properties`/`required`/`enum`), `title`/`description`/`annotations` per W3C, `execute` handlers delegate to `services.ts` and return MCP-shaped objects (`{ ok, error? }` or typed results). Budgets enforced: 500 desc / 150 param / 30 name / 1.5k output.
+- No fallback assistant — WebMCP *is* the agent interface. During development the game remains playable without a host, but investigation is intentionally slower without an agent that can bulk-search and correlate. 26 tools: 14 read-only + 9 visible nav + 3 evidence (guarded). See `JUDGE_QUICKSTART.md` for 90-second verification (no host needed via `LINK`).
+- Declarative fallback: hidden `<form toolname="record_evidence">` in `GameRoot.tsx` with `agentInvoked` + `respondWith` + `:tool-form-active` styling per `developer.chrome.com/docs/ai/webmcp/declarative-api` — both imperative + declarative as best practice.
 
 ---
 
