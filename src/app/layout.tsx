@@ -23,6 +23,21 @@ export const metadata: Metadata = {
     url: "https://orpheus-mcduff.vercel.app/",
     siteName: "ORPHEUS",
     type: "website",
+    images: [
+      {
+        url: "/Images/PhotoDSC04821.png",
+        width: 800,
+        height: 600,
+        alt: "ORPHEUS — The McDuff Investigation: a dead scientist's workstation, a shared desk for you and your agent",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ORPHEUS — The McDuff Investigation",
+    description:
+      "A WebMCP co-op mystery. You see what the agent cannot; the agent remembers what you cannot. One desk, two investigators.",
+    images: ["/Images/PhotoDSC04821.png"],
   },
   robots: { index: true, follow: true },
 };
