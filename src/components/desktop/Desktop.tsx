@@ -59,6 +59,20 @@ export default function Desktop() {
     return () => clearTimeout(id);
   }, []);
 
+  // distant house sounds — something fell, a door closed, occasionally, far away
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let id: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      id = setTimeout(() => {
+        if (document.visibilityState === "visible") sfx.houseAmbience();
+        schedule();
+      }, 70000 + Math.random() * 80000);
+    };
+    schedule();
+    return () => clearTimeout(id);
+  }, []);
+
   return (
     <div
       className={`absolute inset-0 overflow-hidden ${textScale === "lg" ? "data-textscale-lg" : ""}`}

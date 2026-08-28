@@ -269,10 +269,6 @@ class AudioEngine {
     }
   }
 
-  click() {
-    if (!this.playSample("click", 0.78, 0.04)) this.playNote(480, 0.095, 0.22, "square", 740, { crush: true, env: "chirp" });
-  }
-
   /* title menu — user-provided samples */
   menuClick() {
     // fired when a menu item is activated (mouse click or Enter)
@@ -387,6 +383,52 @@ class AudioEngine {
     return true;
   }
 
+  /* ---------- key taps — generic mechanical UI presses (the desk is one keyboard) ---------- */
+
+  private playKeyTap(opts: { rate: number; rateJitter?: number; vol: number; lp?: number }): boolean {
+    if (!this.ok()) return false;
+    if (this.keyBuffers.length === 0) return false; // pack still loading — caller falls back
+    const rate = opts.rate - (opts.rateJitter ?? 0) / 2 + Math.random() * (opts.rateJitter ?? 0);
+    let idx = Math.floor(Math.random() * this.keyBuffers.length);
+    if (this.keyBuffers.length > 1 && idx === this.lastKeyIndex && Math.random() < 0.72) {
+      idx = (idx + 1 + Math.floor(Math.random() * (this.keyBuffers.length - 1))) % this.keyBuffers.length;
+    }
+    this.lastKeyIndex = idx;
+    const buf = this.keyBuffers[idx];
+    const src = this.ctx!.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = rate;
+    const g = this.ctx!.createGain();
+    g.gain.value = opts.vol;
+    const lp = this.ctx!.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = opts.lp ?? 3400;
+    lp.Q.value = 0.6;
+    const pan = this.ctx!.createStereoPanner();
+    pan.pan.value = Math.random() * 0.12 - 0.06;
+    src.connect(lp).connect(pan).connect(g).connect(this.master!);
+    src.start();
+    return true;
+  }
+
+  click() {
+    // generic UI press — mechanical key tap, fallback to mouseclick sample
+    if (this.playKeyTap({ rate: 1.0, rateJitter: 0.16, vol: 0.34, lp: 3400 })) return;
+    if (!this.playSample("click", 0.78, 0.04)) this.playNote(480, 0.095, 0.22, "square", 740, { crush: true, env: "chirp" });
+  }
+
+  minimize() {
+    // a light, quick tap — window shades down
+    if (this.playKeyTap({ rate: 1.06, rateJitter: 0.12, vol: 0.3, lp: 3200 })) return;
+    if (!this.playSample("tick", 0.5, 0.05)) this.playNote(520, 0.045, 0.1, "pulse25", undefined, { env: "blip" });
+  }
+
+  maximize() {
+    // a firmer press — window snaps to expand / restore
+    if (this.playKeyTap({ rate: 0.9, rateJitter: 0.1, vol: 0.4, lp: 3600 })) return;
+    if (!this.playSample("select", 0.6, 0.04)) this.playNote(440, 0.07, 0.15, "pulse25", undefined, { env: "blip" });
+  }
+
   windowOpen() {
     // key-sound chunk — a satisfying mechanical latch, clearly audible
     if (this.playKeyChunk({ rate: 0.84, rateJitter: 0.12, vol: 0.5, lp: 3800 })) return;
@@ -489,6 +531,21 @@ class AudioEngine {
     this.playNote(220, 0.9, 0.16, "triangle", 150, { env: "thud" });
     setTimeout(() => this.playNote(392, 0.3, 0.07, "pulse12", undefined, { env: "blip" }), 190);
     this.noiseHit(0.12, 0.03, 700, 0.8);
+  }
+
+  houseAmbience() {
+    // distant, faint house sounds — something fell, a door closed, far away
+    if (!this.ok()) return;
+    if (Math.random() < 0.5) {
+      // something fell in another room — a muffled thud + low phone of floor
+      this.noiseHit(0.5, 0.03, 120, 0.9);
+      this.playNote(110, 0.8, 0.045, "triangle", 60, { env: "thud" });
+    } else {
+      // a door closing — soft double-thump then a faint click of the latch
+      this.noiseHit(0.16, 0.035, 260, 1.2);
+      setTimeout(() => this.noiseHit(0.28, 0.028, 140, 1.0), 220);
+      this.playNote(150, 0.5, 0.04, "triangle", 90, { env: "thud" });
+    }
   }
 
   irisTick() {

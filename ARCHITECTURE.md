@@ -137,7 +137,9 @@ Synthesized + sampled in `AudioEngine`:
 - drone — detuned 54 / 54.6 triangle + 108.5 sine
 - Cherry KC 1000 clicks — 32 `keypress-*.wav` with random pitch 0.92–1.08, gain 0.34–0.52, lowpass 4.2–5.6k, stereo ±0.08, timing jitter ±3ms
 - ticks/clicks/dings via short noise bursts, band-pass + exponential envelopes; `ding` is 880+1318 Hz decaying.
-- Window open/close — keypress-pack **chunks** (rate 0.66–0.84, lowpass 2.0–2.6k, gain ~0.3): soft mechanical latch, never shrill; Kenney `open/close` samples at low volume as fallback.
+- Window open/close — keypress-pack **chunks** (rate 0.66–0.84, lowpass 3.0–3.8k, gain ~0.5): a satisfying mechanical latch; Kenney `open/close` samples at low volume as fallback.
+- Generic UI & minimize/maximize — keypress-pack **taps** (distinct rate/vol per action: click 1.0, minimize 1.06/lighter, maximize 0.9/firmer); the whole desk reads as one keyboard. Falls back to Kenney samples.
+- Ambience — the desk hums + a drive churns every ~40–80s, and faint **distant house sounds** (something fell, a door closing) drift in every ~70–150s, so the machine feels lived-in and the house feels inhabited.
 
 Master gain `0.78` via compressor, muteable from tray, respects `settings.sound`.
 

@@ -113,11 +113,11 @@ export default function WindowFrame({
     e.stopPropagation();
     if (reducedMotion) {
       minimizeWindow(id);
-      sfx.click();
+      sfx.minimize();
       return;
     }
     setIsShading(true);
-    sfx.click();
+    sfx.minimize();
     setTimeout(() => {
       setIsShading(false);
       minimizeWindow(id);
@@ -127,7 +127,7 @@ export default function WindowFrame({
   const handleMaximize = (e: React.MouseEvent) => {
     e.stopPropagation();
     toggleMaximize(id);
-    sfx.click();
+    sfx.maximize();
   };
 
   const animClass = reducedMotion
