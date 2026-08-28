@@ -165,7 +165,7 @@ Deterministic check: `search_files("window_echo")` returns the path only after `
 
 ## Deterministic tests (no model)
 
-Or run them all in one click: **LINK → RUN EVALS** executes the 9 checks below against the live machine (`src/webmcp/selftest.ts`) and prints ✓/✗ per check.
+Or run them all in one click: **LINK → RUN EVALS** executes the 9 checks below against the live machine (`src/webmcp/selftest.ts`) and prints ✓/✗ per check. State-safe — investigation state is snapshotted and fully restored, so the checks advance no checkpoints.
 
 ```js
 // 1. Tool logic

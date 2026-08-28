@@ -17,7 +17,7 @@ Orpheus is verifiable without any AI host. The `LINK` console *is* the agent int
 4. Pick `get_timeline` — prefilled window `01:45-02:40` → **EXECUTE** → see merged `01:45–02:40` chronology (logs + photos + messages) that would take a human 5 apps
 5. Pick `open_file` — prefilled with `/Research/ORPHEUS/anomaly_notes.txt` → **EXECUTE** → watch document open on YOUR screen
 6. Pick `scroll_document_to_line` — prefilled `{"path":"...anomaly_notes.txt","line":184}` → **EXECUTE** → watch line 184 scroll into view with `line-flash` + `nav-sweep` — the visible actuation proof
-7. Or press **RUN EVALS** — 9 deterministic checks (budgets, security, search, briefing) pass/fail in one click, per `src/webmcp/evals.md`
+7. Or press **RUN EVALS** — 9 deterministic checks (budgets, security, search, briefing) pass/fail in one click, per `src/webmcp/evals.md` — state-safe: investigation state is snapshotted and restored, no checkpoints advanced
 
 You just verified: read-only search at scale + visible navigation that moves the human's screen + budgets + security — all without a host.
 

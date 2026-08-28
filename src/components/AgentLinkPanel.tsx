@@ -46,7 +46,7 @@ export default function AgentLinkPanel({ onClose }: { onClose: () => void }) {
       setOutput(
         `DETERMINISTIC EVALS — ${passed}/${rs.length} PASSED  (src/webmcp/evals.md)\n\n` +
           rs.map((r) => `${r.pass ? "✓" : "✗"} ${r.name}${r.detail ? `  —  ${r.detail}` : ""}`).join("\n") +
-          `\n\nnote: some checks advance investigation state (same as the LINK path).`,
+          `\n\nnote: state-safe — investigation state is snapshotted and fully restored; the checks advance no checkpoints.`,
       );
     } catch (e) {
       setOutput(`ERROR: ${e instanceof Error ? e.message : String(e)}`);

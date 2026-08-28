@@ -39,6 +39,7 @@ export interface ToolDef {
 /* ---------- helpers — budgets per https://developer.chrome.com/docs/ai/webmcp/secure-tools ---------- */
 const MAX_QUERY_LEN = 200;
 const MAX_OUTPUT_CHARS = 1500;
+const TRUNCATION_SUFFIX = "…[truncated]";
 const clampStr = (v: unknown, max = MAX_QUERY_LEN) => String(v ?? "").slice(0, max).trim();
 const str = (description: string) => ({ type: "string", description: description.slice(0, 150) });
 const enumOf = (e: string[], description: string) => ({
@@ -46,7 +47,9 @@ const enumOf = (e: string[], description: string) => ({
   enum: e,
   description: description.slice(0, 150),
 });
-const truncate = (s: string) => (s.length > MAX_OUTPUT_CHARS ? s.slice(0, MAX_OUTPUT_CHARS) + "…[truncated]" : s);
+// suffix counts toward the budget — total output never exceeds MAX_OUTPUT_CHARS
+const truncate = (s: string) =>
+  s.length > MAX_OUTPUT_CHARS ? s.slice(0, MAX_OUTPUT_CHARS - TRUNCATION_SUFFIX.length) + TRUNCATION_SUFFIX : s;
 
 const APP_ENUM = enumOf(ALL_APPS as string[], "Which application");
 

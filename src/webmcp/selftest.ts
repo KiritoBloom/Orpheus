@@ -1,10 +1,18 @@
+import type { AriaStatusState, StoryFlag, Toast } from "@/types/game";
 import type { ToolDef } from "./register";
 import { TOOL_DEFS } from "./register";
+import { useOS } from "@/game/state/osStore";
+import { useAria } from "@/game/state/ariaStore";
+import { useInvestigation } from "@/game/state/investigationStore";
+import { updateSave } from "@/game/state/persistence";
 
 /* ============================================================
    DETERMINISTIC SELF-TESTS — the evals.md assertions, runnable
    in-browser via LINK → RUN EVALS (no host, no model needed).
    Mirrors https://developer.chrome.com/docs/ai/webmcp/evals.
+
+   STATE-SAFE: investigation state is snapshotted before the run
+   and fully restored after — the checks advance nothing.
    ============================================================ */
 
 export interface SelfTestResult {
@@ -19,7 +27,73 @@ function tool(name: string): ToolDef {
   return t;
 }
 
+/* ---------- state sandbox — snapshot / restore ---------- */
+
+interface Snapshot {
+  flags: Set<StoryFlag>;
+  evidenceIds: Set<string>;
+  toasts: Toast[];
+  vaultAttempts: number;
+  vaultUnlocked: boolean;
+  obsWindow: { open: boolean; endsAt: number; lastClosedAt: number };
+  syncStreak: number;
+  syncLastActor: "human" | "agent" | null;
+  syncLastAt: number;
+  ariaStatus: AriaStatusState;
+  ariaStatusDetail: string;
+  highlightId: string | null;
+}
+
+function snapshotState(): Snapshot {
+  const os = useOS.getState();
+  return {
+    flags: new Set(os.flags),
+    evidenceIds: new Set(useInvestigation.getState().evidenceIds),
+    toasts: [...os.toasts],
+    vaultAttempts: os.vaultAttempts,
+    vaultUnlocked: os.vaultUnlocked,
+    obsWindow: { ...os.obsWindow },
+    syncStreak: os.syncStreak,
+    syncLastActor: os.syncLastActor,
+    syncLastAt: os.syncLastAt,
+    ariaStatus: useAria.getState().status,
+    ariaStatusDetail: useAria.getState().statusDetail,
+    highlightId: useInvestigation.getState().highlightId,
+  };
+}
+
+function restoreState(s: Snapshot): void {
+  useOS.setState({
+    flags: s.flags,
+    toasts: s.toasts,
+    vaultAttempts: s.vaultAttempts,
+    vaultUnlocked: s.vaultUnlocked,
+    obsWindow: { ...s.obsWindow },
+    syncStreak: s.syncStreak,
+    syncLastActor: s.syncLastActor,
+    syncLastAt: s.syncLastAt,
+  });
+  useInvestigation.setState({ evidenceIds: s.evidenceIds, highlightId: s.highlightId });
+  useAria.setState({ status: s.ariaStatus, statusDetail: s.ariaStatusDetail });
+  // re-persist the restored state — supersedes any debounced write the checks scheduled
+  updateSave({
+    flags: [...s.flags],
+    evidenceIds: [...s.evidenceIds],
+    vaultAttempts: s.vaultAttempts,
+    unlockedVault: s.vaultUnlocked,
+  });
+}
+
 export function runDeterministicSelfTests(): SelfTestResult[] {
+  const snap = snapshotState();
+  try {
+    return runChecks();
+  } finally {
+    restoreState(snap);
+  }
+}
+
+function runChecks(): SelfTestResult[] {
   const results: SelfTestResult[] = [];
   const check = (name: string, pass: boolean, detail: string) => results.push({ name, pass, detail });
 
