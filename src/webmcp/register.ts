@@ -84,7 +84,7 @@ const get_investigation_context: ToolDef = {
         "/Private/vestibule.enc (locked — 3-word passphrase)",
       ],
       photoIds: ["DSC04821", "DSC04655", "DSC04788", "DSC04903", "IMG_0022", "IMG_0044", "IMG_0103"],
-      note: `The player sees only ${"what"} is on screen. When you learn something visual depends on them describing it.`,
+      note: "You see only machine-readable data — files, mail, messages, logs, EXIF. You cannot see pixels: photographs and anything visual are visible only to the player, who must describe them to you.",
     };
   },
 };
@@ -104,6 +104,7 @@ const search_files: ToolDef = {
     const q = clampStr(query).toLowerCase();
     if (!q) return { ok: false, error: "query is required (1–200 chars)" };
     S.markAgentCollaboration();
+    useAria.getState().setStatus("investigating", "searching the filesystem…");
     const os = useOS.getState();
     const results = S
       .fsList()
@@ -200,6 +201,7 @@ const get_message_thread: ToolDef = {
     const id = clampStr(threadId, 40);
     if (!id) return { ok: false, error: "threadId is required" };
     S.markAgentCollaboration();
+    useAria.getState().setStatus("reading", `reading thread ${id}…`);
     const res = S.getMessageThread(id);
     // truncate bodies to budget (1.5k) — keep ChatMsg shape intact
     if (Array.isArray(res.messages)) {
@@ -218,7 +220,11 @@ const open_messages_thread: ToolDef = {
     properties: { threadId: str("Thread id, e.g. t_sarah") },
     required: ["threadId"],
   },
-  execute: ({ threadId }) => S.openMessagesThread(clampStr(threadId, 40)),
+  execute: ({ threadId }) => {
+    const r = S.openMessagesThread(clampStr(threadId, 40));
+    if (r.ok) useAria.getState().setStatus("responding", "");
+    return r;
+  },
 };
 
 const search_emails: ToolDef = {
@@ -235,6 +241,7 @@ const search_emails: ToolDef = {
     const q = clampStr(query).toLowerCase();
     if (!q) return { ok: false, error: "query is required" };
     S.markAgentCollaboration();
+    useAria.getState().setStatus("investigating", "searching Daniel's mail…");
     const hits = S.listEmails()
       .filter((e) =>
         [e.from, e.fromEmail, e.subject, e.body].some((f) => f.toLowerCase().includes(q))
@@ -255,8 +262,10 @@ const get_email: ToolDef = {
   },
   annotations: { readOnlyHint: true, untrustedContentHint: true },
   execute: ({ emailId }) => {
-    const em = S.getEmail(clampStr(emailId, 40));
+    const id = clampStr(emailId, 40);
+    const em = S.getEmail(id);
     if (!em) return { ok: false, error: "no such email" };
+    useAria.getState().setStatus("reading", `reading ${id}…`);
     return { ...em, body: truncate(em.body) };
   },
 };
@@ -319,6 +328,7 @@ const search_browser_history: ToolDef = {
     const qq = clampStr(query);
     if (!qq) return { ok: false, error: "query is required" };
     S.markAgentCollaboration();
+    useAria.getState().setStatus("investigating", "searching browser history…");
     return { hits: S.searchBrowserHistory(qq).slice(0, 25) };
   },
 };
@@ -335,6 +345,7 @@ const get_system_logs: ToolDef = {
   annotations: { readOnlyHint: true, untrustedContentHint: true },
   execute: ({ filter }) => {
     S.markAgentCollaboration();
+    useAria.getState().setStatus("investigating", "scanning system logs…");
     const f = filter ? clampStr(filter) : undefined;
     const logs = S.getSystemLogs(f);
     if (logs.some((l) => l.time.startsWith("02:13"))) S.flagLogDiscovery();
@@ -355,6 +366,7 @@ const get_timeline: ToolDef = {
   annotations: { readOnlyHint: true, untrustedContentHint: true },
   execute: ({ window }) => {
     S.markAgentCollaboration();
+    useAria.getState().setStatus("investigating", "correlating the final night…");
     const w = clampStr((window as string) ?? "01:45-02:40", 40) || "01:45-02:40";
     // parse window like "01:45-02:40"
     let startMin = 105, endMin = 160; // defaults 01:45, 02:40
@@ -404,7 +416,10 @@ const get_case_evidence: ToolDef = {
   description: "List every piece of evidence recorded on the board so far (ids, sections, summaries).",
   inputSchema: { type: "object", properties: {} },
   annotations: { readOnlyHint: true },
-  execute: () => ({ evidence: S.getCaseEvidence() }),
+  execute: () => {
+    useAria.getState().setStatus("reading", "reviewing the evidence board…");
+    return { evidence: S.getCaseEvidence() };
+  },
 };
 
 /* ================= NAVIGATION TOOLS — visible, destructive ================= */
@@ -494,7 +509,11 @@ const open_directory: ToolDef = {
   title: "Open directory",
   description: "Navigate the File Manager to a directory on the player's screen.",
   inputSchema: { type: "object", properties: { path: str("Directory path, e.g. /Research/ORPHEUS") }, required: ["path"] },
-  execute: ({ path }) => S.openDirectory(clampStr(path, 300)),
+  execute: ({ path }) => {
+    const r = S.openDirectory(clampStr(path, 300));
+    if (r.ok) useAria.getState().setStatus("responding", "");
+    return r;
+  },
 };
 
 const open_email_tool: ToolDef = {
@@ -510,7 +529,11 @@ const open_browser_entry: ToolDef = {
   title: "Open browser entry",
   description: "Open the fictional Browser at a history entry's cached page (entry ids like hist_001 from search_browser_history).",
   inputSchema: { type: "object", properties: { entryId: str("History entry id") }, required: ["entryId"] },
-  execute: ({ entryId }) => S.openBrowserEntry(clampStr(entryId, 40)),
+  execute: ({ entryId }) => {
+    const r = S.openBrowserEntry(clampStr(entryId, 40));
+    if (r.ok) useAria.getState().setStatus("responding", "");
+    return r;
+  },
 };
 
 const terminal_command: ToolDef = {

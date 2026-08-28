@@ -70,7 +70,7 @@ src/
 - All mutations are store methods (`openApp`, `focusWindow`, `setGeom`, `addFlag`, ...). Fictional clock = March 10 09:12 + real elapsed.
 
 ### ariaStore — agent status (`src/game/state/ariaStore.ts`)
-- `status: idle|reading|investigating|responding` + `statusDetail` — surfaced in Taskbar + AgentLinkPanel while WebMCP tools run.
+- `status: idle|reading|investigating|responding` + `statusDetail` — surfaced in Taskbar + AgentLinkPanel while WebMCP tools run. All read/search tools set `investigating`/`reading`; visible navigation tools set `responding` on success — the whole desk reacts to the agent, not just the windows it opens.
 - No chat/queue; WebMCP is the channel (ChatGPT).
 
 ### investigationStore — the case (`src/game/state/investigationStore.ts`)

@@ -75,8 +75,8 @@ export const useInvestigation = create<InvestState>((set, get) => ({
     const q1 = answers.q1 ?? "";
     const q1Hits = [q1].filter(
       (a) =>
-        /(staged|faked|murder|killed|not an accident|didn't fall|did not fall)/.test(a.toLowerCase()) &&
-        /(02:13|watch|band|door|usb|login|heart|mid-beat)/.test(a.toLowerCase())
+        /(staged|faked|murder|killed|not an accident|didn'?t fall|did not fall|pushed|arranged|cover.?up|homicide|made it look)/.test(a.toLowerCase()) &&
+        /(02:13|watch|band|door|usb|login|heart|mid-beat|clock|log)/.test(a.toLowerCase())
     ).length;
     verdicts.q1 = q1Hits > 0 ? "SUPPORTED" : /accident|died|fall/.test(q1.toLowerCase()) && q1.length > 60 ? "PARTIALLY SUPPORTED" : "INSUFFICIENT EVIDENCE";
 
@@ -92,8 +92,8 @@ export const useInvestigation = create<InvestState>((set, get) => ({
     // Q3 what ORPHEUS revealed
     const q3 = (answers.q3 ?? "").toLowerCase();
     verdicts.q3 =
-      /(residual|bias term|drift|smoothing|probab|outcome|loaded|narrowing|agreeable)/.test(q3) &&
-      /(grow|exponential|e-fold|increas)/.test(q3)
+      /(residual|bias|drift|smoothing|probab|outcome|loaded|narrowing|agree|weight|converg)/.test(q3) &&
+      /(grow|exponential|e-?fold|increas|worsen|amplif|compound|acceler|over time)/.test(q3)
         ? "SUPPORTED"
         : /(measurement|anomal|residual)/.test(q3)
           ? "PARTIALLY SUPPORTED"
@@ -102,7 +102,7 @@ export const useInvestigation = create<InvestState>((set, get) => ({
     // Q4 why targeted
     const q4 = (answers.q4 ?? "").toLowerCase();
     verdicts.q4 =
-      /(publish|go public|refus|threat|maintenance|suppress|silenc|knew too much)/.test(q4)
+      /(publish|go public|refus|threat|maintenance|suppress|silenc|knew too much|arrang|erase|eliminat|remove|disappear|stop[^\n]{0,24}(publish|talk|tell))/.test(q4)
         ? "SUPPORTED"
         : /(research|found out|discover)/.test(q4)
           ? "PARTIALLY SUPPORTED"

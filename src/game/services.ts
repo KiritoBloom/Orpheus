@@ -337,11 +337,17 @@ export function attemptVault(words: string[]): { result: "success" | "decoy" | "
   } else if (attempts === 2) {
     os.pushToast({ app: "TERMINAL", title: "HINT", body: "Order matters. He also wore one on a brass plate — middle slot is worn smooth." });
   }
+  // progressive recovery hints — a stuck investigator is guided, never stalled
+  const hints: string[] = [];
+  if (attempts >= 4) hints.push("RECOVERY SECTOR NOTE: the first word is what you light a dark room with.");
+  if (attempts >= 7) hints.push("RECOVERY SECTOR NOTE: FIRST WORD CONFIRMED — 'lantern'. Two remain.");
+  if (attempts >= 10) hints.push("RECOVERY SECTOR NOTE: SECOND WORD — the name he gave the research itself. The third is what remains when a voice is gone.");
   sfx.error();
   return {
     result: "decoy",
     message:
-      "CHECKSUM MISMATCH — sequence rejected.\nAdjacent recovery sector mounted instead: /Private/_fragments_recovered\n(one wrong key does not destroy anything here. Daniel was gentle with strangers.)",
+      "CHECKSUM MISMATCH — sequence rejected.\nAdjacent recovery sector mounted instead: /Private/_fragments_recovered\n(one wrong key does not destroy anything here. Daniel was gentle with strangers.)" +
+      (hints.length ? "\n\n" + hints.join("\n") : ""),
   };
 }
 

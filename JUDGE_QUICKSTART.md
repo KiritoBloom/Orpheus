@@ -12,11 +12,11 @@
 Orpheus is verifiable without any AI host. The `LINK` console *is* the agent interface, exposed to you.
 
 1. Open live URL → wait for iris → **NEW INVESTIGATION** → skip boot (click) → desktop
-2. Tray → **LINK** (or `Ctrl+``) — judge console for all 26 tools
-3. Pick `get_system_logs` → input `{"filter":"02:13"}` → **EXECUTE** → see `log_035 LOGIN user S.OKAFOR ... gait mismatch` returned (1.5k cap, `untrustedContentHint`)
-4. Pick `get_timeline` → **EXECUTE** → see merged `01:45–02:40` chronology (logs + photos + messages) that would take a human 5 apps
-5. Pick `open_file` → `{"path":"/Research/ORPHEUS/anomaly_notes.txt"}` → **EXECUTE** → watch document open on YOUR screen
-6. Pick `scroll_document_to_line` → `{"path":"/Research/ORPHEUS/anomaly_notes.txt","line":184}` → **EXECUTE** → watch line 184 scroll into view with `line-flash` + `nav-sweep` — the visible actuation proof
+2. Tray → **LINK** (or `Ctrl+``) — judge console for all 26 tools; headline tools come with ready-made example inputs prefilled
+3. Pick `get_system_logs` — input prefilled `{"filter":"02:13"}` → **EXECUTE** → see `log_035 LOGIN user S.OKAFOR ... gait mismatch` returned (1.5k cap, `untrustedContentHint`)
+4. Pick `get_timeline` — prefilled window `01:45-02:40` → **EXECUTE** → see merged `01:45–02:40` chronology (logs + photos + messages) that would take a human 5 apps
+5. Pick `open_file` — prefilled with `/Research/ORPHEUS/anomaly_notes.txt` → **EXECUTE** → watch document open on YOUR screen
+6. Pick `scroll_document_to_line` — prefilled `{"path":"...anomaly_notes.txt","line":184}` → **EXECUTE** → watch line 184 scroll into view with `line-flash` + `nav-sweep` — the visible actuation proof
 
 You just verified: read-only search at scale + visible navigation that moves the human's screen + budgets + security — all without a host.
 

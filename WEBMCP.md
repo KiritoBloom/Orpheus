@@ -103,7 +103,7 @@ Errors are `{ ok: false, error: "<human>" }` — never a throw that drops state.
 
 - `registerWebMCPTools()` feature-detects `document.modelContext ?? navigator.modelContext`; retries on 800 ms poll + 1.2 s re-attach; observes `ModelContext`'s `toolchange` on live context (stale-capture bug fixed for Atlas late injection where initial `getModelContext()` is null). Supports `AbortSignal` unregistration per Chrome 153 without breaking in-flight executions; duplicate-name `InvalidStateError` is caught and warned.
 - Imperative + declarative: 26 imperative tools + 1 declarative `toolname="record_evidence"` form in `GameRoot.tsx` with `tooldescription`/`toolparamdescription`, `agentInvoked` + `respondWith(Promise)` handling, `toolactivated`/`toolcancel` window listeners (toast feedback), and `@supports selector(:tool-form-active)` CSS (`form:tool-form-active` dashed accent, `input:tool-submit-active` dashed amber) per `declarative-api` spec.
-- The Agent Link panel (`LINK` in tray / Ctrl+`) exercises every tool without a host by calling the execute handler directly when no WebMCP `executeTool` is available — valuable for judge testing and CI. Filter ◇ readOnly / ◆ nav / ⚑ untrusted. All tools show live `inputSchema` and budgets.
+- The Agent Link panel (`LINK` in tray / Ctrl+`) exercises every tool without a host by calling the execute handler directly when no WebMCP `executeTool` is available — valuable for judge testing and CI. Filter ◇ readOnly / ◆ nav / ⚑ untrusted. All tools show live `inputSchema` and budgets; headline tools arrive with ready-made example inputs prefilled so the documented judge path runs with zero typing.
 
 ---
 

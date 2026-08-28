@@ -65,7 +65,7 @@ Three words in a fixed order:
 2. **ORPHEUS** — the project name
 3. **ECHO** — "what remains when a sound has stopped" (the third word from the draft note + the brass-plate text)
 
-A correct `unlock lantern orpheus echo` in Terminal mounts the vestibule. Any other sequence mounts an adjacent fragment (`_fragments_recovered`) containing a warm archival note — reward for curiosity rather than punishment.
+A correct `unlock lantern orpheus echo` in Terminal mounts the vestibule. Any other sequence mounts an adjacent fragment (`_fragments_recovered`) containing a warm archival note — reward for curiosity rather than punishment. Repeated wrong attempts escalate gentle recovery hints in the terminal output (4+: a fragment about the first word; 7+: the first word confirmed; 10+: the second) so a stuck investigator is guided, never stalled.
 
 ### The reflection
 `DSC04821.JPG` — the office window glass, lower half, contains a dim figure holding a phone with a reversed visitor-badge glint. Visible at normal scale only to the attentive; sharp under manual zoom. The player tells ARIA; ARIA pulls message `t_sarah` line 16:11 ("badge was turned backwards") and browser history (Kestrel visitor badge program page) to identify the org. No tool performs that identification for the player.

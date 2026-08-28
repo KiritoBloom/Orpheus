@@ -105,16 +105,39 @@ export default function AgentLinkPanel({ onClose }: { onClose: () => void }) {
   );
 }
 
+/* Ready-made example inputs for the judge path — zero-typing verification.
+   Values mirror JUDGE_QUICKSTART.md so every console run matches the documented flow. */
+const EXAMPLE_ARGS: Record<string, string> = {
+  get_system_logs: JSON.stringify({ filter: "02:13" }),
+  get_timeline: JSON.stringify({ window: "01:45-02:40" }),
+  search_files: JSON.stringify({ query: "02:13" }),
+  search_messages: JSON.stringify({ query: "badge" }),
+  search_emails: JSON.stringify({ query: "kestrel" }),
+  search_browser_history: JSON.stringify({ query: "kestrel" }),
+  read_file: JSON.stringify({ path: "/Research/ORPHEUS/anomaly_notes.txt" }),
+  open_file: JSON.stringify({ path: "/Research/ORPHEUS/anomaly_notes.txt" }),
+  find_text_in_document: JSON.stringify({ path: "/Research/ORPHEUS/anomaly_notes.txt", query: "02:13" }),
+  scroll_document_to_line: JSON.stringify({ path: "/Research/ORPHEUS/anomaly_notes.txt", line: 184 }),
+  open_directory: JSON.stringify({ path: "/Research/ORPHEUS" }),
+  get_message_thread: JSON.stringify({ threadId: "t_sarah" }),
+  open_messages_thread: JSON.stringify({ threadId: "t_sarah" }),
+  get_email: JSON.stringify({ emailId: "mail_102" }),
+  open_email: JSON.stringify({ emailId: "mail_102" }),
+  get_image_metadata: JSON.stringify({ photoId: "DSC04821" }),
+  open_image: JSON.stringify({ photoId: "DSC04821" }),
+  open_browser_entry: JSON.stringify({ entryId: "hist_003" }),
+  terminal_command: JSON.stringify({ command: "help" }),
+};
+
 function defaultArgs(t: (typeof TOOL_DEFS)[number]): string {
+  const canned = EXAMPLE_ARGS[t.name];
+  if (canned !== undefined) return canned;
   const props = ((t.inputSchema as { properties?: Record<string, unknown> }).properties) ?? {};
   const obj: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(props)) {
     const schema = v as { enum?: string[]; type: string };
     obj[k] = schema.enum ? schema.enum[0] : schema.type === "number" ? 1 : schema.type === "array" ? ["msg_0001"] : "";
   }
-  if (t.name === "scroll_document_to_line") return JSON.stringify({ path: "/Research/ORPHEUS/anomaly_notes.txt", line: 184 });
-  if (t.name === "find_text_in_document") return JSON.stringify({ path: "/Research/ORPHEUS/anomaly_notes.txt", query: "02:13" });
-  if (t.name === "get_image_metadata") return JSON.stringify({ photoId: "DSC04821" });
   if (Object.keys(obj).length === 0) return "{}";
   return JSON.stringify(obj);
 }
