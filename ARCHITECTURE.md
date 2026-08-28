@@ -8,6 +8,7 @@
 - **Zustand 5** — live state (three stores) + persisted to **IndexedDB** via `idb-keyval` (key `orpheus-save-v1`).
 - **CSS only motion** — authentic 90s snap via stepped 80ms transitions; no `framer-motion` runtime (removed for bundle hygiene).
 - **Web Audio API** — all sound is synthesized (`src/audio/engine.ts`); keyboard clicks use `public/sound-effects/unicae_games_keyboard_soundpack_1/Single Keys`.
+- **next/image + next/font** — `next/image` serves `/Images` as AVIF/WebP via `/_next/image` (deviceSizes 640-2048, 1yr immutable, `fetchPriority: high` for viewer, `lazy` for grid); `next/font/google` IBM Plex Mono `display:swap` via `src/app/layout.tsx` (no external @import, optimal CLS).
 
 No server database, no auth, no external REST calls, no env keys.
 
@@ -38,7 +39,7 @@ src/
       investigationStore.ts  evidence set + highlight + four-question evaluation
     services.ts          THE capability layer — every UI and tool goes through here
   webmcp/
-    register.ts          25 TOOL_DEFS + registration + host detection + TermBus
+    register.ts          26 TOOL_DEFS + registration + host detection + TermBus
   components/
     title/IrisTitle.tsx  diegetic aperture mechanism + orbiting menu + pre-menu calibration
     boot/{BootSequence,MissionBriefing}.tsx  full-screen POST + briefing with Cherry MX soundpack
@@ -49,7 +50,7 @@ src/
     applications/{ Files, Mail, Messages, Photos+ImageViewer, Browser, Terminal,
                     SystemLog, Evidence, TextViewer}.tsx
     art/photos.tsx       procedural SVG photographs (every clue is vector & zoomable)
-    AgentLinkPanel.tsx   judge console for all 25 tools (LINK)
+    AgentLinkPanel.tsx   judge console for all 26 tools (LINK)
     GameRoot.tsx         lifecycle: title→boot→briefing→desktop→ending + hydration +
                          WebMCP polling + hum/focus wiring
     EndingSequence.tsx   staggered closes → iris → black
@@ -95,9 +96,9 @@ Event wiring `UI ↔ services` uses five tiny single-channel buses (`SimpleBus` 
 
 ## WebMCP lifecycle
 
-- `GameRoot` hydrates from IndexedDB, then calls `registerWebMCPTools()` once and polls every 1.2 s for late `modelContext` attachment; it observes `toolchange`.
-- On success the 25 `TOOL_DEFS` are registered; input schemas are pure JSON Schema; `execute` handlers delegate to `services.ts` and return MCP-shaped objects (`{ ok, error? }` or typed results).
-- No fallback assistant — WebMCP *is* the agent interface. During development the game remains playable without a host, but investigation is intentionally slower without an agent that can bulk-search and correlate.
+- `GameRoot` hydrates from IndexedDB, then calls `registerWebMCPTools()` once and polls every 800 ms for late `modelContext` (+ 1.2 s re-attach for late Atlas injection); it observes `toolchange`.
+- On success the 26 `TOOL_DEFS` are registered; input schemas are pure JSON Schema; `execute` handlers delegate to `services.ts` and return MCP-shaped objects (`{ ok, error? }` or typed results).
+- No fallback assistant — WebMCP *is* the agent interface. During development the game remains playable without a host, but investigation is intentionally slower without an agent that can bulk-search and correlate. 26 tools: 14 read-only + 9 visible nav + 3 evidence (guarded).
 
 ---
 

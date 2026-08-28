@@ -144,6 +144,19 @@ html, body {
 /* ---------- focus visibility (accessibility) ---------- */
 :focus-visible { outline: 1px dashed var(--accent); outline-offset: 1px; }
 
+/* ---------- declarative WebMCP focus indicator ---------- */
+/* When agent invokes declarative form, browser applies :tool-form-active + :tool-submit-active */
+@supports selector(:tool-form-active) {
+  form:tool-form-active {
+    outline: 1px dashed var(--accent);
+    outline-offset: 2px;
+  }
+  :is(input:tool-submit-active, button:tool-submit-active) {
+    outline: 1px dashed var(--amber);
+    outline-offset: 1px;
+  }
+}
+
 /* ---------- blinking block cursor ---------- */
 @keyframes blinkBlock { 0%,49% {opacity:1;} 50%,100% {opacity:0;} }
 .cursor-block { display:inline-block; width:0.62em; height:1.05em;

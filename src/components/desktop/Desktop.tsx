@@ -25,7 +25,6 @@ import { PhotosApp, ImageViewerApp } from "@/components/applications/PhotosApp";
 export default function Desktop() {
   const crt = useOS((s) => s.settings.crt);
   const textScale = useOS((s) => s.settings.textScale);
-  const windows = useOS((s) => s.windows);
   const [flicker, setFlicker] = useState(false);
 
   // subtle 02:13 intrigue pulse — brief horizontal scan, every ~38s, only when no window has focus (not distracting)
@@ -73,7 +72,7 @@ export default function Desktop() {
         <div className="bg-[#f4edd6] text-[#2b241e] p-2.5 shadow-[0_2px_10px_rgba(0,0,0,0.35),0_0_0_1px_rgba(0,0,0,0.12)] relative">
           <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-amber/80 shadow-[0_1px_3px_rgba(0,0,0,0.4)]" />
           <div className="text-[9px] tracking-[0.14em] text-[#8a7a5a]">MAYA — RECITAL</div>
-          <div className="text-[11px] font-medium leading-none mt-0.5 line-through decoration-[#b48a5a] decoration-1">19:00 — DON'T BE LATE</div>
+          <div className="text-[11px] font-medium leading-none mt-0.5 line-through decoration-[#b48a5a] decoration-1">19:00 — DON&apos;T BE LATE</div>
           <div className="text-[10px] text-[#6b5a3a] mt-1">run 150? @02:13??</div>
           <div className="absolute bottom-0 right-0 w-3 h-3 bg-[#e8dcc0] shadow-[-1px_-1px_2px_rgba(0,0,0,0.08)]" style={{ clipPath: "polygon(100% 0, 0 100%, 100% 100%)" }} />
         </div>

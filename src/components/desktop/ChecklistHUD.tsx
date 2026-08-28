@@ -113,6 +113,7 @@ export default function ChecklistHUD() {
     if (newlyDone.length > 0 && Object.keys(prevDone).length > 0) {
       sfx.chime();
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPrevDone(doneMap);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doneMap]);

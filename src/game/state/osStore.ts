@@ -10,6 +10,8 @@ import type {
   WinState,
 } from "@/types/game";
 import { getSave, updateSave } from "./persistence";
+import { EMAILS } from "@/game/data/emails";
+import { THREADS } from "@/game/data/chatMessages";
 
 /* ============================================================
    OS STORE — phase, windows, focus, toasts, settings, flags.
@@ -216,17 +218,10 @@ export const useOS = create<OSState>((set, get) => ({
     }),
 
   markAllMailRead: () =>
-    set((s) => {
-      // collect all mail ids known at this point
-      const { EMAILS } = require("@/game/data/emails") as { EMAILS: { id: string }[] };
-      return { readMailIds: new Set(EMAILS.map((e) => e.id)) };
-    }),
+    set(() => ({ readMailIds: new Set(EMAILS.map((e) => e.id)) })),
 
   markAllThreadsRead: () =>
-    set((s) => {
-      const { THREADS } = require("@/game/data/chatMessages") as { THREADS: { id: string }[] };
-      return { readThreadIds: new Set(THREADS.map((t) => t.id)) };
-    }),
+    set(() => ({ readThreadIds: new Set(THREADS.map((t) => t.id)) })),
 }));
 
 /* convenience selectors used across the app */

@@ -50,7 +50,7 @@ const truncate = (s: string) => (s.length > MAX_OUTPUT_CHARS ? s.slice(0, MAX_OU
 const APP_ENUM = enumOf(ALL_APPS as string[], "Which application");
 
 /* ================= INVESTIGATION TOOLS — read-only, flat, always available ================= */
-// Alex Nahas: read-only tools are your GETs — surface everything, let agent query.
+// Read-only tools are GETs — surface everything for agent queries.
 
 const get_investigation_context: ToolDef = {
   name: "get_investigation_context",
@@ -579,7 +579,7 @@ const open_evidence_board: ToolDef = {
 /* ============================================================ */
 
 export const TOOL_DEFS: ToolDef[] = [
-  // investigation — read-only flat list (Alex Nahas)
+  // investigation — read-only flat list
   get_investigation_context,
   search_files,
   read_file,

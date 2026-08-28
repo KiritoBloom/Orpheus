@@ -70,10 +70,6 @@ export const useInvestigation = create<InvestState>((set, get) => ({
 
   submitCaseReport: (answers) => {
     const verdicts: InvestState["caseVerdicts"] = {};
-    const has = (...words: string[]) =>
-      Object.values(answers).some((a) =>
-        words.some((w) => a.toLowerCase().includes(w))
-      );
 
     // Q1 what happened
     const q1 = answers.q1 ?? "";

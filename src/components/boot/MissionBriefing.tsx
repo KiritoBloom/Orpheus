@@ -60,6 +60,8 @@ export default function MissionBriefing({ onDone }: { onDone: () => void }) {
   useEffect(() => {
     if (done) return;
     if (shown >= LINES.length) {
+      // typing complete — intentional state transition, not a cascading derivate
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDone(true);
       return;
     }

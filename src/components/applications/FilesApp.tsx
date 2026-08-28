@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/purity -- seek animation jitter uses Math.random intentionally */
 
 import { useEffect, useState } from "react";
 import type { FsNode } from "@/types/game";
@@ -55,7 +56,6 @@ export default function FilesApp() {
         }, 90 + Math.random() * 40);
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function open(node: FsNode) {

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { browserNavBus } from "@/game/services";
 import { CACHED_PAGES, HISTORY } from "@/game/data/browserHistory";
@@ -225,8 +226,7 @@ function CachedPageView({
         <div className="px-6 py-6 max-w-[720px] mx-auto space-y-6">
           {/* Haldane */}
           <div className="flex gap-4 panel-inset !bg-[#0f1e1c] p-4 items-start">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/Images/PhotoBadgeScan.png" alt="M. Haldane's Kestrel visitor badge" className="w-[72px] h-[72px] object-cover object-center rounded-[2px] border border-[#1e2e36] shrink-0 grayscale contrast-125" loading="lazy" />
+            <Image src="/Images/PhotoBadgeScan.png" alt="M. Haldane's Kestrel visitor badge" width={72} height={72} className="w-[72px] h-[72px] object-cover object-center rounded-[2px] border border-[#1e2e36] shrink-0 grayscale contrast-125" loading="lazy" decoding="async" sizes="72px" />
             <div>
               <div className="text-[13px] font-bold tracking-wide text-[#e0ece8]">M. HALDANE — Directorate Liaison</div>
               <div className="text-[11px] text-[#7f9a8e] tracking-wide">Applied programs · office hours by correspondence only</div>
@@ -235,8 +235,7 @@ function CachedPageView({
           </div>
           {/* Vann */}
           <div className="flex gap-4 panel-inset !bg-[#11181c] p-4 items-start border-l-2 !border-l-[#3a4a4a]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/Images/PhotoEliasVann.png" alt="Dr. Elias Vann at CERN in 2003" className="w-[72px] h-[72px] object-cover object-top rounded-[2px] border border-[#1e2e36] shrink-0 grayscale" loading="lazy" />
+            <Image src="/Images/PhotoEliasVann.png" alt="Dr. Elias Vann at CERN in 2003" width={72} height={72} className="w-[72px] h-[72px] object-cover object-top rounded-[2px] border border-[#1e2e36] shrink-0 grayscale" loading="lazy" decoding="async" sizes="72px" />
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <span className="text-[13px] font-bold tracking-wide text-[#d8c8b8]">DR. ELIAS VANN</span>
@@ -306,12 +305,15 @@ function CachedPageView({
         <div className="max-w-[680px] mx-auto px-6 py-6 flex gap-6 flex-col sm:flex-row flex-1 w-full">
           <div className="shrink-0">
             <div className="w-[200px] h-[240px] bg-[#e8ddd0] border border-[#d6cfc0] overflow-hidden p-1.5 mx-auto sm:mx-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Image
                 src="/Images/PhotoEliasVann.png"
                 alt="Dr. Elias Vann at CERN in 2003"
+                width={200}
+                height={240}
                 className="w-full h-full object-cover grayscale contrast-110"
                 loading="lazy"
+                decoding="async"
+                sizes="200px"
               />
             </div>
             <div className="text-[10px] text-[#7a7060] text-center mt-2 font-mono">CERN 2003 · trigger-counter group<br/>photo: Meyrin site · August</div>

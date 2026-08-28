@@ -97,9 +97,9 @@ pnpm dev      # http://localhost:3000
 pnpm build && pnpm start
 ```
 
-Tech stack: Next.js 16.3 + React 19 + TypeScript + Tailwind + Turbopack + Zustand + `idb-keyval` for persistence + Web Audio API for sound. Zero `framer-motion` runtime — all motion is CSS stepped 80ms for authentic 90s snap.
+Tech stack: Next.js 16.3 + React 19 + TypeScript + Tailwind + Turbopack + Zustand + `idb-keyval` for persistence + Web Audio API for sound + `next/image` (AVIF/WebP, 1yr immutable) + `next/font` (IBM Plex Mono, display:swap). Zero `framer-motion` runtime — all motion is CSS stepped 80ms for authentic 90s snap.
 
-No backend, no database, no authentication. Persistence is IndexedDB (`orpheus-save-v1`) via Zustand + custom `src/game/state/persistence.ts`. Secure headers: `Origin-Agent-Cluster: ?1`, `Permissions-Policy: tools=self` (see `next.config.ts`).
+No backend, no database, no authentication. Persistence is IndexedDB (`orpheus-save-v1`) via Zustand + custom `src/game/state/persistence.ts`. Secure headers: `Origin-Agent-Cluster: ?1`, `Permissions-Policy: tools=self`, `Cross-Origin-Opener-Policy: same-origin`, `Cache-Control: immutable` for `_next/static` + `/Images` + `/_next/image` + `CDN-Cache-Control` (Cloudflare/Netlify) — see `next.config.ts`.
 
 ---
 
@@ -117,7 +117,7 @@ No backend, no database, no authentication. Persistence is IndexedDB (`orpheus-s
 
 3. For a full loop: open **Photos** → double-click `DSC04821.JPG` → tell the agent (ChatGPT) "something is reflected in the window" → watch it pull metadata, search messages, open the notebook, and scroll to line ≈184 (`"02:13 is not a time..."`) for you to read.
 
-The registration code lives in `src/webmcp/register.ts` and feature-detects `document.modelContext ?? navigator.modelContext` defensively. Rejection on duplicate name or bad schema is handled; `toolchange` events are observed with re-attach for late Atlas injection. Budgets enforced: 500 char desc / 150 param / 30 name / 1.5k output. `terminal_command` allowlists `ls|cd|cat|unlock|help|clear` and caps at 200 chars per secure-tools guide. Declarative fallback form for `record_evidence` lives hidden in `GameRoot.tsx`.
+The registration code lives in `src/webmcp/register.ts` and feature-detects `document.modelContext ?? navigator.modelContext` defensively. Rejection on duplicate name or bad schema is handled; `toolchange` events are observed with 800 ms poll + 1.2 s re-attach for late Atlas injection. Budgets enforced: 500 char desc / 150 param / 30 name / 1.5k output. `terminal_command` allowlists `ls|cd|cat|open|search|unlock|help|clear|history` and caps at 200 chars per secure-tools guide. Declarative fallback form for `record_evidence` lives hidden in `GameRoot.tsx`.
 
 ---
 

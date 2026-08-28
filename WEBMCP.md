@@ -7,13 +7,13 @@
 - **Secure context required** (HTTPS). `registerWebMCPTools()` bails cleanly if no host; the game remains playable but most efficient with an agent. Headers `Origin-Agent-Cluster: ?1` + `Permissions-Policy: tools=self` set in `next.config.ts`.
 - **Budgets per Chrome best practices:** 500 char desc / 150 param / 30 name / 1.5k output. `MAX_QUERY_LEN=200`, `MAX_OUTPUT_CHARS=1500`, `clampStr()` + `truncate()` on every path.
 
-The integration is **visible to the player** (windows open and scroll), **inspectable by a judge** (`src/webmcp/register.ts` is a single, readable module), and **manually runnable** without a host (tray **LINK** — the Agent Link console — calls `document.modelContext.executeTool` when available, the underlying service otherwise). Also includes a hidden declarative `<form data-webmcp-tool="record_evidence">` in `GameRoot.tsx` for the Declarative API.
+The integration is **visible to the player** (windows open and scroll), **inspectable by a judge** (`src/webmcp/register.ts` is a single, readable module), and **manually runnable** without a host (tray **LINK** — the Agent Link console — calls `document.modelContext.executeTool` when available, the underlying service otherwise). Also includes an offscreen declarative `<form toolname="record_evidence" tooldescription="...">` in `GameRoot.tsx` for the Declarative API (correct per `developer.chrome.com/docs/ai/webmcp/declarative-api`, with `toolparamdescription`, `agentInvoked` + `respondWith`, and `:tool-form-active` CSS).
 
 ---
 
 ## Tools (26)
 
-### Investigation — read-only (flat, always available — Alex Nahas)
+### Investigation — read-only (flat, always available)
 
 | Tool | Description | Input | Ann. |
 |---|---|---|---|
@@ -56,7 +56,17 @@ The integration is **visible to the player** (windows open and scroll), **inspec
 
 No `click(x,y)`, `type`, or hidden screenshot tools exist. The agent cannot zoom, cannot see pixels, cannot read screen geometry. The only way to show a visual clue is to ask the player to look.
 
-Security: `read_file`/`get_email`/`get_message_thread` etc. return `untrustedContentHint: true` so agents treat file bodies as data not instructions (lethal trifecta mitigation — Alex Nahas). `terminal_command` allowlists `ls|cd|cat|open|search|unlock|help|clear|history` and caps at 200 chars.
+### Security — prompt injection & tool hardening
+
+Per `developer.chrome.com/docs/ai/webmcp/secure-tools` + W3C WebMCP §6.3–6.4:
+
+- **Annotations:** every tool returning UGC/external fiction (`search_files`, `read_file`, `search_messages`, `get_message_thread`, `search_emails`, `get_email`, `search_browser_history`, `get_system_logs`, `get_timeline`, `find_text_in_document`) sets `untrustedContentHint: true` + `readOnlyHint: true` so the model treats file bodies as **data not instructions** (lethal trifecta mitigation: data × instructions × action). Pure system tools (`get_investigation_context`, `get_image_metadata`, `get_case_evidence`) stay `readOnly` only; mutating nav tools are neither. `terminal_command` is intentionally not readOnly.
+- **Budgets:** `MAX_QUERY_LEN=200`, `MAX_OUTPUT_CHARS=1500`, `description ≤500`, `param description ≤150`, `name ≤30` enforced via `clampStr()` + `truncate()` + `str().slice(0,150)` on every path per Chrome budgets.
+- **Strict validation, loose schema:** schemas are loose JSON Schema (`type: object` with `properties`/`required`/`enum`), code validates strictly (`path` must be absolute, `query` ≥1 char, `terminal_command` regex) and returns plain `{ok:false, error:"..."}` for self-correction (best-practices: “validate strictly in code, loosely in schema”).
+- **Allowlist, not blocklist:** `terminal_command` regex `^(ls|cd|cat|open|search|unlock|help|clear|history)(\s+[a-zA-Z0-9._\/\- ]*)?$` — only those verbs + `[A-Za-z0-9._/ -]`, so `; && | \` $()` injection is impossible; capped 200 chars per `secure-tools` input length guidance.
+- **No tool poisoning:** all `name/title/description` are static strings in `register.ts`, never derived from user content; no over-parameterization (1–2 params per tool, minimal `properties`).
+- **Origin isolation + Permissions Policy:** `next.config.ts` sets `Origin-Agent-Cluster: ?1` + `Permissions-Policy: tools=self` + `Cross-Origin-Opener-Policy: same-origin`; `SecureContext` (HTTPS) required, bails cleanly if no host; no `exposedTo` (single-origin, no cross-origin leakage).
+- **Cancellation:** `execute` receives `{signal}` and checks `signal.aborted` before running; registration uses `AbortSignal` for clean unregistration per Chrome 153 (prevents in-flight side effects).
 
 ---
 
@@ -87,9 +97,9 @@ Errors are `{ ok: false, error: "<human>" }` — never a throw that drops state.
 
 ## Lifecycle and robustness
 
-- `registerWebMCPTools()` feature-detects; retries on 800 ms poll + 1.2 s re-attach; observes `ModelContext`'s `toolchange` on live context (stale-capture bug fixed for Atlas late injection). Supports `AbortSignal`.
-- Duplicate-name registration rejection is caught; `unregister` via signal ready.
-- The Agent Link panel (`LINK` in tray / Ctrl+`) exercises every tool without a host by calling the execute handler directly when no WebMCP `executeTool` is available — valuable for judge testing and CI. Filter ◇ readOnly / ◆ nav / ⚑ untrusted. Declarative form fallback for `record_evidence` in `GameRoot.tsx`.
+- `registerWebMCPTools()` feature-detects `document.modelContext ?? navigator.modelContext`; retries on 800 ms poll + 1.2 s re-attach; observes `ModelContext`'s `toolchange` on live context (stale-capture bug fixed for Atlas late injection where initial `getModelContext()` is null). Supports `AbortSignal` unregistration per Chrome 153 without breaking in-flight executions; duplicate-name `InvalidStateError` is caught and warned.
+- Imperative + declarative: 26 imperative tools + 1 declarative `toolname="record_evidence"` form in `GameRoot.tsx` with `tooldescription`/`toolparamdescription`, `agentInvoked` + `respondWith(Promise)` handling, `toolactivated`/`toolcancel` window listeners (toast feedback), and `@supports selector(:tool-form-active)` CSS (`form:tool-form-active` dashed accent, `input:tool-submit-active` dashed amber) per `declarative-api` spec.
+- The Agent Link panel (`LINK` in tray / Ctrl+`) exercises every tool without a host by calling the execute handler directly when no WebMCP `executeTool` is available — valuable for judge testing and CI. Filter ◇ readOnly / ◆ nav / ⚑ untrusted. All tools show live `inputSchema` and budgets.
 
 ---
 

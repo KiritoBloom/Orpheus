@@ -1,5 +1,15 @@
 import type { Metadata, Viewport } from "next";
+import { IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
+
+// Self-hosted font with display:swap, variable, latin subset — no external @import, optimal CLS
+const plex = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  display: "swap",
+  variable: "--font-mono",
+  fallback: ["JetBrains Mono", "Cascadia Mono", "Consolas", "Courier New", "monospace"],
+});
 
 export const metadata: Metadata = {
   title: "ORPHEUS — The McDuff Investigation",
@@ -8,7 +18,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://orpheus-mcduff.vercel.app"),
   openGraph: {
     title: "ORPHEUS — The McDuff Investigation",
-    description: "A WebMCP experiment: human + agent investigate the same dead scientist's computer. 25 tools, visible actuation, no generic automation.",
+    description: "A WebMCP experiment: human + agent investigate the same dead scientist's computer. 26 tools, visible actuation, no generic automation.",
     url: "https://orpheus-mcduff.vercel.app/",
     siteName: "ORPHEUS",
     type: "website",
@@ -25,7 +35,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="en" className={`${plex.variable} h-full antialiased`}>
       <body className="min-h-full">{children}</body>
     </html>
   );

@@ -124,6 +124,7 @@ export default function IrisTitle({ onLaunch }: { onLaunch: (mode: "new" | "cont
   /* ---------- save probe ---------- */
   useEffect(() => {
     const s = getSave();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time hydration probe
     setHasSave(Boolean(s.hasProgress && !s.caseCompleteAt));
   }, []);
 
@@ -883,7 +884,7 @@ export default function IrisTitle({ onLaunch }: { onLaunch: (mode: "new" | "cont
                   <div className="iris-hr" />
                   <div className="iris-about-row"><span className="iris-about-role">FORMAT</span><span className="iris-about-val">A WEBMCP EXPERIMENT</span></div>
                   <div className="iris-about-row"><span className="iris-about-role">DESIGN</span><span className="iris-about-val">built with an AI co-investigator</span></div>
-                  <div className="iris-about-row"><span className="iris-about-role">SOUND</span><span className="iris-about-val">synthesized live, no samples</span></div>
+                  <div className="iris-about-row"><span className="iris-about-role">SOUND</span><span className="iris-about-val">hybrid sampler + Web Audio synthesis</span></div>
                   <div className="iris-about-note">DANIEL MCDUFF IS FICTIONAL</div>
                   <div className="iris-about-challenge">BUILT FOR THE WEBMCP CHALLENGE</div>
                 </div>

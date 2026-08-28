@@ -166,7 +166,7 @@ console.assert(r3.ok===false);
 ## How to run with Inspector
 
 1. Enable `chrome://flags/#enable-webmcp-testing` → Relaunch.
-2. Open https://orpheus-mcduff.vercel.app/ → `LINK` → verify 25 tools, ◇ readOnly / ◆ nav / ⚑ untrusted, 500/150/1.5k budgets.
+2. Open https://orpheus-mcduff.vercel.app/ → `LINK` → verify 26 tools, ◇ readOnly / ◆ nav / ⚑ untrusted, 500/150/1.5k budgets.
 3. Install Model Context Tool Inspector extension → paste each eval's `messages[0].content` → check `expectedCall`.
 
 Files that matter: `src/webmcp/register.ts` (single registry), `src/game/services.ts` (capability layer), `src/components/GameRoot.tsx` (800 ms poll + re-attach).

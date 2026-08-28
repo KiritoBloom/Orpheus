@@ -211,7 +211,7 @@ export function getImageMetadata(photoId: string): PhotoMeta | undefined {
 
 /* ---------------- mail ---------------- */
 
-export interface MailIndexItem extends Email {}
+export type MailIndexItem = Email;
 
 export function listEmails(): Email[] {
   const os = useOS.getState();

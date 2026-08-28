@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import type { PhotoMeta } from "@/types/game";
 import { PHOTOS, getPhoto } from "@/game/data/photos";
 import { getCurrentPhotoId, openPhoto, photoFocusBus } from "@/game/services";
@@ -28,12 +29,36 @@ const PHOTO_SOURCES: Record<string, string> = {
   campus_map: "/Images/PhotoCampusMap.png",
 };
 
-function PhotoAsset({ id, className = "" }: { id: string; className?: string }) {
+function PhotoAsset({
+  id,
+  className = "",
+  priority = false,
+  sizes,
+}: {
+  id: string;
+  className?: string;
+  priority?: boolean;
+  sizes?: string;
+}) {
   const source = PHOTO_SOURCES[id];
-  if (!source) return <div className="w-full h-full bg-surface" />;
-  // Public assets retain the evidence exactly as supplied, rather than recreating it as SVG.
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={source} alt="" className={`w-full h-full object-cover ${className}`} draggable={false} />;
+  const meta = getPhoto(id);
+  if (!source || !meta) return <div className="w-full h-full bg-surface" />;
+  // Optimized via next/image → WebP/AVIF, responsive, immutable cache. PNG source is converted on demand.
+  return (
+    <Image
+      src={source}
+      alt={meta.caption || meta.filename}
+      width={meta.width}
+      height={meta.height}
+      sizes={sizes ?? "(max-width: 640px) 120px, 256px"}
+      className={`w-full h-full object-cover ${className}`}
+      draggable={false}
+      loading={priority ? undefined : "lazy"}
+      decoding="async"
+      fetchPriority={priority ? "high" : "auto"}
+      priority={priority}
+    />
+  );
 }
 
 /* ---------------- album grid ---------------- */
@@ -73,7 +98,8 @@ export function PhotosApp() {
             aria-label={`open ${p.filename}`}
           >
             <div className="aspect-[4/3] overflow-hidden border border-line group-hover:border-linebright img-checker relative">
-              <div className="absolute inset-0 pointer-events-none"><PhotoAsset id={p.id} /></div>
+              {/* Thumbnail 120px — served as 256w WebP via _next/image */}
+              <div className="absolute inset-0 pointer-events-none"><PhotoAsset id={p.id} sizes="120px" /></div>
             </div>
             <div className="mt-1 text-[9.5px] text-dim truncate group-hover:text-txt">{p.filename}</div>
           </button>
@@ -200,7 +226,8 @@ export function ImageViewerApp() {
           style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom * (bump ? 1.02 : 1)})`, transition: dragging ? "none" : bump ? "transform 40ms ease-out" : "transform .12s ease-out" }}
         >
           <div className="relative" style={{ width: "min(100%, 900px)", aspectRatio: `${meta.width}/${meta.height}` }}>
-            <PhotoAsset id={photoId} className="object-contain" />
+            {/* Viewer: priority + high fetchPriority for the forensic detail the player must zoom */}
+            <PhotoAsset id={photoId} className="object-contain" priority sizes="(max-width: 900px) 100vw, 900px" />
           </div>
         </div>
 

@@ -36,7 +36,6 @@ const SAMPLE_MAP: Record<string, string> = {
   // title menu — user-provided sound effects
   menuClick: "/sound-effects/mixkit-mouse-click-close.wav",        // menu item confirm
   menuSelect: "/sound-effects/freesound_community-select-menu-47560.mp3", // menu highlight/hover
-  menuTyping: "/sound-effects/lenspulse-mechanical-keyboard-fast-typing-sound-effect-577918.mp3", // boot typing
 };
 
 class AudioEngine {
@@ -283,30 +282,6 @@ class AudioEngine {
   menuSelect() {
     // fired when the highlight moves onto a menu item (hover or arrow keys)
     if (!this.playSample("menuSelect", 0.5, 0.03)) this.playNote(620, 0.05, 0.09, "pulse25", undefined, { env: "blip" });
-  }
-
-  private typingTimer: ReturnType<typeof setTimeout> | null = null;
-
-  startTyping() {
-    this.stopTyping();
-    if (!this.ok()) return;
-    const tick = () => {
-      const buf = this.buffers.get("menuTyping");
-      if (buf) {
-        this.playSample("menuTyping", 0.42, 0.02);
-        // replay just before the sample runs out so typing never goes silent mid-line
-        this.typingTimer = setTimeout(tick, Math.max(140, buf.duration * 1000 - 40));
-      } else {
-        // synthesized fallback while the sample pack is unavailable
-        this.keyClick();
-        this.typingTimer = setTimeout(tick, 150);
-      }
-    };
-    tick();
-  }
-
-  stopTyping() {
-    if (this.typingTimer) { clearTimeout(this.typingTimer); this.typingTimer = null; }
   }
 
   keyClick() {

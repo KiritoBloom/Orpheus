@@ -13,12 +13,10 @@ export default function WindowFrame({
   id,
   title,
   children,
-  accent,
 }: {
   id: WinId;
   title: string;
   children: React.ReactNode;
-  accent?: boolean;
 }) {
   const win = useOS((s) => s.windows[id]);
   const focused = useOS((s) => s.focused === id);
@@ -73,6 +71,7 @@ export default function WindowFrame({
   // 90s open ghost + scan when win just opened
   useEffect(() => {
     if (win.open && !win.minimized) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- entrance animation trigger
       setJustOpened(true);
       const t = setTimeout(() => setJustOpened(false), 220);
       return () => clearTimeout(t);

@@ -141,7 +141,7 @@ The case reconstruction UI (`Evidence → CASE RECONSTRUCTION`) asks four questi
 
 ### Every clue has a purpose; clues connect rather than sit isolated
 
-All 21 evidence items derive from at least two independent sources. No entry exists for flavor alone.
+All 20 evidence items derive from at least two independent sources. No entry exists for flavor alone.
 
 | Example | Connects |
 |---|---|

@@ -1,7 +1,11 @@
 "use client";
+/* eslint-disable react/no-unescaped-entities -- SVG text nodes contain literal quotes for diegetic detail */
 
 /* ============================================================
    PHOTOGRAPHIC ARTWORK — procedural SVG "photographs".
+   DEPRECATED: retained for reference only. Production uses PNG
+   assets in public/Images/ via PhotosApp.tsx PhotoAsset.
+   Not imported anywhere; no bundle cost. Keep for design history.
    Every clue is vector: crisp at any zoom. Human-only details
    are deliberately small/dim at fit-size, sharp when zoomed.
    ============================================================ */

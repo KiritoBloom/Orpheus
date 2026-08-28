@@ -61,7 +61,7 @@ export default function GameRoot() {
   }, [hydrate]);
 
   /* ---------- webmcp registration (poll for late injection) ---------- */
-  // Justin Rushing / Sarah Drasner: ChatGPT Atlas + Chrome 149 both inject async — poll + live toolchange
+  // Atlas + Chrome 149 inject async — poll + live toolchange
   useEffect(() => {
     if (!ready) return;
     registerWebMCPTools();
@@ -129,24 +129,32 @@ export default function GameRoot() {
   }, []);
 
   /* ---------- first desktop entry — greet + auto-open Field Guide ---------- */
+  // Desktop entry handled once; avoids re-trigger on settings changes and skips auto-open for returning users.
+  const desktopEntryHandled = useRef(false);
   useEffect(() => {
-    if (phase !== "desktop" || !ready) return;
+    if (phase !== "desktop" || !ready) {
+      if (phase !== "desktop") desktopEntryHandled.current = false;
+      return;
+    }
+    if (desktopEntryHandled.current) return;
+    desktopEntryHandled.current = true;
     const os = useOS.getState();
     const alreadyMet = os.flags.has("MET_ARIA");
     const sawGuide = os.flags.has("FOUND_GUIDE");
+    const soundOn = useOS.getState().settings.sound;
     const t = setTimeout(async () => {
       if (!alreadyMet && !useOS.getState().flags.has("MET_ARIA")) {
         useAria.getState().setStatus("idle");
         useOS.getState().addFlag("MET_ARIA");
-        if (settings.sound) sfx.ding();
+        if (soundOn) sfx.ding();
       }
-      // auto-open the Field Guide exactly once per investigation — the promised "file that opens when we first enter the desktop"
+      // Auto-open Field Guide exactly once per investigation — the promised "file that opens when we first enter the desktop"
       if (!sawGuide && !useOS.getState().flags.has("FOUND_GUIDE")) {
         const { openFile, openApplication } = await import("@/game/services");
         // small stagger so the desktop settles, then guide appears on top
         setTimeout(() => {
           openFile("/System/FIELD_GUIDE.txt");
-          if (settings.sound) sfx.windowOpen();
+          if (useOS.getState().settings.sound) sfx.windowOpen();
         }, 500);
         setTimeout(() => {
           // open Files behind it so the player sees the filesystem context
@@ -160,13 +168,11 @@ export default function GameRoot() {
             body: "I can search everything. You can see what I cannot. Tell me what you see → watch me move.",
           });
         }, 1400);
-      } else if (!useOS.getState().windows.files.open) {
-        // returning investigator who already saw guide — just ensure Files is available
-        setTimeout(() => useOS.getState().openWindow("files"), 400);
       }
+      // No else branch: returning investigators choose when to open Files themselves.
     }, 900);
     return () => clearTimeout(t);
-  }, [phase, ready, settings.sound]);
+  }, [phase, ready]);
 
   /* ---------- case complete → ending ---------- */
   useEffect(() => {
@@ -221,6 +227,25 @@ export default function GameRoot() {
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
+  }, []);
+
+  /* ---------- declarative tool lifecycle ---------- */
+  useEffect(() => {
+    const onActivated = (e: Event) => {
+      const name = (e as unknown as { toolName?: string }).toolName ?? "record_evidence";
+      // Visible feedback when agent fills the declarative form (Chrome guide: :tool-form-active)
+      useOS.getState().pushToast({ app: "WEBMCP", title: "TOOL ACTIVATED", body: `${name} — agent is filling the form` });
+    };
+    const onCancel = (e: Event) => {
+      const name = (e as unknown as { toolName?: string }).toolName ?? "record_evidence";
+      useOS.getState().pushToast({ app: "WEBMCP", title: "TOOL CANCELLED", body: name });
+    };
+    window.addEventListener("toolactivated" as never, onActivated as never);
+    window.addEventListener("toolcancel" as never, onCancel as never);
+    return () => {
+      window.removeEventListener("toolactivated" as never, onActivated as never);
+      window.removeEventListener("toolcancel" as never, onCancel as never);
+    };
   }, []);
 
   /* ---------- phase transitions from title ---------- */
@@ -317,21 +342,30 @@ export default function GameRoot() {
       {phase === "desktop" && <Toasts />}
 
       {/* ---------- declarative WebMCP tool — https://developer.chrome.com/docs/ai/webmcp/declarative-api ---------- */}
-      {/* Sarah Drasner: show both imperative + declarative. This form is a second path to record_evidence, visible to agents that prefer filling forms. Imperative remains primary. */}
+      {/* Both imperative + declarative per best practices. Uses toolname/tooldescription/toolparamdescription + agentInvoked/respondWith. Offscreen but focusable so :tool-form-active outline shows when agent invokes. */}
       <form
         id="webmcp-declarative-evidence"
-        data-webmcp-tool="record_evidence"
-        data-webmcp-description="Record evidence via form — alternative to record_evidence tool"
+        {...({ toolname: "record_evidence", tooldescription: "Record evidence via form — alternative to record_evidence tool" } as unknown as React.FormHTMLAttributes<HTMLFormElement>)}
         onSubmit={(e) => {
-          e.preventDefault();
+          const se = e as unknown as SubmitEvent & { agentInvoked?: boolean; respondWith?: (p: Promise<unknown>) => void };
           const fd = new FormData(e.currentTarget as HTMLFormElement);
           const id = String(fd.get("evidenceId") || "").trim();
-          if (id) import("@/game/services").then((S) => S.recordEvidenceById(id));
+          if (!id) return;
+          if (se.agentInvoked && se.respondWith) {
+            e.preventDefault();
+            const p = import("@/game/services").then((S) => S.recordEvidenceById(id));
+            se.respondWith(p);
+            return;
+          }
+          e.preventDefault();
+          void import("@/game/services").then((S) => S.recordEvidenceById(id));
         }}
-        style={{ display: "none" }}
+        // Offscreen but not display:none so browser can focus and apply :tool-form-active (Chrome declarative guide)
+        style={{ position: "absolute", left: "-9999px", width: "1px", height: "1px", overflow: "hidden" }}
         aria-hidden
       >
-        <input name="evidenceId" type="hidden" defaultValue="ev_daniel" />
+        <input name="evidenceId" type="hidden" defaultValue="ev_daniel" {...({ toolparamdescription: "Evidence id, e.g. ev_0213_login" } as unknown as React.InputHTMLAttributes<HTMLInputElement>)} />
+        <button type="submit" style={{ display: "none" }} tabIndex={-1} aria-hidden>Submit</button>
       </form>
     </div>
   );

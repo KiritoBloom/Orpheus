@@ -19,6 +19,7 @@ export default function DesktopIcons() {
 
   function activate(app: AppId) {
     setSelected(app);
+    // eslint-disable-next-line react-hooks/purity -- event handler, not render
     const now = Date.now();
     if (lastTap.current?.app === app && now - lastTap.current.t < 450) {
       os.openApp(app);

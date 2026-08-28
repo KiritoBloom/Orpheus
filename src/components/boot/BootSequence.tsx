@@ -59,6 +59,7 @@ export default function BootSequence({ onDone }: { onDone: () => void }) {
     if (phase !== "post" || done) return;
     const line = BOOT_LINES[shown];
     if (!line) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- boot completion transition
       setDone(true);
       if (os.settings.sound) sfx.bootBeep();
       return;
