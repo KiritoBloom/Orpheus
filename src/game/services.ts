@@ -165,8 +165,8 @@ export function openPhoto(photoId: string): void {
   const os = useOS.getState();
   currentPhotoId = photoId;
   os.openWindow("imageviewer");
-  // Let a newly opened viewer subscribe before delivering the focus event.
-  setTimeout(() => photoFocusBus.emit(photoId), 0);
+  // Viewer now syncs via getCurrentPhotoId() in useLayoutEffect — emit synchronously for already-open case
+  photoFocusBus.emit(photoId);
   sfx.windowOpen();
   onPhotoViewed(photoId);
 }

@@ -31,23 +31,13 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Next static assets + Images are content-addressed — 1 year immutable
-        source: "/_next/static/:path*",
-        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
-      },
-      {
-        // CDN cache for all deployment targets (Vercel, Cloudflare, Netlify)
+        // CDN cache for all deployment targets (Vercel, Cloudflare, Netlify) — Images are content-addressed
         source: "/Images/:path*",
         headers: [
           { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
           { key: "CDN-Cache-Control", value: "public, max-age=31536000, immutable" },
           { key: "Cloudflare-CDN-Cache-Control", value: "public, max-age=31536000, immutable" },
         ],
-      },
-      {
-        // Optimized images via _next/image — same long TTL
-        source: "/_next/image",
-        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
       },
     ];
   },

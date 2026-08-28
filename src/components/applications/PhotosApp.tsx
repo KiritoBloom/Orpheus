@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Image from "next/image";
 import type { PhotoMeta } from "@/types/game";
 import { PHOTOS, getPhoto } from "@/game/data/photos";
@@ -31,32 +31,51 @@ const PHOTO_SOURCES: Record<string, string> = {
 
 function PhotoAsset({
   id,
-  className = "",
-  priority = false,
   sizes,
 }: {
   id: string;
-  className?: string;
-  priority?: boolean;
   sizes?: string;
 }) {
   const source = PHOTO_SOURCES[id];
   const meta = getPhoto(id);
   if (!source || !meta) return <div className="w-full h-full bg-surface" />;
-  // Optimized via next/image → WebP/AVIF, responsive, immutable cache. PNG source is converted on demand.
+  // Grid thumbnail: optimized via next/image → WebP/AVIF. Low-res is fine for 120px tiles.
   return (
     <Image
       src={source}
       alt={meta.caption || meta.filename}
       width={meta.width}
       height={meta.height}
-      sizes={sizes ?? "(max-width: 640px) 120px, 256px"}
-      className={`w-full h-full object-cover ${className}`}
+      sizes={sizes ?? "120px"}
+      className="w-full h-full object-cover"
       draggable={false}
-      loading={priority ? undefined : "lazy"}
+      loading="lazy"
       decoding="async"
-      fetchPriority={priority ? "high" : "auto"}
-      priority={priority}
+      fetchPriority="auto"
+    />
+  );
+}
+
+function PhotoViewerImage({ id }: { id: string }) {
+  const source = PHOTO_SOURCES[id];
+  const meta = getPhoto(id);
+  if (!source || !meta) return <div className="w-full h-full bg-surface" />;
+  // Forensic viewer: full-resolution PNG (unoptimized) so CSS scale(9×) stays crisp
+  // and does not upscale a 256w WebP into a blurry, ghosted tile.
+  return (
+    <Image
+      src={source}
+      alt={meta.caption || meta.filename}
+      width={meta.width}
+      height={meta.height}
+      className="w-full h-full object-contain"
+      draggable={false}
+      decoding="async"
+      fetchPriority="high"
+      priority
+      unoptimized
+      sizes="900px"
+      style={{ objectFit: "contain" }}
     />
   );
 }
@@ -98,7 +117,6 @@ export function PhotosApp() {
             aria-label={`open ${p.filename}`}
           >
             <div className="aspect-[4/3] overflow-hidden border border-line group-hover:border-linebright img-checker relative">
-              {/* Thumbnail 120px — served as 256w WebP via _next/image */}
               <div className="absolute inset-0 pointer-events-none"><PhotoAsset id={p.id} sizes="120px" /></div>
             </div>
             <div className="mt-1 text-[9.5px] text-dim truncate group-hover:text-txt">{p.filename}</div>
@@ -112,7 +130,7 @@ export function PhotosApp() {
 /* ---------------- viewer ---------------- */
 
 export function ImageViewerApp() {
-  const [photoId, setPhotoId] = useState<string>("DSC04821");
+  const [photoId, setPhotoId] = useState<string>(() => getCurrentPhotoId());
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [showInfo, setShowInfo] = useState(false);
@@ -123,12 +141,13 @@ export function ImageViewerApp() {
   const prevZoomRef = useRef(1);
   const os = useOS();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const selectPhoto = (id: string) => {
       setPhotoId(id);
       setZoom(1);
       setPan({ x: 0, y: 0 });
     };
+    // Sync immediately before paint — avoids flash of DSC04821 when opening a different photo
     selectPhoto(getCurrentPhotoId());
     return photoFocusBus.on((id) => selectPhoto(String(id)));
   }, []);
@@ -223,11 +242,15 @@ export function ImageViewerApp() {
       >
         <div
           className="absolute inset-0 grid place-items-center"
-          style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom * (bump ? 1.02 : 1)})`, transition: dragging ? "none" : bump ? "transform 40ms ease-out" : "transform .12s ease-out" }}
+          style={{
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom * (bump ? 1.02 : 1)})`,
+            transformOrigin: "center center",
+            willChange: "transform",
+            transition: dragging ? "none" : bump ? "transform 40ms ease-out" : "transform .12s ease-out",
+          }}
         >
           <div className="relative" style={{ width: "min(100%, 900px)", aspectRatio: `${meta.width}/${meta.height}` }}>
-            {/* Viewer: priority + high fetchPriority for the forensic detail the player must zoom */}
-            <PhotoAsset id={photoId} className="object-contain" priority sizes="(max-width: 900px) 100vw, 900px" />
+            <PhotoViewerImage id={photoId} />
           </div>
         </div>
 
