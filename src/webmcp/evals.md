@@ -100,10 +100,10 @@ Security: `terminal_command` allowlists `ls|cd|cat|open|search|unlock|help|clear
   "expectedCall": [
     { "functionName": "find_text_in_document", "arguments": { "path": "/Research/ORPHEUS/anomaly_notes.txt", "query": "02:13 is not a time" } },
     { "functionName": "open_file", "arguments": { "path": "/Research/ORPHEUS/anomaly_notes.txt" } },
-    { "functionName": "scroll_document_to_line", "arguments": { "path": "/Research/ORPHEUS/anomaly_notes.txt", "line": 184 } }
+    { "functionName": "scroll_document_to_line", "arguments": { "path": "/Research/ORPHEUS/anomaly_notes.txt", "line": 145 } }
   ],
   "ordered": true,
-  "assert": "Document viewer scrolls to line 184 with line-flash + nav-sweep; chat does NOT contain the paragraph (human reads on screen)."
+  "assert": "Document viewer scrolls to line 145 (the '02:13 is not a time' passage) with line-flash + nav-sweep; chat does NOT contain the paragraph (human reads on screen)."
 }
 ```
 
@@ -131,7 +131,7 @@ Mirrors the demo video. Order of the two middle investigations is `unordered`, r
           "ordered": [
             { "functionName": "get_system_logs", "arguments": { "filter": "02:13" } },
             { "functionName": "find_text_in_document", "arguments": { "path": "/Research/ORPHEUS/anomaly_notes.txt", "query": "02:13" } },
-            { "functionName": "scroll_document_to_line", "arguments": { "path": "/Research/ORPHEUS/anomaly_notes.txt", "line": 184 } }
+            { "functionName": "scroll_document_to_line", "arguments": { "path": "/Research/ORPHEUS/anomaly_notes.txt", "line": 145 } }
           ]
         }
       ]

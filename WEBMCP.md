@@ -121,7 +121,7 @@ Seven evals covering isolation → ambiguous → ordered chain → end-to-end �
 
 ## Judge path — 90 seconds
 
-See `JUDGE_QUICKSTART.md`. Fastest path without an agent: `LINK` → `get_system_logs {"filter":"02:13"}` → `get_timeline` → `scroll_document_to_line {"path":"/Research/ORPHEUS/anomaly_notes.txt","line":184}` — watch the desktop move on your screen. With an agent (Atlas or Chrome flag): say "Something is reflected in DSC04821 — what is it?" and watch the handoff.
+See `JUDGE_QUICKSTART.md`. Fastest path without an agent: `LINK` → `get_system_logs {"filter":"02:13"}` → `get_timeline` → `scroll_document_to_line {"path":"/Research/ORPHEUS/anomaly_notes.txt","line":145}` — watch the desktop move on your screen (line 145 is the "02:13 is not a time" passage). With an agent (Atlas or Chrome flag): say "Something is reflected in DSC04821 — what is it?" and watch the handoff.
 
 ## Pattern — beyond the game (co-op anywhere solo work strains people)
 

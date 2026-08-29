@@ -182,3 +182,106 @@ function runChecks(): SelfTestResult[] {
 
   return results;
 }
+
+/* ============================================================
+   QUICK VERIFY — 9 evals + 3 visible-actuation tool calls.
+   This is the "30-second judge path" without a host.
+
+   Difference from RUN EVALS:
+   - RUN EVALS = 9 deterministic in-process checks (budgets, schemas,
+     security, search, briefing, budget, etc.) — every check inspects
+     a return value but doesn't visibly move the desk.
+   - QUICK VERIFY = the same 9 checks PLUS 3 tool calls that ACTUATE
+     the desk: a system-log query (proves a UGC tool with
+     untrustedContentHint), a timeline merge (proves cross-source
+     correlation), and a scroll-to-line (proves the visible-actuation
+     contract — the document moves on screen).
+
+   State-safe: snapshot before, restore after, like RUN EVALS.
+   Returns a tagged result so the panel can render a clear
+   pass/partial/fail banner.
+
+   The 3 tool calls are hardcoded to the documented headline
+   values from JUDGE_QUICKSTART.md so the panel matches the docs.
+   Line 145 = the "02:13 is not a time" passage (lineOf() in
+   filesystem.ts: LINE_0213_PASSAGE = 145).
+   ============================================================ */
+
+export interface QuickVerifyResult {
+  passed: number; // total checks passed
+  total: number; // total checks (always 9 + 3 = 12)
+  evals: SelfTestResult[];
+  toolCalls: { name: string; pass: boolean; detail: string }[];
+  summary: "pass" | "partial";
+}
+
+export async function runQuickVerify(): Promise<QuickVerifyResult> {
+  const snap = snapshotState();
+  const evals = runDeterministicSelfTests();
+  const toolCalls: { name: string; pass: boolean; detail: string }[] = [];
+
+  try {
+    // 1) system logs filter — proves a UGC tool with untrustedContentHint
+    {
+      const r = tool("get_system_logs").execute({ filter: "02:13" }) as {
+        count: number;
+        logs?: { id: string; detail: string }[];
+      };
+      const logs = r.logs ?? [];
+      const ok =
+        r.count >= 1 &&
+        logs.some((l) => l.id === "log_035" && /gait/i.test(l.detail));
+      toolCalls.push({
+        name: "get_system_logs {filter:'02:13'} → final-night cluster + gait reveal",
+        pass: ok,
+        detail: `count: ${r.count} · log_035 ${logs.some((l) => l.id === "log_035") ? "present" : "MISSING"}`,
+      });
+    }
+
+    // 2) timeline merge — proves cross-source correlation
+    {
+      const r = tool("get_timeline").execute({ window: "01:45-02:40" }) as {
+        count: number;
+        has0213Cluster: boolean;
+        timeline?: { time: string }[];
+      };
+      const ok = r.count >= 1 && r.has0213Cluster === true && (r.timeline?.length ?? 0) > 0;
+      toolCalls.push({
+        name: "get_timeline {window:'01:45-02:40'} → merged chronology + 02:13 cluster",
+        pass: ok,
+        detail: `count: ${r.count} · 02:13 cluster: ${r.has0213Cluster ? "yes" : "NO"}`,
+      });
+    }
+
+    // 3) scroll-to-line — proves the visible-actuation contract
+    //    The line is chosen so the player visibly sees the document move
+    //    AND the line content is meaningful (the "02:13 is not a time" passage).
+    //    LINE_0213_PASSAGE in filesystem.ts = 145.
+    {
+      const r = tool("scroll_document_to_line").execute({
+        path: "/Research/ORPHEUS/anomaly_notes.txt",
+        line: 145,
+      }) as { ok: boolean; error?: string; line?: number };
+      const ok = r.ok === true && r.line === 145;
+      toolCalls.push({
+        name: "scroll_document_to_line (anomaly_notes.txt:145) → document moves on screen",
+        pass: ok,
+        detail: r.ok ? `scrolled to line ${r.line}` : r.error ?? "ok=false",
+      });
+    }
+  } finally {
+    restoreState(snap);
+  }
+
+  const evalPasses = evals.filter((r) => r.pass).length;
+  const toolPasses = toolCalls.filter((r) => r.pass).length;
+  const passed = evalPasses + toolPasses;
+  const total = evals.length + toolCalls.length;
+  return {
+    passed,
+    total,
+    evals,
+    toolCalls,
+    summary: passed === total ? "pass" : "partial",
+  };
+}

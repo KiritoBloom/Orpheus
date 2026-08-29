@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAria } from "@/game/state/ariaStore";
 import { TOOL_DEFS, webmcpAvailable } from "@/webmcp/register";
-import { runDeterministicSelfTests } from "@/webmcp/selftest";
+import { runDeterministicSelfTests, runQuickVerify } from "@/webmcp/selftest";
 
 /* ============================================================
    AGENT LINK PANEL — judge/dev console.
@@ -54,49 +54,37 @@ export default function AgentLinkPanel({ onClose }: { onClose: () => void }) {
     setBusy(false);
   }
 
-  /** One-click judge verification — runs the deterministic evals + 3 headline
-   *  tool calls from JUDGE_QUICKSTART.md (system logs → timeline → scroll).
-   *  Everything runs without a host. Result is plain text so a judge can
-   *  verify WebMCP is live in under 30 seconds. */
+  /** One-click judge verification — runs the 9 deterministic evals + 3
+   *  visible-actuation tool calls (system logs → timeline → scroll-to-line
+   *  145 on the "02:13 is not a time" passage). State-safe: investigation
+   *  state is snapshotted and restored, so this advances no checkpoints.
+   *
+   *  Differs from RUN EVALS: RUN EVALS only inspects return values; QUICK
+   *  VERIFY also ACTUATES the desk (the document viewer scrolls visibly
+   *  during the run), proving the visible-actuation contract.
+   */
   async function quickVerify() {
     setBusy(true);
-    setOutput("… running 9 evals + 3 tool calls");
+    setOutput("… running 9 evals + 3 visible-actuation tool calls");
     try {
+      const r = await runQuickVerify();
       const lines: string[] = [];
-      // 1) deterministic evals
-      const rs = runDeterministicSelfTests();
-      const passed = rs.filter((r) => r.pass).length;
-      lines.push(`▸ DETERMINISTIC EVALS — ${passed}/${rs.length} PASSED`);
-      rs.forEach((r) => lines.push(`  ${r.pass ? "✓" : "✗"} ${r.name}`));
-      // 2) headline tool calls (the 30s judge path)
-      const checks: { name: string; tool: string; input: Record<string, unknown> }[] = [
-        { name: "get_system_logs {filter:02:13}", tool: "get_system_logs", input: { filter: "02:13" } },
-        { name: "get_timeline {window:01:45-02:40}", tool: "get_timeline", input: { window: "01:45-02:40" } },
-        { name: "scroll_document_to_line (anomaly_notes.txt:184)", tool: "scroll_document_to_line", input: { path: "/Research/ORPHEUS/anomaly_notes.txt", line: 184 } },
-      ];
-      let toolOk = 0;
-      for (const c of checks) {
-        const def = TOOL_DEFS.find((t) => t.name === c.tool);
-        if (!def) { lines.push(`  ✗ ${c.name} (no such tool)`); continue; }
-        try {
-          const r = await def.execute(c.input);
-          const ok2 = (r as { ok?: boolean })?.ok !== false;
-          if (ok2) toolOk++;
-          const preview = JSON.stringify(r).slice(0, 140);
-          lines.push(`  ${ok2 ? "✓" : "✗"} ${c.name} → ${preview}${preview.length === 140 ? "…" : ""}`);
-        } catch (e) {
-          lines.push(`  ✗ ${c.name} — ${e instanceof Error ? e.message : String(e)}`);
-        }
-      }
-      const totalPass = passed === rs.length && toolOk === checks.length;
-      lines.unshift(
-        totalPass
-          ? `✅ WEBMCP VERIFIED — ${passed}/${rs.length} evals + ${toolOk}/${checks.length} tool calls`
-          : `⚠ WEBMCP PARTIAL — ${passed}/${rs.length} evals + ${toolOk}/${checks.length} tool calls`,
-      );
+      const banner =
+        r.summary === "pass"
+          ? `✅ WEBMCP VERIFIED — ${r.passed}/${r.total} checks passed`
+          : `⚠ WEBMCP PARTIAL — ${r.passed}/${r.total} checks passed`;
+      lines.push(banner);
       lines.push("");
-      lines.push("See the document on screen — scroll_document_to_line moved line 184 into view.");
-      lines.push("State-safe: investigation state was snapshotted and restored.");
+      // deterministic evals
+      lines.push(`▸ DETERMINISTIC EVALS — ${r.evals.filter((x) => x.pass).length}/${r.evals.length} PASSED`);
+      r.evals.forEach((e) => lines.push(`  ${e.pass ? "✓" : "✗"} ${e.name}`));
+      lines.push("");
+      // visible-actuation tool calls
+      lines.push(`▸ VISIBLE-ACTUATION TOOL CALLS — ${r.toolCalls.filter((x) => x.pass).length}/${r.toolCalls.length} PASSED`);
+      r.toolCalls.forEach((c) => lines.push(`  ${c.pass ? "✓" : "✗"} ${c.name}` + (c.detail ? `  —  ${c.detail}` : "")));
+      lines.push("");
+      lines.push("The document viewer scrolled on screen during the scroll check.");
+      lines.push("State-safe: investigation state was snapshotted and restored — no checkpoints advanced.");
       setOutput(lines.join("\n"));
     } catch (e) {
       setOutput(`ERROR: ${e instanceof Error ? e.message : String(e)}`);
@@ -174,7 +162,7 @@ export default function AgentLinkPanel({ onClose }: { onClose: () => void }) {
                 className="btn-bevel text-[11px] px-3 !bg-accent/20 !border-accent !text-accent"
                 disabled={busy}
                 onClick={quickVerify}
-                title="One-click judge verification: 9 evals + 3 headline tool calls (JUDGE_QUICKSTART 30s path)"
+                title="One-click judge verification: 9 evals + 3 visible-actuation tool calls. Differs from RUN EVALS — actually moves the desk (scroll-to-line)."
               >
                 ⚡ QUICK VERIFY
               </button>
@@ -200,7 +188,7 @@ const EXAMPLE_ARGS: Record<string, string> = {
   read_file: JSON.stringify({ path: "/Research/ORPHEUS/anomaly_notes.txt" }),
   open_file: JSON.stringify({ path: "/Research/ORPHEUS/anomaly_notes.txt" }),
   find_text_in_document: JSON.stringify({ path: "/Research/ORPHEUS/anomaly_notes.txt", query: "02:13" }),
-  scroll_document_to_line: JSON.stringify({ path: "/Research/ORPHEUS/anomaly_notes.txt", line: 184 }),
+  scroll_document_to_line: JSON.stringify({ path: "/Research/ORPHEUS/anomaly_notes.txt", line: 145 }),
   open_directory: JSON.stringify({ path: "/Research/ORPHEUS" }),
   get_message_thread: JSON.stringify({ threadId: "t_sarah" }),
   open_messages_thread: JSON.stringify({ threadId: "t_sarah" }),
