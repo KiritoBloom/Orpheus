@@ -191,33 +191,106 @@ html, body {
 .boot-titlebar-glyph { color: var(--accent); font-size: 9px; line-height:1; }
 .boot-titlebar-status { font-size: 8.5px; letter-spacing: 0.18em; color: var(--text-faint); }
 .boot-crt {
-  position: relative; flex: 1; min-height: 0; overflow: hidden; overflow-y: auto;
+  position: relative; flex: 1; min-height: 0; overflow: hidden;
   background: #070a09;
-  padding: 3.2vh 3.8vw 2.2vh;
   display: flex; flex-direction: column;
 }
 .boot-crt::before {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
   background:
     radial-gradient(ellipse 78% 64% at 52% 42%, rgba(143,202,160,0.045), transparent 62%),
     radial-gradient(ellipse at center, transparent 68%, rgba(0,0,0,0.46) 100%);
 }
 .boot-crt-scan {
-  position: absolute; inset: 0; pointer-events: none; opacity: 0.06;
+  position: absolute; inset: 0; pointer-events: none; opacity: 0.06; z-index: 3;
   background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(127,174,139,0.38) 2px 3px);
 }
-.boot-crt-inner {
-  position: relative; width: 100%; max-width: 880px; margin: 0 auto;
+
+/* ---------- POST — a diagnostic console, not text floating in a void ----------
+   Two columns: the check register on the left, live hardware telemetry on the
+   right. Both fill the tube, so the screen reads as a machine at work. */
+.post-grid {
+  position: relative; z-index: 2;
+  flex: 1; min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 268px;
 }
+.post-main {
+  min-width: 0; min-height: 0; overflow: hidden;
+  padding: 22px 24px 16px 30px;
+  display: flex; flex-direction: column;
+}
+.post-head {
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  padding-bottom: 10px; margin-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.post-head-name { font-size: clamp(14px, 1.6vw, 18px); letter-spacing: 0.16em; color: var(--text); }
+.post-head-name b { font-weight: 400; color: var(--accent); }
+.post-head-meta { font-size: 8.5px; letter-spacing: 0.2em; color: var(--text-faint); margin-left: auto; }
+
+/* check register — label · leader dots · result, tabular so nothing drifts */
+.post-check { display: grid; grid-template-columns: 178px minmax(24px, 1fr) auto; align-items: baseline; column-gap: 12px; }
+.post-check-row { display: contents; }
+.post-check-label { font-size: 12px; line-height: 2.15; letter-spacing: 0.1em; color: var(--text-dim); }
+.post-check-lead { border-bottom: 1px dotted #1f2b25; transform: translateY(-4px); }
+.post-check-val { font-size: 12px; line-height: 2.15; letter-spacing: 0.06em; color: var(--text); white-space: nowrap; }
+.post-check-val small { font-size: 9.5px; letter-spacing: 0.1em; color: var(--text-faint); margin-left: 9px; }
+.post-check-val.is-amber { color: var(--amber); }
+.post-check-val.is-accent { color: var(--accent); }
+.post-in { animation: postIn 110ms steps(2) both; }
+@keyframes postIn { from { opacity: 0; } to { opacity: 1; } }
+
+.post-tail { margin-top: auto; padding-top: 16px; }
+.post-tail-line { font-size: 12px; letter-spacing: 0.08em; color: var(--text); }
+
+/* telemetry rail — the machine's vitals; something is always moving */
+.post-rail {
+  min-width: 0; min-height: 0; overflow: hidden;
+  border-left: 1px solid var(--line);
+  background: #060908;
+  padding: 22px 18px 16px;
+  display: flex; flex-direction: column; gap: 17px;
+}
+.post-rail-head { font-size: 8.5px; letter-spacing: 0.28em; color: var(--text-faint); }
+.post-stat-k { font-size: 8.5px; letter-spacing: 0.2em; color: var(--text-faint); }
+.post-stat-v { font-size: 13px; letter-spacing: 0.08em; color: var(--text); margin-top: 3px; }
+.post-stat-v.is-accent { color: var(--accent); }
+.post-stat-v.is-amber { color: var(--amber); }
+
+/* memory map — cells fill in as the test walks the address space */
+.post-map { display: grid; grid-template-columns: repeat(12, 1fr); gap: 2px; margin-top: 7px; }
+.post-map-cell { aspect-ratio: 1; background: #0e1512; border: 1px solid #131c18; }
+.post-map-cell.is-on { background: var(--accent-dim); border-color: var(--accent-dim); }
+.post-map-cell.is-hot { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 5px rgba(143,202,160,0.7); }
+
+/* bus trace — a small live waveform, there to prove the thing is running */
+.post-trace { height: 36px; margin-top: 6px; border: 1px solid #17201c; background: #0a1210; position: relative; overflow: hidden; }
+.post-trace-bars { position: absolute; inset: 2px; display: flex; align-items: flex-end; gap: 1px; }
+.post-trace-bar { flex: 1; background: var(--accent-dim); opacity: 0.72; }
+
+.post-rail-foot { margin-top: auto; font-size: 8.5px; letter-spacing: 0.18em; color: var(--text-faint); line-height: 1.95; }
+
+/* ---------- splash — the machine identifying itself, filling the tube ---------- */
 .boot-splash {
-  position: relative; flex: 1; display: grid; place-items: center; text-align: center;
-  padding: 8vh 3vw;
+  position: relative; z-index: 2;
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
 }
-.boot-wordmark { font-size: 26px; letter-spacing: 0.14em; color: var(--text); line-height:1; }
+.boot-splash-main { flex: 1; min-height: 0; display: grid; place-items: center; text-align: center; padding: 4vh 3vw; }
+.boot-wordmark { font-size: clamp(30px, 6.4vw, 66px); letter-spacing: 0.16em; color: var(--text); line-height: 1; }
 .boot-wordmark span { color: var(--accent); }
-.boot-tagline { font-size: 9px; letter-spacing: 0.38em; color: var(--text-faint); margin-top: 10px; }
-.boot-rail { width: 264px; max-width: 68vw; height: 4px; margin: 22px auto 0; background: #0e1512; border: 1px solid #1a2420; overflow: hidden; }
+.boot-tagline { font-size: clamp(8.5px, 1.1vw, 11px); letter-spacing: 0.5em; color: var(--text-faint); margin-top: 15px; }
+.boot-rail { width: clamp(220px, 34vw, 440px); height: 4px; margin: 32px auto 0; background: #0e1512; border: 1px solid #1a2420; overflow: hidden; }
 .boot-rail-fill { height: 100%; background: var(--accent); box-shadow: 0 0 8px rgba(143,202,160,0.38); }
+
+/* the plate — a stamped equipment label across the foot of the splash */
+.boot-plate { flex: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--line); }
+.boot-plate-cell { padding: 11px 16px; border-left: 1px solid var(--line); min-width: 0; }
+.boot-plate-cell:first-child { border-left: 0; }
+.boot-plate-k { font-size: 8px; letter-spacing: 0.24em; color: var(--text-faint); }
+.boot-plate-v { font-size: 11px; letter-spacing: 0.1em; color: var(--text-dim); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 .boot-status {
   flex: none;
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -232,10 +305,205 @@ html, body {
 .boot-prompt { color: var(--accent); letter-spacing: 0.18em; text-shadow: 0 0 10px rgba(143,202,160,0.32); animation: bootPromptPulse 1.35s ease-in-out infinite alternate; white-space: nowrap; }
 @keyframes bootPromptPulse { from { opacity: 0.72; } to { opacity: 1; } }
 .boot-cursor { display:inline-block; width:0.62em; height:1.06em; background: var(--accent); vertical-align:-0.15em; margin-left:2px; animation: blinkBlock 1.06s steps(1) infinite; box-shadow: 0 0 6px rgba(143,202,160,0.42); }
+
+@media (max-width: 900px) {
+  .post-grid { grid-template-columns: minmax(0, 1fr); }
+  .post-rail { display: none; }
+}
 @media (max-width: 640px) {
-  .boot-crt { padding: 2.2vh 4.2vw 2vh; }
-  .boot-line { font-size: 12px; }
+  .post-main { padding: 15px 15px 12px 18px; }
+  .post-check { grid-template-columns: 134px minmax(18px, 1fr) auto; }
+  .post-check-label, .post-check-val { font-size: 11px; line-height: 1.95; }
+  .boot-plate { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .boot-plate-cell:nth-child(3) { border-left: 0; }
   .boot-status { padding: 7px 10px; font-size: 8.5px; }
+}
+
+/* ---------- case file — the briefing, as a physical case jacket ----------
+   Full-bleed, two columns. Left: the jacket spine — case number set huge,
+   classification stamp, subject record card, the 02:13 dial that the whole
+   case turns on. Right: the file itself, sections landing one at a time.
+   No floating centred box, no teletype: this is a document, at desk scale. */
+.brief-shell {
+  position: fixed; inset: 0; z-index: 10;
+  background: var(--bg-deep);
+  display: flex; flex-direction: column;
+  cursor: pointer; user-select: none;
+  overflow: hidden;
+}
+.brief-body {
+  position: relative; z-index: 2;
+  flex: 1; min-height: 0;
+  display: grid; grid-template-columns: 316px minmax(0, 1fr);
+  background: #070a09;
+}
+.brief-body::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
+  background:
+    radial-gradient(ellipse 80% 66% at 46% 40%, rgba(143,202,160,0.04), transparent 62%),
+    radial-gradient(ellipse at center, transparent 70%, rgba(0,0,0,0.45) 100%);
+}
+
+/* ---------- the spine ---------- */
+.brief-spine {
+  min-width: 0; min-height: 0; overflow: hidden;
+  border-right: 1px solid var(--line);
+  background: linear-gradient(180deg, #0b120f, #070a09);
+  padding: 26px 22px 18px;
+  display: flex; flex-direction: column; gap: 20px;
+}
+.brief-caseno { line-height: 0.86; }
+.brief-caseno-k { font-size: 8.5px; letter-spacing: 0.34em; color: var(--text-faint); }
+.brief-caseno-v {
+  font-size: clamp(46px, 7vw, 76px); letter-spacing: 0.04em; color: var(--accent);
+  text-shadow: 0 0 34px rgba(143, 202, 160, 0.22);
+  margin-top: 8px;
+}
+/* classification stamp — struck on at a slight angle, like ink on card */
+.brief-stampmark {
+  align-self: flex-start;
+  border: 2px solid var(--alert);
+  color: var(--alert);
+  padding: 4px 11px 3px;
+  font-size: 10px; letter-spacing: 0.3em;
+  transform: rotate(-2.4deg);
+  opacity: 0.82;
+}
+/* the 02:13 dial — the minute the case turns on, as a real gauge */
+.brief-dial { display: flex; align-items: center; gap: 13px; }
+.brief-dial-face {
+  width: 58px; height: 58px; flex: none; border-radius: 50%;
+  border: 1px solid var(--line-bright);
+  background: radial-gradient(circle at 42% 36%, #131b17, #080b0a 72%);
+  position: relative;
+  box-shadow: inset 0 0 12px rgba(0,0,0,0.7);
+}
+.brief-dial-hand {
+  position: absolute; left: 50%; top: 50%;
+  width: 1.5px; background: var(--amber);
+  transform-origin: 50% 100%;
+  box-shadow: 0 0 6px rgba(214, 176, 122, 0.6);
+}
+.brief-dial-hand.is-hour { height: 15px; margin: -15px 0 0 -0.75px; transform: rotate(30deg); }
+.brief-dial-hand.is-min { height: 22px; margin: -22px 0 0 -0.75px; transform: rotate(78deg); }
+.brief-dial-pin { position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; margin: -1.5px 0 0 -1.5px; border-radius: 50%; background: var(--amber); }
+.brief-dial-t { font-size: 17px; letter-spacing: 0.14em; color: var(--amber); }
+.brief-dial-s { font-size: 8.5px; letter-spacing: 0.18em; color: var(--text-faint); margin-top: 3px; line-height: 1.6; }
+
+/* record card — the subject, as an index card in the jacket */
+.brief-card {
+  background: #0a1210;
+  border: 1px solid; border-color: #060a08 #3d5246 #3d5246 #060a08; /* sunken */
+  padding: 11px 12px 12px;
+}
+.brief-card-k { font-size: 8px; letter-spacing: 0.26em; color: var(--text-faint); }
+.brief-card-name { font-size: 14px; letter-spacing: 0.1em; color: var(--text); margin-top: 5px; }
+.brief-card-row { display: flex; justify-content: space-between; gap: 10px; margin-top: 9px; font-size: 9.5px; letter-spacing: 0.12em; }
+.brief-card-row dt { color: var(--text-faint); }
+.brief-card-row dd { color: var(--text-dim); text-align: right; }
+.brief-card-row dd.is-alert { color: var(--alert); }
+
+.brief-spine-foot { margin-top: auto; font-size: 8.5px; letter-spacing: 0.2em; color: var(--text-faint); line-height: 2; }
+
+/* ---------- the file ---------- */
+.brief-file {
+  min-width: 0; min-height: 0; overflow-y: auto;
+  padding: 26px 34px 30px 32px;
+}
+.brief-file-head {
+  display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+  padding-bottom: 11px; margin-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+.brief-file-title { font-size: clamp(14px, 1.7vw, 19px); letter-spacing: 0.16em; color: var(--text); }
+.brief-file-meta { font-size: 8.5px; letter-spacing: 0.2em; color: var(--text-faint); margin-left: auto; }
+
+/* section — numbered rule with the heading riding it, no boxes-in-boxes */
+.brief-section { padding: 20px 0 4px; max-width: 76ch; }
+.brief-section-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 13px; }
+.brief-section-no {
+  font-size: 9px; letter-spacing: 0.14em; color: var(--accent);
+  border: 1px solid var(--accent-dim); padding: 2px 6px 1px; flex: none;
+}
+.brief-section-legend { font-size: 10.5px; letter-spacing: 0.3em; color: var(--text-dim); }
+.brief-section-rule { flex: 1; height: 1px; background: var(--line); }
+
+/* record fields */
+.brief-fields { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 7px 14px; align-items: baseline; }
+.brief-flabel { font-size: 8.5px; letter-spacing: 0.2em; color: var(--text-faint); padding-top: 3px; }
+.brief-fvalue { font-size: 12.5px; letter-spacing: 0.03em; color: var(--text); line-height: 1.5; }
+.brief-fvalue small { display: block; font-size: 9.5px; letter-spacing: 0.12em; color: var(--text-faint); margin-top: 3px; }
+.brief-fvalue.is-alert { color: var(--alert); }
+
+/* the record — three sources on one minute, as a conflict table */
+.brief-conflict { border-top: 1px solid var(--line); }
+.brief-conflict-row {
+  display: grid; grid-template-columns: 150px minmax(0, 1fr);
+  gap: 4px 16px; align-items: baseline;
+  padding: 11px 0 11px 12px;
+  border-bottom: 1px solid var(--line);
+  border-left: 2px solid var(--line-bright);
+}
+.brief-conflict-row.is-amber { border-left-color: var(--amber); }
+.brief-conflict-row.is-alert { border-left-color: var(--alert); }
+.brief-conflict-src { font-size: 8.5px; letter-spacing: 0.18em; color: var(--text-faint); line-height: 1.7; }
+.brief-conflict-src b { display: block; font-weight: 400; font-size: 11px; letter-spacing: 0.1em; color: var(--text-dim); }
+.brief-conflict-txt { font-size: 12px; line-height: 1.65; color: var(--text); }
+.brief-verdict { margin-top: 13px; font-size: 11.5px; line-height: 1.7; color: var(--amber); }
+
+/* objectives */
+.brief-obj { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 9px 8px; }
+.brief-obj-n { font-size: 9.5px; letter-spacing: 0.08em; color: var(--accent-dim); padding-top: 3px; }
+.brief-obj-t { font-size: 12.5px; line-height: 1.6; color: var(--text); }
+
+/* partnership — two capability columns that read as one instrument */
+.brief-split { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--line); margin-top: 13px; }
+.brief-col { padding: 12px 14px 13px; min-width: 0; }
+.brief-col + .brief-col { border-left: 1px solid var(--line); }
+.brief-col-head { font-size: 8.5px; letter-spacing: 0.24em; color: var(--accent); margin-bottom: 8px; }
+.brief-col-head.is-dim { color: var(--text-dim); }
+.brief-col ul { margin: 0; padding: 0; }
+.brief-col li { list-style: none; position: relative; padding-left: 13px; font-size: 11.5px; line-height: 1.6; color: var(--text-dim); }
+.brief-col li + li { margin-top: 6px; }
+.brief-col li::before { content: "▸"; position: absolute; left: 0; font-size: 8px; top: 3px; color: var(--accent-dim); }
+.brief-note { font-size: 12px; line-height: 1.7; color: var(--text-dim); }
+.brief-note + .brief-note { margin-top: 9px; }
+.brief-note b { font-weight: 400; color: var(--text); }
+.brief-notes { display: grid; gap: 9px; }
+
+/* section reveal — stepped, matches every other animation on the desk */
+.brief-in { animation: briefIn 140ms steps(2) both; }
+@keyframes briefIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* rail */
+.brief-rail {
+  flex: none;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 7px 8px 7px 14px;
+  background: var(--surface);
+  border-top: 1px solid var(--line-bright);
+}
+.brief-rail-left { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 9px; letter-spacing: 0.16em; color: var(--text-faint); }
+.brief-rail-hint { font-size: 8.5px; letter-spacing: 0.16em; color: var(--text-faint); }
+.brief-go { font-size: 10px; letter-spacing: 0.2em; padding: 5px 16px; }
+
+@media (max-width: 1000px) {
+  .brief-body { grid-template-columns: 250px minmax(0, 1fr); }
+  .brief-file { padding: 20px 22px 26px; }
+}
+@media (max-width: 760px) {
+  .brief-body { grid-template-columns: minmax(0, 1fr); }
+  .brief-spine {
+    border-right: 0; border-bottom: 1px solid var(--line);
+    flex-direction: row; align-items: center; flex-wrap: wrap; gap: 16px;
+    padding: 14px 16px;
+  }
+  .brief-caseno-v { font-size: 34px; }
+  .brief-card, .brief-spine-foot { display: none; }
+  .brief-fields { grid-template-columns: 1fr; gap: 2px; }
+  .brief-conflict-row { grid-template-columns: 1fr; }
+  .brief-split { grid-template-columns: 1fr; }
+  .brief-col + .brief-col { border-left: 0; border-top: 1px solid var(--line); }
 }
 
 /* ---------- windows — authentic 90s workstation (CDE/Motif/IRIX) ---------- */
@@ -442,28 +710,180 @@ html, body {
   cursor: default;
 }
 
-/* exit flash — clean single bloom that reads as one deliberate cut */
-.iris-exitflash {
-  position: absolute; inset: 0; z-index: 40;
-  pointer-events: none;
-  opacity: 0;
-  background:
-    radial-gradient(circle at 50% 46%, #f6fff8 0%, rgba(210,255,222,0.96) 18%, rgba(143,202,160,0.55) 42%, rgba(6,10,8,0.0) 74%),
-    radial-gradient(ellipse at center, rgba(0,0,0,0) 58%, rgba(0,0,0,0.55) 100%);
+/* ---------- exit: the dive lands, the blades finish the job ----------
+   Once the housing has raced past the frame edges, the blade seams keep
+   sweeping at full-screen scale and the core light pinches off. Aperture
+   (src/components/Aperture.tsx) picks it up from here on the next phase. */
+.iris-dive-glare {
+  position: absolute; inset: 0; z-index: 40; pointer-events: none;
+  background: radial-gradient(circle at 50% 46%,
+    rgba(233, 255, 239, 0.9) 0%,
+    rgba(168, 226, 184, 0.5) 6%,
+    rgba(110, 168, 124, 0.18) 16%,
+    transparent 34%);
+  animation: diveGlare 620ms ease-in both;
 }
-.iris-exitflash.is-on {
-  animation: exitFlash 0.62s cubic-bezier(0.2, 0.6, 0.2, 1) forwards;
-}
-@keyframes exitFlash {
-  0% { opacity: 0; transform: scale(0.96); }
-  28% { opacity: 0.98; transform: scale(1); }
-  100% { opacity: 1; transform: scale(1); }
+@keyframes diveGlare {
+  0%   { opacity: 0; transform: scale(2.2); }
+  55%  { opacity: 1; transform: scale(0.8); }
+  100% { opacity: 0.85; transform: scale(0.06); }
 }
 
-/* closing state — menu fades fast, glow settles, iris holds */
+/* closing state — menu clears fast, unpicked callouts drop, iris holds centre */
 .iris-root.is-closing .iris-menu { opacity: 0 !important; transition: opacity 0.22s ease; pointer-events: none; }
 .iris-root.is-closing .iris-glowfloor-v2 { opacity: 0.08 !important; transition: opacity 0.6s ease; }
+.iris-root.is-closing .iris-bg-grid { opacity: 0.25; transition: opacity 0.5s ease; }
 .iris-root.is-closing .iris-svg { filter: drop-shadow(0 22px 36px rgba(0,0,0,0.62)) drop-shadow(0 2px 10px rgba(0,0,0,0.55)) brightness(1.06); transition: filter 0.7s ease; }
+
+/* ---------- the dive — the camera pushes INTO the lens ----------
+   The optic you have been looking at stops being an object on screen and
+   becomes the screen: the housing races past the edges of the frame while
+   the blades shut, so the last thing visible is the aperture itself, now
+   the size of the monitor. The full-screen shutter then takes the handoff
+   at exactly that scale and the next phase opens through it. */
+.iris-root.is-diving .iris-stage-v2 {
+  animation: irisDive 1180ms cubic-bezier(0.42, 0, 0.86, 0.36) both;
+  transform-origin: 50% 46%;
+  will-change: transform;
+}
+@keyframes irisDive {
+  0%   { transform: scale(1); }
+  38%  { transform: scale(1.5); }
+  100% { transform: scale(7.4); }
+}
+.iris-root.is-diving .iris-shadow { opacity: 0; transition: opacity 0.4s ease; }
+.iris-root.is-diving .iris-bg-grid,
+.iris-root.is-diving .iris-bg-noise,
+.iris-root.is-diving .iris-screen-scan {
+  animation: bgRecede 1180ms cubic-bezier(0.42, 0, 0.86, 0.36) both;
+  transform-origin: 50% 46%;
+}
+@keyframes bgRecede {
+  0%   { transform: scale(1); opacity: 0.9; }
+  100% { transform: scale(3.4); opacity: 0; }
+}
+
+/* the committed callout gets one beat of acknowledgement before the menu goes */
+.iris-item.is-committed {
+  opacity: 1 !important;
+  animation: itemCommit 240ms steps(2) 2;
+}
+@keyframes itemCommit { 0%, 100% { filter: none; } 50% { filter: brightness(1.9); } }
+
+/* ---------- phase handoff — the aperture IS the transition ----------
+   The title's shutter shuts to a pinhole. The next phase does not cut in:
+   it opens through that same pinhole, blade shadow peeling outward, a lit
+   phosphor rim racing ahead of the picture. The camera steps through the
+   lens. Every phase change uses it, so the machine reads as one optic.
+
+   The hole is a real animated gradient stop (@property), not a scaled box,
+   so the edge stays razor sharp at any viewport size. */
+@property --ap-r {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+
+.aperture {
+  position: fixed; inset: 0; z-index: 1390;
+  pointer-events: none;
+}
+/* the blade shadow: black everywhere but the opening, with a soft contact edge */
+.aperture-iris {
+  position: absolute; inset: 0;
+  --ap-r: 0%;
+  background: radial-gradient(circle at 50% 47%,
+    transparent 0,
+    transparent var(--ap-r),
+    rgba(0, 0, 0, 0.92) calc(var(--ap-r) + 1.2%),
+    #000 calc(var(--ap-r) + 7%));
+}
+.aperture-in .aperture-iris { animation: apOpen 900ms cubic-bezier(0.18, 0.82, 0.16, 1) both; }
+@keyframes apOpen {
+  0%   { --ap-r: 0%; opacity: 1; }
+  76%  { opacity: 1; }
+  100% { --ap-r: 118%; opacity: 0; }
+}
+.aperture-out .aperture-iris { animation: apShut 460ms cubic-bezier(0.62, 0.02, 0.96, 0.32) both; }
+@keyframes apShut {
+  0%   { --ap-r: 118%; }
+  100% { --ap-r: 0%; }
+}
+
+/* the rim: the lit blade edge, travelling with the opening */
+.aperture-rim {
+  position: absolute; left: 50%; top: 47%;
+  width: 22vmax; height: 22vmax; margin: -11vmax 0 0 -11vmax;
+  border-radius: 50%;
+  border: 1.5px solid rgba(222, 255, 232, 0.92);
+  box-shadow:
+    0 0 30px 6px rgba(143, 202, 160, 0.4),
+    inset 0 0 34px 8px rgba(143, 202, 160, 0.16);
+}
+.aperture-in .aperture-rim { animation: apRimOut 900ms cubic-bezier(0.18, 0.82, 0.16, 1) both; }
+@keyframes apRimOut {
+  0%   { transform: scale(0.004); opacity: 0; }
+  8%   { opacity: 1; }
+  70%  { opacity: 0.42; }
+  100% { transform: scale(7.2); opacity: 0; }
+}
+.aperture-out .aperture-rim { animation: apRimIn 460ms cubic-bezier(0.62, 0.02, 0.96, 0.32) both; }
+@keyframes apRimIn {
+  0%   { transform: scale(7.2); opacity: 0; }
+  30%  { opacity: 0.7; }
+  100% { transform: scale(0.004); opacity: 1; }
+}
+
+/* the glint: the last of the light pinching off / the first spark of the next */
+.aperture-glint {
+  position: absolute; inset: 0;
+  background: radial-gradient(circle at 50% 47%,
+    rgba(240, 255, 244, 0.95) 0%,
+    rgba(168, 226, 184, 0.5) 5%,
+    rgba(143, 202, 160, 0.16) 13%,
+    transparent 26%);
+}
+.aperture-in .aperture-glint { animation: apGlintOut 620ms ease-out both; }
+@keyframes apGlintOut {
+  0%   { opacity: 1; transform: scale(0.06); }
+  100% { opacity: 0; transform: scale(1.5); }
+}
+.aperture-out .aperture-glint { animation: apGlintIn 460ms ease-in both; }
+@keyframes apGlintIn {
+  0%   { opacity: 0; transform: scale(1.6); }
+  72%  { opacity: 0.95; transform: scale(0.4); }
+  100% { opacity: 0; transform: scale(0.04); }
+}
+
+/* eight blade seams sweeping across the opening — the shutter, not a wipe */
+.aperture-blades {
+  position: absolute; left: 50%; top: 47%;
+  width: 240vmax; height: 240vmax; margin: -120vmax 0 0 -120vmax;
+  background: conic-gradient(from 0deg,
+    rgba(0,0,0,0.5) 0deg, transparent 6deg, transparent 39deg, rgba(0,0,0,0.5) 45deg,
+    rgba(0,0,0,0.5) 45deg, transparent 51deg, transparent 84deg, rgba(0,0,0,0.5) 90deg,
+    rgba(0,0,0,0.5) 90deg, transparent 96deg, transparent 129deg, rgba(0,0,0,0.5) 135deg,
+    rgba(0,0,0,0.5) 135deg, transparent 141deg, transparent 174deg, rgba(0,0,0,0.5) 180deg,
+    rgba(0,0,0,0.5) 180deg, transparent 186deg, transparent 219deg, rgba(0,0,0,0.5) 225deg,
+    rgba(0,0,0,0.5) 225deg, transparent 231deg, transparent 264deg, rgba(0,0,0,0.5) 270deg,
+    rgba(0,0,0,0.5) 270deg, transparent 276deg, transparent 309deg, rgba(0,0,0,0.5) 315deg,
+    rgba(0,0,0,0.5) 315deg, transparent 321deg, transparent 354deg, rgba(0,0,0,0.5) 360deg);
+  mask-image: radial-gradient(circle at 50% 50%, #000 0%, rgba(0,0,0,0.5) 3%, transparent 7%);
+}
+.aperture-in .aperture-blades { animation: apBlades 900ms cubic-bezier(0.18, 0.82, 0.16, 1) both; }
+@keyframes apBlades {
+  0%   { transform: rotate(-16deg); opacity: 0.9; }
+  100% { transform: rotate(4deg); opacity: 0; }
+}
+.aperture-out .aperture-blades { animation: apBladesShut 460ms cubic-bezier(0.62, 0.02, 0.96, 0.32) both; }
+@keyframes apBladesShut {
+  0%   { transform: rotate(6deg); opacity: 0; }
+  100% { transform: rotate(-14deg); opacity: 0.9; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aperture { display: none; }
+}
 
 /* ticks */
 @keyframes ticksSpin { to { transform: rotate(360deg); } }

@@ -14,6 +14,7 @@ import Desktop from "@/components/desktop/Desktop";
 import Toasts from "@/components/notifications/Toasts";
 import EndingSequence from "@/components/EndingSequence";
 import EventFlash from "@/components/EventFlash";
+import { Aperture } from "@/components/Aperture";
 
 /* ============================================================
    GAME ROOT — the machine lifecycle.
@@ -34,6 +35,7 @@ export default function GameRoot() {
 
   const [ready, setReady] = useState(false);
   const [endingRequested, setEndingRequested] = useState(false);
+  const [curtain, setCurtain] = useState(0); // bumped per phase arrival so the aperture opens on it
   const audioPrimed = useRef(false);
 
   /* ---------- persistence hydrate ---------- */
@@ -342,9 +344,11 @@ export default function GameRoot() {
         useAria.setState({ status: "idle", statusDetail: "" });
         useInvestigation.setState({ evidenceIds: new Set(["ev_daniel"]), caseReport: {}, caseVerdicts: {}, caseCompleteAt: null });
         sfx.ensure();
+        setCurtain((c) => c + 1);
         setPhase("boot");
       } else {
         sfx.ensure();
+        setCurtain((c) => c + 1);
         setPhase("desktop");
         // Files + guide handling lives in the first-desktop-entry effect
       }
@@ -374,11 +378,12 @@ export default function GameRoot() {
 
       {phase === "title" && <IrisTitle onLaunch={handleLaunch} />}
 
-      {phase === "boot" && <BootSequence onDone={() => setPhase("briefing")} />}
+      {phase === "boot" && <BootSequence onDone={() => { setCurtain((c) => c + 1); setPhase("briefing"); }} />}
 
       {phase === "briefing" && (
         <MissionBriefing
           onDone={() => {
+            setCurtain((c) => c + 1);
             setPhase("desktop");
           }}
         />
@@ -398,6 +403,9 @@ export default function GameRoot() {
 
       {/* always-on toasts — hidden behind title's own vignette but fine */}
       {phase === "desktop" && <Toasts />}
+
+      {/* the shutter opens on whatever phase just mounted — one continuous optic */}
+      {curtain > 0 && phase !== "title" && <Aperture key={curtain} dir="in" />}
 
       {/* cinematic event moments — dim + amber rim on mystery messages & 02:13 */}
       <EventFlash />

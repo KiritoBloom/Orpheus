@@ -1,171 +1,367 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { sfx } from "@/audio/engine";
 import { useOS } from "@/game/state/osStore";
+import { Aperture, usePhaseExit } from "@/components/Aperture";
 
 /* ============================================================
-   MISSION BRIEFING — same 90s terminal chrome as POST.
-   Character typing, silent, same cadence and panel language.
+   CASE FILE 001 — the authorization.
+
+   A case jacket, at desk scale: the spine on the left carries the
+   case number, the classification stamp, the subject card and the
+   02:13 dial the whole case turns on; the file on the right lands
+   section by section. Sections use the desk's own idioms — record
+   fields, a conflict table, a capability pair — not paragraphs of
+   teletype.
    ============================================================ */
 
-const LINES: { text: string; cls: string }[] = [
-  { text: "AUTHORIZED INVESTIGATION PROTOCOL — CASE 001", cls: "text-accent" },
-  { text: "", cls: "" },
-  { text: "SUBJECT:", cls: "text-dim" },
-  { text: "DR. DANIEL MCDUFF", cls: "text-txt" },
-  { text: "", cls: "" },
-  { text: "POSITION:", cls: "text-dim" },
-  { text: "PROFESSOR OF PHYSICS AND ASTRONOMY — UNIVERSITY OF PENNSYLVANIA", cls: "text-txt" },
-  { text: "PREVIOUS EMPLOYMENT: CERN", cls: "text-txt" },
-  { text: "", cls: "" },
-  { text: "STATUS:", cls: "text-dim" },
-  { text: "DECEASED  —  official: accidental fall", cls: "text-alert" },
-  { text: "         —  unofficial: read the timestamps", cls: "text-amber" },
-  { text: "", cls: "" },
-  { text: "LAST RECORD:", cls: "text-dim" },
-  { text: "2026-03-10  02:13:07  LOGIN  S.OKAFOR  —  gait mismatch", cls: "text-amber" },
-  { text: "02:13:07  —  same minute his clock stopped. Twice.", cls: "text-faint" },
-  { text: "", cls: "" },
-  { text: "OBJECTIVE:", cls: "text-dim" },
-  { text: "Determine what happened to Dr. McDuff.", cls: "text-txt" },
-  { text: "Recover his scattered research (project: ORPHEUS).", cls: "text-txt" },
-  { text: "Preserve evidence.", cls: "text-txt" },
-  { text: "", cls: "" },
-  { text: "YOUR PARTNER:", cls: "text-dim" },
-  { text: "An onboard AI (ARIA) remains active.", cls: "text-txt" },
-  { text: "She can SEARCH the machine in seconds; she cannot SEE it.", cls: "text-txt" },
-  { text: "You are the eyes. She is the hands. Move together.", cls: "text-accent" },
-  { text: "", cls: "" },
-  { text: "A FIELD GUIDE will open on your desktop.", cls: "text-dim" },
-  { text: "Read it. Then follow what intrigues you.", cls: "text-amber" },
+type Field = { label: string; value: string; sub?: string; tone?: "alert" };
+type Conflict = { src: string; time: string; text: string; tone?: "amber" | "alert" };
+type Column = { head: string; dim?: boolean; items: string[] };
+
+type Section =
+  | { no: string; legend: string; kind: "fields"; fields: Field[] }
+  | { no: string; legend: string; kind: "conflict"; rows: Conflict[]; verdict: string }
+  | { no: string; legend: string; kind: "objectives"; items: string[] }
+  | { no: string; legend: string; kind: "partner"; intro: string; columns: Column[]; note: string }
+  | { no: string; legend: string; kind: "notes"; notes: string[] };
+
+const SECTIONS: Section[] = [
+  {
+    no: "I",
+    legend: "SUBJECT",
+    kind: "fields",
+    fields: [
+      { label: "NAME", value: "Dr. Daniel McDuff" },
+      {
+        label: "POSITION",
+        value: "Professor of Physics and Astronomy — University of Pennsylvania",
+        sub: "PREVIOUS POST: CERN — PRECISION MEASUREMENT",
+      },
+      { label: "STATUS", value: "Deceased — 2026-03-10, at home", tone: "alert" },
+      { label: "RULING", value: "Accidental fall.", sub: "FILED WITHOUT AN EXAMINATION OF THIS MACHINE" },
+      { label: "THIS UNIT", value: "His personal workstation. Air-gapped. Seized intact." },
+    ],
+  },
+  {
+    no: "II",
+    legend: "ONE MINUTE, THREE RECORDS",
+    kind: "conflict",
+    rows: [
+      {
+        src: "ACCESS LOG",
+        time: "02:13:07",
+        text: "A login under Sarah Okafor's credentials. The gait signature on file is not hers.",
+        tone: "amber",
+      },
+      {
+        src: "WALL CLOCK",
+        time: "02:13",
+        text: "Stopped. Two photographs taken hours apart both show that same minute.",
+        tone: "amber",
+      },
+      {
+        src: "POWER LOG",
+        time: "02:00–03:00",
+        text: "Nothing. No interruption, no restart, no gap that would explain a stopped clock.",
+      },
+    ],
+    verdict: "At most one of these describes what actually happened that minute.",
+  },
+  {
+    no: "III",
+    legend: "OBJECTIVE",
+    kind: "objectives",
+    items: [
+      "Establish what happened to Dr. McDuff on the night of 2026-03-10.",
+      "Recover his research. He scattered it across this disk under one name: ORPHEUS.",
+      "File every source you rely on to the evidence board. A conclusion without a source will not hold.",
+    ],
+  },
+  {
+    no: "IV",
+    legend: "YOUR PARTNER",
+    kind: "partner",
+    intro:
+      "Daniel built an assistant into this workstation. ARIA resumed 74 hours after his last login and is still running. She can read every byte on this disk. She cannot see your screen.",
+    columns: [
+      {
+        head: "ARIA READS",
+        items: [
+          "searches thousands of lines across files, mail, logs and messages",
+          "cross-references names, dates and figures in seconds",
+          "opens a document on your screen at the exact line",
+        ],
+      },
+      {
+        head: "YOU SEE",
+        dim: true,
+        items: [
+          "reflections, handwriting, clock faces, a figure in a window",
+          "photographs at 1× to 9× — zoom and pan",
+          "tone, intent, and what is missing from a record",
+        ],
+      },
+    ],
+    note: "Work in that order. You describe what you see, ARIA finds what matches it, you decide what it means. Neither half closes this case alone.",
+  },
+  {
+    no: "V",
+    legend: "ON ARRIVAL",
+    kind: "notes",
+    notes: [
+      "A field guide opens on the desktop. It explains the machine, not the answer.",
+      "Daniel left three requests in /System/readme_first.txt. Start there — it takes a minute.",
+      "Nothing here is timed and nothing advances on its own. The session is archived as you work.",
+    ],
+  },
 ];
 
-const TYPE_MS = 11;
-const LINE_PAUSE = 140;
-const BLANK_PAUSE = 90;
+const REVEAL_MS = 430;
 
 export default function MissionBriefing({ onDone }: { onDone: () => void }) {
   const [shown, setShown] = useState(0);
-  const [chars, setChars] = useState(0);
-  const [done, setDone] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fileRef = useRef<HTMLDivElement>(null);
   const os = useOS();
+  const done = shown >= SECTIONS.length;
+  const [leaving, leave] = usePhaseExit(onDone);
+
+  const reduced = os.settings.reducedMotion;
+  const sound = os.settings.sound;
 
   useEffect(() => {
-    if (os.settings.sound) sfx.ensure();
-  }, [os.settings.sound]);
+    if (sound) sfx.ensure();
+  }, [sound]);
 
-  // Cherry KC 1000 — same humanized key pack as POST
+  // sections land one at a time — a file being assembled, not characters crawling
   useEffect(() => {
     if (done) return;
-    if (shown >= LINES.length) {
-      // typing complete — intentional state transition, not a cascading derivate
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setDone(true);
-      return;
-    }
-    const line = LINES[shown];
-    const reduced = os.settings.reducedMotion;
-
-    if (reduced || line.text === "") {
-      const d = line.text === "" ? BLANK_PAUSE : LINE_PAUSE;
-      const t = setTimeout(() => setShown((s) => s + 1), d);
-      timer.current = t;
-      return () => clearTimeout(t);
-    }
-
-    if (chars < line.text.length) {
-      if (os.settings.sound) {
-        const ch = line.text[chars];
-        if (ch !== " " && ch !== "\t") sfx.bootKey();
-        else if (Math.random() < 0.18) sfx.bootKey();
-      }
-      const jitter = Math.random() * 6 - 3;
-      const t = setTimeout(() => setChars((c) => c + 1), Math.max(6, TYPE_MS + jitter));
-      timer.current = t;
-      return () => clearTimeout(t);
-    }
-
-    if (os.settings.sound && line.text.trim().length > 0) sfx.bootKeyEnter();
+    const delay = reduced ? 80 : shown === 0 ? 240 : REVEAL_MS;
     const t = setTimeout(() => {
       setShown((s) => s + 1);
-      setChars(0);
-    }, LINE_PAUSE);
-    timer.current = t;
+      if (sound) sfx.bootKeyEnter();
+    }, delay);
     return () => clearTimeout(t);
-  }, [shown, chars, done, os.settings.reducedMotion, os.settings.sound]);
+  }, [shown, done, reduced, sound]);
 
-  function finish() {
+  // keep the newest section in view as the file grows
+  useEffect(() => {
+    const el = fileRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: reduced ? "auto" : "smooth" });
+  }, [shown, reduced]);
+
+  useEffect(() => {
+    if (done && sound) sfx.bootBeep();
+  }, [done, sound]);
+
+  const advance = useCallback(() => {
     if (!done) {
-      setShown(LINES.length);
-      setChars(0);
-      setDone(true);
+      setShown(SECTIONS.length);
       return;
     }
+    if (sound) sfx.menuClick();
     os.addFlag("INTRO_COMPLETE");
-    onDone();
-  }
+    leave();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done, leave, sound]);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        finish();
+        advance();
       }
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shown, done]);
-
-  const current = LINES[shown];
-  const progress = `${Math.min(shown + (done ? 0 : 1), LINES.length)}/${LINES.length}`;
+  }, [advance]);
 
   return (
-    <div className="boot-shell" onClick={finish} role="status" aria-label="mission briefing">
-      <div className="boot-frame" onClick={(e) => e.stopPropagation()}>
-        <div className="boot-titlebar">
-          <span className="boot-titlebar-label">
-            <span className="boot-titlebar-glyph">▣</span>
-            INVESTIGATION PROTOCOL — AUTHORIZED
-          </span>
-          <span className="boot-titlebar-status">{done ? "READY" : `BRIEFING ${progress}`}</span>
-        </div>
+    <div className="brief-shell" onClick={advance} role="document" aria-label="case file 001 — authorization">
+      {leaving && <Aperture dir="out" />}
 
-        <div className="boot-crt" onClick={finish}>
-          <div className="boot-crt-scan" aria-hidden />
-          <div className="boot-crt-inner text-[13px] leading-[1.7] boot-phosphor">
-            {LINES.slice(0, shown).map((l, i) => (
-              <div key={`m-${i}`} className={`boot-line ${l.cls} ${l.cls === "text-txt" ? "font-medium" : ""}`}>
-                {l.text || "\u00A0"}
-              </div>
-            ))}
-            {!done && current && (
-              <div className={`boot-line ${current.cls} ${current.cls === "text-txt" ? "font-medium" : ""}`}>
-                {current.text === "" ? "\u00A0" : current.text.slice(0, chars)}
-                {current.text !== "" && <span className="boot-cursor" aria-hidden />}
-              </div>
-            )}
-            {done && (
-              <div className="mt-8 space-y-3">
-                <div className="h-px bg-linebright opacity-30 w-[360px] max-w-[72%]" />
-                <div className="mono-xs tracking-[0.16em] text-dim">EVIDENCE PRESERVATION MODE ENGAGED · SESSION WILL BE ARCHIVED</div>
-                <div className="mono-xs tracking-[0.12em] text-faint opacity-70">read as long as you need — nothing advances on its own</div>
-              </div>
-            )}
+      <div className="boot-titlebar">
+        <span className="boot-titlebar-label">
+          <span className="boot-titlebar-glyph" aria-hidden>▣</span>
+          CASE FILE — AUTHORIZATION
+        </span>
+        <span className="boot-titlebar-status">
+          {done ? "COMPLETE" : `ASSEMBLING ${shown}/${SECTIONS.length}`}
+        </span>
+      </div>
+
+      <div className="brief-body">
+        {/* ---------- spine ---------- */}
+        <aside className="brief-spine">
+          <div className="brief-caseno">
+            <div className="brief-caseno-k">CASE</div>
+            <div className="brief-caseno-v">001</div>
           </div>
-        </div>
 
-        <div className="boot-status">
-          <span className="boot-status-left">
-            <span className="boot-status-dot" aria-hidden />
-            <span className="truncate">{done ? "BRIEFING COMPLETE — AWAITING CONFIRMATION" : "RECEIVING AUTHORIZATION PACKET…"}</span>
-          </span>
-          <span className={`boot-status-right ${done ? "boot-prompt" : "tracking-[0.14em] text-faint"}`}>
-            {done ? "▸ PRESS ENTER TO CONTINUE" : "PLEASE WAIT"}
-          </span>
+          <div className="brief-stampmark">RESTRICTED</div>
+
+          <div className="brief-dial">
+            <div className="brief-dial-face" aria-hidden>
+              <span className="brief-dial-hand is-hour" />
+              <span className="brief-dial-hand is-min" />
+              <span className="brief-dial-pin" />
+            </div>
+            <div>
+              <div className="brief-dial-t">02:13</div>
+              <div className="brief-dial-s">
+                THE MINUTE
+                <br />
+                EVERYTHING TOUCHES
+              </div>
+            </div>
+          </div>
+
+          <div className="brief-card">
+            <div className="brief-card-k">SUBJECT OF RECORD</div>
+            <div className="brief-card-name">D. MCDUFF</div>
+            <dl>
+              <div className="brief-card-row">
+                <dt>STATUS</dt>
+                <dd className="is-alert">DECEASED</dd>
+              </div>
+              <div className="brief-card-row">
+                <dt>FOUND</dt>
+                <dd>2026-03-10</dd>
+              </div>
+              <div className="brief-card-row">
+                <dt>RULING</dt>
+                <dd>ACCIDENTAL</dd>
+              </div>
+              <div className="brief-card-row">
+                <dt>REOPENED</dt>
+                <dd>BY YOU</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div className="brief-spine-foot">
+            OPENED 2026-03-10 09:12
+            <br />
+            ASSIGNED — YOU + ARIA
+            <br />
+            EVIDENCE ARCHIVED CONTINUOUSLY
+          </div>
+        </aside>
+
+        {/* ---------- the file ---------- */}
+        <div className="brief-file" ref={fileRef} onClick={advance}>
+          <div className="brief-file-head">
+            <span className="brief-file-title">INVESTIGATION AUTHORIZATION</span>
+            <span className="brief-file-meta">MCDUFF WORKSTATION · AIR-GAPPED</span>
+          </div>
+
+          {SECTIONS.slice(0, shown).map((s) => (
+            <section key={s.no} className={`brief-section ${reduced ? "" : "brief-in"}`}>
+              <div className="brief-section-head">
+                <span className="brief-section-no">{s.no}</span>
+                <span className="brief-section-legend">{s.legend}</span>
+                <span className="brief-section-rule" aria-hidden />
+              </div>
+
+              {s.kind === "fields" && (
+                <div className="brief-fields">
+                  {s.fields.map((f) => (
+                    <div key={f.label} className="contents">
+                      <div className="brief-flabel">{f.label}</div>
+                      <div className={`brief-fvalue ${f.tone === "alert" ? "is-alert" : ""}`}>
+                        {f.value}
+                        {f.sub && <small>{f.sub}</small>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {s.kind === "conflict" && (
+                <>
+                  <div className="brief-conflict">
+                    {s.rows.map((r) => (
+                      <div
+                        key={r.src}
+                        className={`brief-conflict-row ${r.tone === "amber" ? "is-amber" : r.tone === "alert" ? "is-alert" : ""}`}
+                      >
+                        <div className="brief-conflict-src">
+                          {r.src}
+                          <b>{r.time}</b>
+                        </div>
+                        <div className="brief-conflict-txt">{r.text}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="brief-verdict">{s.verdict}</div>
+                </>
+              )}
+
+              {s.kind === "objectives" && (
+                <div className="brief-obj">
+                  {s.items.map((t, i) => (
+                    <div key={t} className="contents">
+                      <div className="brief-obj-n">{String(i + 1).padStart(2, "0")}</div>
+                      <div className="brief-obj-t">{t}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {s.kind === "partner" && (
+                <>
+                  <div className="brief-note">{s.intro}</div>
+                  <div className="brief-split">
+                    {s.columns.map((c) => (
+                      <div key={c.head} className="brief-col">
+                        <div className={`brief-col-head ${c.dim ? "is-dim" : ""}`}>{c.head}</div>
+                        <ul>
+                          {c.items.map((it) => (
+                            <li key={it}>{it}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="brief-note mt-3">{s.note}</div>
+                </>
+              )}
+
+              {s.kind === "notes" && (
+                <div className="brief-notes">
+                  {s.notes.map((n) => (
+                    <div key={n} className="brief-note">
+                      {n}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          ))}
         </div>
+      </div>
+
+      <div className="brief-rail">
+        <span className="brief-rail-left">
+          <span className="boot-status-dot" aria-hidden />
+          <span className="truncate">
+            {done ? "AUTHORIZATION GRANTED — CASE 001 IS YOURS" : "ASSEMBLING CASE FILE…"}
+          </span>
+        </span>
+        <span className="flex items-center gap-3">
+          <span className="brief-rail-hint">{done ? "ENTER" : "CLICK TO SKIP"}</span>
+          <button
+            className="btn-bevel brief-go"
+            onClick={(e) => {
+              e.stopPropagation();
+              advance();
+            }}
+          >
+            {done ? "OPEN WORKSTATION ▸" : "SHOW ALL"}
+          </button>
+        </span>
       </div>
     </div>
   );
