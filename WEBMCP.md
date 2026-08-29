@@ -1,6 +1,6 @@
 # WEBMCP — how Orpheus uses the standard
 
-> Orpheus is a co-op investigation for the nights nobody else is online. WebMCP is what makes the second seat real: the agent gets 25 narrow, auditable tools that operate the workstation, and the human keeps the one capability no tool exposes — looking. This document is the audit trail for that claim.
+> The agent gets 25 narrow, auditable tools that operate the workstation. The human keeps the one capability no tool exposes — looking.
 
 Everything below is verifiable in this repo. `pnpm test:webmcp` checks the registry headless; **LINK → ⚡ QUICK VERIFY** checks it live in the browser with no agent required.
 
@@ -22,7 +22,7 @@ Everything below is verifiable in this repo. `pnpm test:webmcp` checks the regis
 Three properties matter more than the counts:
 
 1. **Visible.** Every mutating tool changes what is on the player's screen. Windows open, documents scroll, a highlight pins, the terminal prints. You watch the agent work.
-2. **Asymmetric.** There is no `zoom`, no `click(x,y)`, no `type`, no screenshot. The agent cannot see pixels. That is enforced by absence — the capability does not exist to be misused.
+2. **Asymmetric.** There is no `zoom`, no `click(x,y)`, no `type`, no screenshot. This is a decision, not a constraint: ChatGPT is multimodal, and an agent with pixels solves this case alone while the human watches. Removing the capability is the only version that holds under a host that wants to be helpful — a prompt asking a model not to look is not a mechanic.
 3. **Shared.** `services.ts` is the only module that knows how to open a file, scroll a document, unlock the vault, or search the corpus. Remove WebMCP and the agent loses every one of those abilities at once.
 
 ---
@@ -69,7 +69,7 @@ Three properties matter more than the counts:
 | `open_evidence_board` | Evidence board opens | `{}` |
 | `terminal_command` | Terminal focuses and prints the output | `{ command }` |
 
-`show_in_document` is the hero primitive. It replaces what used to be a three-call chain (`open_file` → `scroll_document_to_line` → `find_text_in_document`) and accepts either an explicit `line` or a `query` resolved to the first match, so the agent points at a passage in one round trip instead of quoting it into chat.
+`show_in_document` replaces what used to be a three-call chain (`open_file` → `scroll_document_to_line` → `find_text_in_document`) and accepts either an explicit `line` or a `query` resolved to the first match, so the agent points at a passage in one round trip instead of quoting it into chat.
 
 ### Write — guarded
 
@@ -176,7 +176,40 @@ Model-facing eval specs in the `messages` / `expectedCall` format: `src/webmcp/e
 
 After the vault opens, the workstation reopens a 90-second observability window every ~2.5 minutes. Inside it, one asymmetric pair completes the beat: **the human zooms the stopped clock in `DSC04655` past 2.5×** while **the agent calls `get_system_logs`**. `noteWindowHuman()` and `noteWindowAgent()` both live in `services.ts`; neither fires outside the window and neither counts alone. Sync both and `/Private/window_echo.txt` appears.
 
-This is the clearest answer to "what can people and agents do together that was impossible before." It is not a convenience. It is a two-player mechanic where one player is an agent, and it cannot exist without a web standard that lets a page hand an agent real, narrow capabilities while a human watches.
+It is a two-player mechanic where one player is an agent, and it cannot exist without a web standard that lets a page hand an agent real, narrow capabilities while a human watches. Reachable in ~20 seconds via [`?demo=window`](https://orpheus-mcduff.vercel.app/?demo=window) (`src/game/demo.ts`).
+
+---
+
+## Architecture
+
+One rule runs through the codebase: **if the human can do it and the agent can do it, the logic exists exactly once.** `src/game/services.ts` is that once. The React apps call it; the WebMCP tools call it. Removing WebMCP does not degrade the agent — it removes it entirely.
+
+Next.js 16.3 (App Router, Turbopack, TypeScript), React 19, Tailwind 4, Zustand 5 persisted to IndexedDB via `idb-keyval`, CSS-only motion stepped at 80 ms, Web Audio (sampled first, procedural fallback). One static route, SSR-safe throughout. No server, database, authentication, external API calls, or environment variables.
+
+```
+src/
+  app/                   layout (+ declarative focus styles), globals.css, page
+  types/game.ts          every domain and state shape
+  game/
+    data/                filesystem (docs + computed key lines) · emails (17/5 folders) ·
+                         chatMessages (7 threads incl. t_observer, 35 msgs) ·
+                         browserHistory (18 + 17 cached) · systemLogs (51) ·
+                         evidence (21/5 sections) · photos (12, 3 sealed)
+    state/               osStore (phase, windows, flags, vault, obsWindow, synchrony) ·
+                         ariaStore (agent status only — WebMCP is the channel) ·
+                         investigationStore (evidence, four-question verdicts) ·
+                         persistence (one debounced idb-keyval record)
+    services.ts          THE capability layer — every capability exactly once
+    demo.ts              ?demo= / ?skip= judge entry points
+  webmcp/                register.ts · static-checks.ts · selftest.ts · evals.md
+  components/            DeclarativeForm · AgentLinkPanel · GameRoot ·
+                         title/ boot/ desktop/ taskbar/ windows/ notifications/ applications/
+  audio/engine.ts        hum, drone, key clicks, chimes, ambience
+```
+
+**Capability parity.** Each capability has one implementation and up to two entry points. `FilesApp` double-click and `open_file` both call `openFile()`. The text viewer's find bar and `show_in_document` both call `showInDocument()`. Two capabilities are deliberately one-sided: `notePhotoInspection` (the zoom detent — UI only, no zoom tool) and `getTimeline` (agent only, no UI equivalent). Components communicate through five `SimpleBus` channels plus `TermBus` and the document listeners.
+
+**Adding to the world.** A document is an `FsNode` in `filesystem.ts`; a photo is a `PhotoMeta` plus a PNG in `public/Images/`; an evidence item is an `EvidenceItem` with an optional `autoUnlockFlag`. A new tool is a `services.ts` function plus one entry in `TOOL_DEFS` — `register.ts` may not import from `game/data/*`, and `pnpm test:webmcp` fails if it does.
 
 ---
 

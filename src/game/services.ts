@@ -692,6 +692,16 @@ export function isObsWindowOpen(): boolean {
   return useOS.getState().obsWindow.open;
 }
 
+/**
+ * Arm the window to open `inSeconds` from now instead of waiting a full re-arm
+ * period. Used only by the `?demo=` entry points (src/game/demo.ts) so the set
+ * piece can be reached — and recorded — without playing to the vault first.
+ */
+export function armObservabilityWindow(inSeconds = 20): void {
+  const wait = Math.max(0, OBS_REARM_MS - Math.max(0, inSeconds) * 1000);
+  useOS.setState({ obsWindow: { open: false, endsAt: 0, lastClosedAt: Date.now() - wait } });
+}
+
 /** Called on a short interval (GameRoot) — opens, closes, and re-arms the window. */
 export function tickObservabilityWindow(): void {
   const os = useOS.getState();

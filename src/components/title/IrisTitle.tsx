@@ -77,7 +77,9 @@ export default function IrisTitle({ onLaunch }: { onLaunch: (mode: "new" | "cont
   const [aperture, setAperture] = useState(0.06); // 1=open, 0.06=closed start, 0.58=calibration contract
   const [litTicks, setLitTicks] = useState(0);
   const [tickPulse, setTickPulse] = useState<number | null>(null);
-  const [exitFlash, setExitFlash] = useState(false); // final flare before the cut to boot
+  const [diving, setDiving] = useState(false); // camera pushes into the lens on the way out
+  const [diveGlare, setDiveGlare] = useState(false); // core light pinching off at monitor scale
+  const [committed, setCommitted] = useState<MenuKey | null>(null); // the callout the player chose, held for one beat
 
   const os = useOS();
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -314,27 +316,47 @@ export default function IrisTitle({ onLaunch }: { onLaunch: (mode: "new" | "cont
     if (os.settings.sound) sfx.menuClick(); // dismiss shares the confirm sound
   }
 
-  /* ---------- exit sequence — clean single close → flash → cut ----------
-     Two-stage only: subtle tension then one decisive mechanical shut.
-     No jitter, no back-and-forth — reads as a deliberate shutter. */
+  /* ---------- exit — the camera dives INTO the lens ----------
+     The optic stops being an object on the screen and becomes the screen.
+     Commit is acknowledged on the callout, the shutter starts to shut, then
+     the whole housing races past the frame edges so the aperture ends up the
+     size of the monitor. Aperture (dir="in") picks it up on the far side at
+     exactly that scale, so the next phase literally opens through this lens
+     — one continuous optical move, no cut anywhere. */
   function beginTransition(mode: "new" | "continue") {
-    setClosing(true);
     const sound = os.settings.sound;
     mouseTargetRef.current = { x: 0, y: 0 };
-    if (sound) sfx.irisWhir("close");
-    // 0–0.34s: settle — the iris draws in just enough to show intent
-    animateAperture(0.78, 340, "out");
-    // 0.36–1.34s: commit — one smooth mechanical close to a pinhole
+    setCommitted(mode === "new" ? "new" : "continue");
+
+    if (os.settings.reducedMotion) {
+      setClosing(true);
+      setApertureValue(0.028);
+      timers.current.push(setTimeout(() => onLaunch(mode), 260));
+      return;
+    }
+
+    // 0.20s: menu clears, shutter takes up its slack, the whir starts
     timers.current.push(setTimeout(() => {
-      if (sound) sfx.servoDown();
-      animateAperture(0.028, 980, "mech");
-    }, 360));
-    // 1.38s: the flash — cold bloom from the core, then hard cut
+      setClosing(true);
+      if (sound) sfx.irisWhir("close");
+      animateAperture(0.72, 320, "out");
+    }, 200));
+
+    // 0.52s: the push begins — housing swells toward the frame while the
+    // blades keep closing, so scale and shutter resolve on the same beat
     timers.current.push(setTimeout(() => {
-      setExitFlash(true);
+      setDiving(true);
+      if (sound) { sfx.servoDown(); sfx.bootSwell(); }
+      animateAperture(0.02, 900, "mech");
+    }, 520));
+
+    // 1.36s: the aperture is now monitor-sized and pinching shut — glare
+    timers.current.push(setTimeout(() => {
+      setDiveGlare(true);
       if (sound) sfx.deepThud();
-    }, 1380));
-    timers.current.push(setTimeout(() => onLaunch(mode), 1760));
+    }, 1360));
+
+    timers.current.push(setTimeout(() => onLaunch(mode), 1720));
   }
 
   /* ---------- mouse tracking (normalized -1..1) ---------- */
@@ -364,14 +386,14 @@ export default function IrisTitle({ onLaunch }: { onLaunch: (mode: "new" | "cont
 
   return (
     <div
-      className={`iris-root ${closing ? "is-closing" : ""} ${keyNav && !closing ? "iris-keynav" : ""}`}
+      className={`iris-root ${closing ? "is-closing" : ""} ${diving ? "is-diving" : ""} ${keyNav && !closing ? "iris-keynav" : ""}`}
       onMouseDown={skip}
       onMouseMove={onMouseMove}
       role="application"
       aria-label="ORPHEUS system interface"
     >
-      {/* ---------- exit flash — the last thing the title screen shows ---------- */}
-      <div className={`iris-exitflash ${exitFlash ? "is-on" : ""}`} aria-hidden />
+      {/* ---------- exit — the core light pinching off at monitor scale ---------- */}
+      {diveGlare && <div className="iris-dive-glare" aria-hidden />}
 
       {/* ---------- background planes ---------- */}
       <div className="iris-bg-grid" aria-hidden />
@@ -738,7 +760,7 @@ export default function IrisTitle({ onLaunch }: { onLaunch: (mode: "new" | "cont
                 <button
                   key={m.key}
                   role="menuitem"
-                  className={`iris-item ${active ? "is-active" : ""} ${disabled ? "is-disabled" : ""}`}
+                  className={`iris-item ${active ? "is-active" : ""} ${disabled ? "is-disabled" : ""} ${committed === m.key ? "is-committed" : ""}`}
                   style={{
                     "--tx": off.x,
                     "--ty": off.y,

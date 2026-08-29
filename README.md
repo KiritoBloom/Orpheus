@@ -2,7 +2,9 @@
 
 **Live:** https://orpheus-mcduff.vercel.app/ — open it in ChatGPT's in-app browser, or in Chrome with `chrome://flags/#enable-webmcp-testing` enabled.
 
-**A co-op mystery for the nights nobody else is online.** One desk, two investigators: you see what the agent cannot, the agent remembers what you cannot. Not a replacement for playing with a friend — just presence, so a solitary session strains a little less.
+**A co-op mystery for the nights nobody else is online.** One desk, two investigators: you see what the agent cannot, the agent remembers what you cannot.
+
+**Judges, skip ahead:** [`?demo=verify`](https://orpheus-mcduff.vercel.app/?demo=verify) lands on the desktop with the tool console open · [`?demo=window`](https://orpheus-mcduff.vercel.app/?demo=window) preloads the vault so the 02:13 set piece arms in ~20 seconds. Preloaded flags only — every gate is the real gate.
 
 ```js
 // src/webmcp/register.ts — 25 narrow tools registered this way
@@ -28,7 +30,7 @@ You have been authorized to inspect the workstation of **Dr. Daniel McDuff** —
 
 A fully playable investigative narrative set inside a dead scientist's computer — files, mail, messages, photographs, browser history, system logs, and a sealed encrypted archive — where an AI agent sits beside you at the same machine.
 
-It feels like a game. It is also a working argument about what the web becomes when a page can hand an agent real, narrow capabilities while a human watches. Explore the workstation with a partner that can search everything and operate the machine, but cannot see a single pixel.
+It feels like a game. It is also a working argument about what the web becomes when a page can hand an agent real, narrow capabilities while a human watches.
 
 - Built for the [WebMCP Challenge](https://webmcp.devpost.com/)
 - Single-page Next.js app, **no backend, no database, no API keys**. Intelligence comes from your WebMCP host (ChatGPT, Chrome's origin trial, any browser exposing `document.modelContext`)
@@ -60,15 +62,17 @@ The machine visibly moves — windows open, documents scroll, lines highlight �
 
 ## Deliberately asymmetric
 
+**A design decision, stated plainly:** ChatGPT can see images. I could have handed the agent pixels and it would have solved this case alone while you watched. Withholding vision is the point — it makes the second seat a player instead of an autocomplete. The tools do not exist, so the temptation does not exist, and neither seat can finish the case without the other.
+
 **You are the eyes.**
 Open applications, browse files, read documents, inspect photographs, zoom manually. Notice the reflection, the handwriting, the stopped clock hands, the timestamp in a corner. Form theories. Decide what matters. Write the final reconstruction.
 
 **The agent is the memory.**
 Search messages, mail, files, and history at scale. Read EXIF and system logs. Merge a chronology across five sources. Find the one line in 51 log entries that changes the case. Open the evidence on your screen and point at it.
 
-The agent **cannot** zoom, pan, click coordinates, type into arbitrary fields, or take a screenshot. Those tools do not exist to be misused. The asymmetry is enforced by absence, and it is what keeps both seats necessary.
+There is no `zoom`, no `click(x,y)`, no `type`, no screenshot, no `read_screen`. The asymmetry is enforced by absence.
 
-There is also a moment where the asymmetry becomes a mechanic. After the vault opens, the workstation reopens a 90-second window every ~2.5 minutes. Inside it, **you** must zoom the stopped clock while **the agent** queries the logs from the same minute. Neither action counts alone. Neither counts outside the window.
+There is also a moment where it becomes a mechanic. After the vault opens, the workstation reopens a 90-second window every ~2.5 minutes. Inside it, **you** must zoom the stopped clock while **the agent** queries the logs from the same minute. Neither action counts alone. Neither counts outside the window.
 
 ---
 
@@ -91,9 +95,8 @@ Every navigation tool has a visible effect, and every tool routes through one sh
 
 The tool console is exposed to you, so WebMCP is verifiable without any host.
 
-1. Open the live URL → **NEW INVESTIGATION** → click to skip the boot.
-2. Tray → **LINK** (or `Ctrl+``).
-3. Press **⚡ QUICK VERIFY**.
+1. Open [`?demo=verify`](https://orpheus-mcduff.vercel.app/?demo=verify) — desktop, tool console already open. (Or the plain URL → **NEW INVESTIGATION** → click to skip the boot → tray **LINK** / `Ctrl+``.)
+2. Press **⚡ QUICK VERIFY**.
 
 Twelve deterministic checks plus three tool calls that visibly move the desk, then `✅ WEBMCP VERIFIED`. The document viewer opens, scrolls, and pins a highlight during the run.
 
@@ -149,19 +152,20 @@ src/
     GameRoot.tsx          lifecycle, hydration, WebMCP registration
     applications/         Files · Mail · Messages · Photos · Browser ·
                           Terminal · SystemLog · Evidence · TextViewer
+    demo.ts            the ?demo= / ?skip= judge entry points
 scripts/run-webmcp-tests.mjs   pnpm test:webmcp
 scripts/smoke.mjs              pnpm smoke — headless boot + QUICK VERIFY
 scripts/smoke-apps.mjs         pnpm smoke:apps — every app, every form, the vault
 
-docs: README · WEBMCP.md · ARCHITECTURE.md · JUDGE_QUICKSTART.md ·
-      GAME_DESIGN.md · SUBMISSION_DRAFT.md
+docs: README · WEBMCP.md (integration, security, architecture) ·
+      JUDGE_QUICKSTART.md · GAME_DESIGN.md (puzzle design)
 ```
 
 ---
 
 ## The iris title
 
-The opening is a diegetic circular mechanism — camera aperture, optical sensor, biometric scanner — that the menu orbits. It wakes with the machine: black, then a point of light, then segments assembling, then the aperture calibrating, then the menu labels emerging. Hovering a label makes the mechanism respond. **New Investigation** contracts the iris to black and boots Daniel's workstation in one continuous motion. No logo, no hero image, no conventional menu. Curiosity first, then faint unease, then "what am I looking at?"
+The opening is a diegetic circular mechanism — camera aperture, optical sensor, biometric scanner — that the menu orbits. It wakes with the machine, responds to hover, and contracts to black as the workstation boots, in one continuous motion. No logo, no hero image, no conventional menu.
 
 ---
 

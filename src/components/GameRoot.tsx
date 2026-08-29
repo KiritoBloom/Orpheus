@@ -6,6 +6,7 @@ import { useOS } from "@/game/state/osStore";
 import { useAria } from "@/game/state/ariaStore";
 import { useInvestigation } from "@/game/state/investigationStore";
 import { registerWebMCPTools, getModelContext, getRegistrationState } from "@/webmcp/register";
+import { readDemoConfig, isDemoEntry, applyDemoConfig, demoBanner, type DemoConfig } from "@/game/demo";
 import { sfx } from "@/audio/engine";
 import IrisTitle from "@/components/title/IrisTitle";
 import BootSequence from "@/components/boot/BootSequence";
@@ -37,6 +38,8 @@ export default function GameRoot() {
   const [endingRequested, setEndingRequested] = useState(false);
   const [curtain, setCurtain] = useState(0); // bumped per phase arrival so the aperture opens on it
   const audioPrimed = useRef(false);
+  const demoRef = useRef<DemoConfig | null>(null);
+  const demoAnnounced = useRef(false);
 
   /* ---------- persistence hydrate ---------- */
   useEffect(() => {
@@ -61,9 +64,33 @@ export default function GameRoot() {
       });
       hydrate({ hasProgress: save.hasProgress });
       sfx.setEnabled(save.settings.sound);
+
+      // ?demo= / ?skip= — preload state and land on the desktop. Flags are set
+      // with setState, never addFlag, so a judge's shortcut is not persisted
+      // over a player's save. See src/game/demo.ts.
+      const cfg = readDemoConfig();
+      if (isDemoEntry(cfg)) {
+        await applyDemoConfig(cfg);
+        demoRef.current = cfg;
+        setCurtain((c) => c + 1);
+        useOS.getState().setPhase("desktop");
+      }
       setReady(true);
     })();
   }, [hydrate]);
+
+  /* ---------- demo entry — banner, and the LINK console for ?demo=verify ---------- */
+  useEffect(() => {
+    const cfg = demoRef.current;
+    if (!ready || phase !== "desktop" || !cfg || demoAnnounced.current) return;
+    demoAnnounced.current = true;
+    const banner = demoBanner(cfg);
+    const t = setTimeout(() => {
+      if (banner) useOS.getState().pushToast({ app: "DEMO", ...banner });
+      if (cfg.mode === "verify") window.dispatchEvent(new CustomEvent("orpheus:open-link"));
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [ready, phase]);
 
   /* ---------- webmcp registration (poll + toolchange re-register) ---------- */
   // Hosts inject `document.modelContext` asynchronously (Atlas notably late),

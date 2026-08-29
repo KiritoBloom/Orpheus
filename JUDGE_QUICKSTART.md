@@ -9,9 +9,10 @@
 
 ## 0) No agent needed — 30 seconds
 
-1. Open the live URL → wait for the iris → **NEW INVESTIGATION** → click to skip the boot → desktop.
-2. Tray → **LINK** (or `Ctrl+``). This is the WebMCP tool console: all 25 imperative tools with live schemas, plus the 4 declarative forms listed. Headline tools arrive with example inputs prefilled, so the documented path runs with zero typing.
-3. Press **⚡ QUICK VERIFY**.
+1. **[`?demo=verify`](https://orpheus-mcduff.vercel.app/?demo=verify)** — lands on the desktop with the tool console open. (Cold path: live URL → iris → **NEW INVESTIGATION** → click to skip the boot → tray **LINK** / `Ctrl+``.)
+2. Press **⚡ QUICK VERIFY**.
+
+The console lists all 25 imperative tools with live schemas plus the 4 declarative forms, and headline tools arrive with example inputs prefilled, so the documented path runs with zero typing.
 
 That single click runs 12 deterministic checks plus 3 tool calls that visibly move the desk, and prints `✅ WEBMCP VERIFIED`. During the run the document viewer opens, scrolls, and pins a highlight — that is the agent moving your screen.
 
@@ -55,9 +56,11 @@ Open the live URL in **ChatGPT's in-app browser** (native WebMCP), or in Chrome 
 4. *"What happened at 02:13?"* → `get_system_logs {"filter":"02:13"}` → the six-entry cluster and the gait mismatch that first frames Sarah, then exonerates her.
 5. *"Show me where Daniel says 02:13 is not a time."* → `show_in_document` → the document moves on **your** screen and pins line 145. The passage is not in the chat. You read it where he wrote it.
 
-**The set piece.** After the vault opens (`terminal_command {"command":"unlock lantern orpheus echo"}`), the machine reopens a 90-second window every ~2.5 minutes — amber pulse, `02:13 WINDOW` badge in the taskbar. Inside it, zoom `DSC04655` past 2.5× **while** the agent calls `get_system_logs`. Neither action counts alone; neither counts outside the window. Sync both and `/Private/window_echo.txt` appears.
+**The set piece.** Open **[`?demo=window`](https://orpheus-mcduff.vercel.app/?demo=window)** — the vestibule is already decrypted and the window arms ~20 seconds after arrival, so you do not have to play to the vault or wait out a re-arm. (Unassisted: `terminal_command {"command":"unlock lantern orpheus echo"}`, then the window reopens every ~2.5 minutes.) Amber pulse, `02:13 WINDOW` badge in the taskbar. Inside it, zoom `DSC04655` past 2.5× **while** the agent calls `get_system_logs`. Neither action counts alone; neither counts outside the window. Sync both and `/Private/window_echo.txt` appears.
 
 That is the loop: **you see → you describe → the agent searches and opens → you inspect → repeat.** The `COLLABORATED_WITH_ARIA` flag gates case reconstruction, so the case genuinely cannot be closed without it.
+
+**On the agent's blindness.** ChatGPT is multimodal; this is a choice, not a limitation I ran into. Give the agent pixels and it solves the case alone while the human watches — so the pixels are not on offer. Removing the capability instead of asking the model to ignore it is the only version that holds under a host that wants to be helpful.
 
 ---
 
@@ -71,10 +74,24 @@ That is the loop: **you see → you describe → the agent searches and opens �
 | `src/webmcp/static-checks.ts` | The 9 shared registry checks — the same function runs in the browser panel and in `pnpm test:webmcp` |
 | `src/webmcp/selftest.ts` | The 12 live evals behind RUN EVALS, snapshot-and-restore state safe |
 | `src/components/GameRoot.tsx` | Registration polling and `toolchange` re-registration |
+| `src/game/demo.ts` | The `?demo=` entry points — flags preloaded with `setState` so a shortcut is never persisted, and no gate softened |
 
 ---
 
-## 3) Beyond the case
+## 3) Demo entry points
+
+| Link | State |
+|---|---|
+| [`?demo=verify`](https://orpheus-mcduff.vercel.app/?demo=verify) | Desktop, tool console open |
+| [`?demo=window`](https://orpheus-mcduff.vercel.app/?demo=window) | Vestibule decrypted, 02:13 arming in ~20s |
+| [`?demo=full`](https://orpheus-mcduff.vercel.app/?demo=full) | The above plus the reconstruction gate satisfied |
+| `?skip=intro` | Cold desk, iris and boot skipped |
+
+A banner names the shortcut on arrival. Preloaded flags are the flags real play sets; every check, gate, and tool behaves identically. `src/game/demo.ts`.
+
+---
+
+## 4) Beyond the case
 
 The McDuff investigation is instance one. The pattern — 20–30 semantic tools over filesystem, messages, logs, and images, with visible actuation and asymmetric perception — transfers to any corpus where some evidence is visual and some is machine-readable:
 
@@ -87,7 +104,7 @@ Replace `src/game/data/*`, keep the `services.ts` + `register.ts` split, deploy 
 
 ---
 
-## 4) Expected results checklist
+## 5) Expected results checklist
 
 - [ ] `LINK` lists 25 tools with ◇/◆/⚑ markers, live `title` / `description` / `inputSchema`, and the 4 declarative forms
 - [ ] `⚡ QUICK VERIFY` prints `✅ WEBMCP VERIFIED` — 15/15 (12 evals + 3 actuations)
@@ -102,4 +119,4 @@ Replace `src/game/data/*`, keep the `services.ts` + `register.ts` split, deploy 
 
 If you are short on time, the 30-second LINK path alone covers WebMCP Leverage and Execution.
 
-More detail: `WEBMCP.md` (tool table + security audit) · `ARCHITECTURE.md` (stack) · `GAME_DESIGN.md` (puzzle design).
+More detail: `WEBMCP.md` (tool table, security audit, architecture) · `GAME_DESIGN.md` (puzzle design).
