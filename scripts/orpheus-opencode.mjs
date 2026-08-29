@@ -12,13 +12,20 @@
      1. Verifies the live URL is reachable
      2. Prints the opencode.json MCP block to paste
      3. Opens the Chrome Web Store page for the MCP-B extension
-     4. Starts @mcp-b/native-server in the foreground
-     5. Forwards Ctrl-C to the child for a clean shutdown
+        (one-time — tracked via a marker file)
+     4. If DEV_EXTENSION_ID is set:
+        a. Runs `register` to install the native-messaging manifest
+        b. Runs `update-port 12306`
+        c. Spawns the native server in the foreground (Ctrl-C to stop)
+     4b. If DEV_EXTENSION_ID is NOT set:
+        Tells you exactly how to get it (open chrome://extensions,
+        enable Developer mode, copy the ID under MCP-B) and exits.
 
    Usage:
      pnpm opencode               # from the repo root
      node scripts/orpheus-opencode.mjs
      node scripts/orpheus-opencode.mjs --no-server  # print config only
+     RESET=1 pnpm opencode       # force-reopen the extension store
 
    The judges will use ChatGPT Atlas / Chrome 149 flag — see
    JUDGE_QUICKSTART.md for the actual submission path. This is
@@ -26,12 +33,15 @@
    ============================================================ */
 
 import { spawn, spawnSync } from "node:child_process";
-import { platform } from "node:os";
+import { existsSync, writeFileSync, readFileSync } from "node:fs";
+import { homedir, platform } from "node:os";
+import { join } from "node:path";
 
 const LIVE_URL = "https://orpheus-mcduff.vercel.app/";
 const NATIVE_SERVER_PORT = 12306;
 const EXTENSION_STORE_URL =
   "https://chromewebstore.google.com/search/mcp-b";
+const REMINDER_PATH = join(homedir(), ".cache", "orheus-opencode-reminder.json");
 
 const argv = process.argv.slice(2);
 const NO_SERVER = argv.includes("--no-server");
@@ -102,12 +112,22 @@ console.log();
 info(dim("OpenCode's MCP is stdio; the native host speaks Streamable HTTP."));
 info(dim("`mcp-remote` is the bridge. After the first run it'll cache."));
 
-/* ---------- 4. open the extension store page ---------- */
-step(3, "Installing the MCP-B Chrome extension…");
-info("Opening the Chrome Web Store search for the MCP-B extension.");
-info("Search for " + bold("`WebMCP`") + " or " + bold("`@mcp-b`") + " — install the one by `mcp-b`.");
-info(dim("(The official extension is published by anomalyco / mcp-b; if you don't see it, the README at https://github.com/miguelspizza/webmcp has the latest link.)"));
-if (!PRINT_ONLY) {
+/* ---------- 3. open the extension store page (idempotent) ---------- */
+step(3, "MCP-B Chrome extension…");
+const reminder = existsSync(REMINDER_PATH)
+  ? (() => { try { return JSON.parse(readFileSync(REMINDER_PATH, "utf8")); } catch { return {}; } })()
+  : {};
+const alreadyOpened = !!reminder.openedAt;
+const forceReopen = process.env.RESET === "1" || argv.includes("--reopen");
+
+if (alreadyOpened && !forceReopen) {
+  info(dim(`(extension store already opened ${reminder.openedAt} — set RESET=1 or pass --reopen to show again)`));
+} else if (PRINT_ONLY) {
+  info(dim(`(skipped — --print-only)  ${EXTENSION_STORE_URL}`));
+} else {
+  info("If you haven't already, install the MCP-B extension.");
+  info("Search for " + bold("`WebMCP`") + " or " + bold("`@mcp-b`") + " in the Chrome Web Store — install the one by `mcp-b`.");
+  info(dim("(Extension is published by anomalyco / mcp-b. README: https://github.com/miguelspizza/webmcp)"));
   try {
     const opener =
       platform() === "darwin" ? "open" :
@@ -115,30 +135,83 @@ if (!PRINT_ONLY) {
       "xdg-open";
     spawnSync(opener, [EXTENSION_STORE_URL], { stdio: "ignore", shell: true });
     info(green("✓ Opened in your default browser."));
+    try {
+      writeFileSync(REMINDER_PATH, JSON.stringify({ openedAt: new Date().toISOString() }, null, 2));
+    } catch {}
   } catch {
     info(dim(`Could not auto-open. Visit: ${EXTENSION_STORE_URL}`));
   }
-} else {
-  info(dim(`(skipped — --print-only)  ${EXTENSION_STORE_URL}`));
 }
 
-/* ---------- 5. install + start the native server ---------- */
+/* ---------- 4. install + start the native server ---------- */
 step(4, "Starting the MCP-B native server…");
 if (NO_SERVER || PRINT_ONLY) {
   info(dim("(skipped — --no-server / --print-only)"));
   info(dim("When ready, run:  npx -y @mcp-b/native-server"));
+  info(dim("(you'll also need DEV_EXTENSION_ID set — see the README for how to get it from chrome://extensions)"));
   console.log();
   info(green("Done. After the extension is installed and the site is open in Chrome, start an OpenCode session."));
   process.exit(0);
 }
 
-info(dim("Spawning: npx -y @mcp-b/native-server"));
+const isWin = process.platform === "win32";
+const cmd = isWin ? "npx.cmd" : "npx";
+
+/* The native server uses Chrome's Native Messaging protocol. To bootstrap:
+     1. Install extension (done in step 3)
+     2. Copy the extension's ID from chrome://extensions
+     3. Set DEV_EXTENSION_ID=<id> in the env
+     4. Run `register` to install the native-messaging manifest
+     5. Run `update-port <port>` so the manifest points at the right port
+     6. Start the server (which now has the env + config it needs)
+   We do steps 4–6 here. Step 2 is a one-time user action.
+*/
+let extId = process.env.DEV_EXTENSION_ID?.trim();
+if (!extId) {
+  warn("DEV_EXTENSION_ID is not set.");
+  warn("Get the extension ID from chrome://extensions (enable Developer mode, then copy the ID under MCP-B).");
+  warn("Then re-run:  $env:DEV_EXTENSION_ID='<paste-id>'; pnpm opencode");
+  console.log();
+  // Open chrome://extensions to make it a one-click follow-up
+  try {
+    const opener = isWin ? "start" : platform() === "darwin" ? "open" : "xdg-open";
+    spawnSync(opener, ["chrome://extensions"], { stdio: "ignore", shell: true });
+  } catch {}
+  process.exit(1);
+}
+info(dim(`DEV_EXTENSION_ID=${extId.slice(0, 12)}…`));
+
+/* 4. register the native-messaging manifest (writes to OS-specific location) */
+info(dim("Registering native-messaging host (one-time)…"));
+const reg = spawnSync(cmd, ["-y", "@mcp-b/native-server", "register"], {
+  stdio: "inherit",
+  env: { ...process.env, DEV_EXTENSION_ID: extId },
+  shell: isWin,
+});
+if (reg.status !== 0) {
+  warn(`register exited with code ${reg.status}. Continuing — manifest may already be installed.`);
+}
+
+/* 5. point the manifest at our port */
+info(dim(`Setting port to ${NATIVE_SERVER_PORT}…`));
+const port = spawnSync(cmd, ["-y", "@mcp-b/native-server", "update-port", String(NATIVE_SERVER_PORT)], {
+  stdio: "inherit",
+  env: { ...process.env, DEV_EXTENSION_ID: extId },
+  shell: isWin,
+});
+if (port.status !== 0) {
+  warn(`update-port exited with code ${port.status}. Continuing anyway.`);
+}
+
+/* 6. finally start the actual server */
+info(dim("Starting the MCP HTTP endpoint…"));
 info(dim(`(will listen on http://127.0.0.1:${NATIVE_SERVER_PORT}/mcp — Ctrl-C to stop)`));
 console.log();
 
-const child = spawn("npx", ["-y", "@mcp-b/native-server"], {
+const child = spawn(cmd, ["-y", "@mcp-b/native-server"], {
   stdio: "inherit",
-  env: process.env,
+  env: { ...process.env, DEV_EXTENSION_ID: extId },
+  shell: isWin,
 });
 
 let shuttingDown = false;
@@ -148,7 +221,7 @@ const shutdown = (sig) => {
   console.log();
   info(yellow(`Received ${sig}, stopping native server…`));
   try {
-    if (process.platform === "win32") {
+    if (isWin) {
       // npx is a .cmd shim — taskkill the whole tree so the child node dies too
       spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
     } else {
