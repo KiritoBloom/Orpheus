@@ -8,7 +8,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:webmcp": "node --experimental-strip-types --no-warnings scripts/run-webmcp-tests.mjs"
+    "test:webmcp": "node --experimental-strip-types --no-warnings scripts/run-webmcp-tests.mjs",
+    "opencode": "node scripts/orpheus-opencode.mjs",
+    "opencode:print": "node scripts/orpheus-opencode.mjs --print-only"
   },
   "dependencies": {
     "idb-keyval": "^6.3.0",
