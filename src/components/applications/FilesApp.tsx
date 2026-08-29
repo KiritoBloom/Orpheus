@@ -126,15 +126,15 @@ export default function FilesApp() {
 
         {/* Declarative tool: the agent can attempt the vault passphrase natively */}
         {!os.vaultUnlocked && os.flags.has("FOUND_PRIVATE_HINT") && (
-          <div className="shrink-0 px-3 py-1.5 border-b border-line bg-surface2 flex items-center gap-3">
-            <span className="mono-xs text-amber shrink-0">UNLOCK VESTIBULE —</span>
+          <div className="shrink-0 px-3 py-1.5 border-b border-line bg-surface2">
             <DeclarativeForm
               toolname="unlock_vault"
-              tooldescription="Submit the three-word passphrase Daniel photographed on his desk. Three words, in the correct order. Wrong attempts reveal a fragment archive."
+              tooldescription="Submit the three-word passphrase Daniel photographed on his desk. Three words, in the correct order. Wrong attempts reveal a fragment archive instead of destroying anything."
               paramName="passphrase"
               paramDescription="Three words separated by single spaces — e.g. 'lantern orpheus echo'. The order matters."
               placeholder="lantern orpheus echo"
               submitLabel="UNLOCK"
+              label="UNLOCK VESTIBULE —"
               className="flex-1"
               onExecute={async (passphrase) => {
                 const words = passphrase.split(/\s+/).filter(Boolean);

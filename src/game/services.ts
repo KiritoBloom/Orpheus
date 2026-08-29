@@ -6,13 +6,19 @@ import { EMAILS } from "@/game/data/emails";
 import { CHAT_MESSAGES, THREADS } from "@/game/data/chatMessages";
 import { HISTORY } from "@/game/data/browserHistory";
 import { LOGS } from "@/game/data/systemLogs";
-import { getPhoto } from "@/game/data/photos";
+import { getPhoto, PHOTOS } from "@/game/data/photos";
 import { useOS } from "@/game/state/osStore";
 import { sfx } from "@/audio/engine";
 
 /* ============================================================
    GAME SERVICES — every capability exists exactly once.
    Both the UI and the WebMCP tools call these functions.
+
+   Rule of the codebase: if the UI can do it and the agent can
+   do it, the logic lives here and both call it. No tool in
+   src/webmcp/register.ts reimplements game logic; no app
+   component reimplements a tool. That is what makes WebMCP
+   fundamental here rather than bolted on.
    ============================================================ */
 
 const FS: FsNode[] = buildFilesystem();
@@ -23,14 +29,55 @@ export function fsList(): FsNode[] {
 export function fsGet(path: string): FsNode | undefined {
   return FS.find((n) => n.path === path);
 }
-export function fsChildren(dirPath: string): FsNode[] {
+
+/** Single visibility predicate for filesystem objects — story flags + vault state. */
+export function fsVisible(n: FsNode): boolean {
   const os = useOS.getState();
+  if (n.hiddenUntilFlag && !os.flags.has(n.hiddenUntilFlag)) return false;
+  if (n.requiresUnlock && !os.vaultUnlocked) return false;
+  return true;
+}
+
+export function fsChildren(dirPath: string): FsNode[] {
+  return FS.filter((n) => n.parent === dirPath && fsVisible(n));
+}
+
+/* ---------------- filesystem search — one implementation ---------------- */
+
+export interface FileHit {
+  path: string;
+  kind: FsNode["kind"];
+  modified: string;
+  excerpt: string;
+  approxLine?: number;
+}
+
+/**
+ * Search names + readable contents. Used by the WebMCP `search_files` tool,
+ * the Terminal `search` verb, and the Evidence board's `request_correlation`
+ * declarative form — one predicate, three callers.
+ */
+export function searchFiles(query: string, opts: { limit?: number; excerptChars?: number } = {}): FileHit[] {
+  const limit = opts.limit ?? 25;
+  const excerptChars = opts.excerptChars ?? 120;
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
   return FS.filter((n) => {
-    if (n.parent !== dirPath) return false;
-    if (n.hiddenUntilFlag && !os.flags.has(n.hiddenUntilFlag)) return false;
-    if (n.requiresUnlock && !os.vaultUnlocked) return false;
-    return true;
-  });
+    if (!fsVisible(n)) return false;
+    // sealed containers match on name only — contents must stay opaque
+    if (n.encrypted) return n.name.toLowerCase().includes(q);
+    return n.name.toLowerCase().includes(q) || (n.content?.toLowerCase().includes(q) ?? false);
+  })
+    .slice(0, limit)
+    .map((n) => {
+      const idx = n.content ? n.content.toLowerCase().indexOf(q) : -1;
+      const excerpt =
+        idx >= 0
+          ? n.content!.slice(Math.max(0, idx - 40), idx + 80).replace(/\s+/g, " ").slice(0, excerptChars)
+          : "";
+      const approxLine = idx >= 0 ? n.content!.slice(0, idx).split("\n").length : undefined;
+      return { path: n.path, kind: n.kind, modified: n.modified, excerpt, approxLine };
+    });
 }
 
 /* ---------------- application navigation ---------------- */
@@ -226,6 +273,96 @@ export function openPhoto(photoId: string): void {
   onPhotoViewed(photoId);
 }
 
+/** Is this photo reachable right now? (private-backup gating + filesystem flags) */
+export function isPhotoAccessible(photoId: string): boolean {
+  const meta = getPhoto(photoId);
+  if (!meta) return false;
+  const os = useOS.getState();
+  if (meta.inPrivateBackup && !os.vaultUnlocked) return false;
+  const node = FS.find((n) => n.photoId === photoId);
+  if (node && node.hiddenUntilFlag && !os.flags.has(node.hiddenUntilFlag)) return false;
+  return true;
+}
+
+/** Resolve a photo by exact id or partial filename (used by the inspect_photo form). */
+export function resolvePhoto(raw: string): PhotoMeta | undefined {
+  const q = raw.trim().toLowerCase().replace(/\.(png|jpe?g)$/, "");
+  if (!q) return undefined;
+  return PHOTOS.find((p) => p.id.toLowerCase() === q) ?? PHOTOS.find((p) => p.filename.toLowerCase().includes(q));
+}
+
+/** Where the player should look in a given photo — the agent cannot see pixels, so it points. */
+export function photoInspectionHint(photoId: string): string {
+  switch (photoId) {
+    case "DSC04821":
+      return "Hint: window glass, lower half — a figure holds a phone with a reversed badge glint.";
+    case "DSC04655":
+      return "Hint: a stopped wall clock. Note the minute hand.";
+    case "IMG_0022":
+      return "Hint: a reminder card photographed through glass.";
+    case "IMG_0044":
+      return "Hint: a door camera timestamp — bottom-right corner.";
+    case "IMG_0103":
+      return "Hint: a health-band trace — the line ends mid-beat.";
+    default:
+      return `Caption: ${getPhoto(photoId)?.caption ?? "no caption"}.`;
+  }
+}
+
+// cooldown for ARIA's reactive zoom toast — presence, not nagging
+let lastAriaZoomToastAt = 0;
+/** Zoom detent threshold at which manual inspection counts as "looking closely". */
+export const ZOOM_INSPECTION_THRESHOLD = 2.5;
+
+/**
+ * Human side of the asymmetry: the player crossed the inspection detent on a
+ * photo. Called by the image viewer only — no WebMCP tool can reach this,
+ * because the agent cannot zoom. Owns every flag, toast, and co-op beat that
+ * manual inspection triggers.
+ */
+export function notePhotoInspection(photoId: string, zoom: number): void {
+  if (zoom < ZOOM_INSPECTION_THRESHOLD) return;
+  noteHumanAction(); // the human is inspecting — synchrony rhythm
+  onPhotoViewed(photoId, zoom);
+  const os = useOS.getState();
+  if (photoId === "DSC04821") {
+    os.pushToast({ app: "PHOTOS", title: "DSC04821.JPG", body: "Something is reflected in the glass." });
+    return;
+  }
+  if (photoId === "DSC04655") {
+    noteWindowHuman(); // 02:13 window — human side (the stopped clock)
+    return;
+  }
+  if (Date.now() - lastAriaZoomToastAt > 180_000) {
+    // ARIA reacts when the human goes quiet over a photo — presence, not automation
+    lastAriaZoomToastAt = Date.now();
+    os.pushToast({
+      app: "ARIA",
+      title: "ZOOM NOTED",
+      body: "You've gone quiet. Describe what you see — I'll find what it connects to.",
+    });
+  }
+}
+
+/**
+ * Backs the Photos app's `inspect_photo` declarative form: resolve a photo by
+ * id or filename, return machine-readable metadata plus a directional hint.
+ * Never returns pixels — the player still has to look.
+ */
+export function inspectPhoto(raw: string): { ok: boolean; message: string; photoId?: string } {
+  const photo = resolvePhoto(raw);
+  if (!photo) return { ok: false, message: `no photo matches "${raw}"` };
+  if (!isPhotoAccessible(photo.id))
+    return { ok: false, message: `${photo.filename} is sealed in /Private/photo_backup — unlock the vestibule first.`, photoId: photo.id };
+  const meta = getImageMetadata(photo.id);
+  const hint = photoInspectionHint(photo.id);
+  return {
+    ok: true,
+    photoId: photo.id,
+    message: `${photo.filename} — ${meta?.exif.dateOriginal ?? "unknown date"} · ${meta?.exif.camera ?? "?"} · ${meta?.exif.gpsLabel ?? "?"}. ${hint}`,
+  };
+}
+
 let photoListener: ((photoId: string, zoom: number) => void) | null = null;
 export function setPhotoListener(fn: typeof photoListener) {
   photoListener = fn;
@@ -239,7 +376,7 @@ function onPhotoViewed(photoId: string, zoom = 1) {
   photoListener?.(photoId, zoom);
   // story hooks
   const os = useOS.getState();
-  if (photoId === "DSC04821" && zoom >= 2.5) {
+  if (photoId === "DSC04821" && zoom >= ZOOM_INSPECTION_THRESHOLD) {
     os.addFlag("FOUND_PHOTO_017");
   }
   if (photoId === "IMG_0022") os.addFlag("FOUND_PRIVATE_HINT");
@@ -259,7 +396,8 @@ function onPhotoViewed(photoId: string, zoom = 1) {
 
 export function getImageMetadata(photoId: string): PhotoMeta | undefined {
   const photo = getPhoto(photoId);
-  if (photo?.inPrivateBackup && !useOS.getState().vaultUnlocked) return undefined;
+  if (!photo) return undefined;
+  if (!isPhotoAccessible(photoId)) return undefined;
   useOS.getState().addFlag("DISCOVERED_METADATA");
   return photo;
 }
@@ -271,6 +409,15 @@ export type MailIndexItem = Email;
 export function listEmails(): Email[] {
   const os = useOS.getState();
   return EMAILS.filter((e) => !(e.hiddenUntilFlag && !os.flags.has(e.hiddenUntilFlag)));
+}
+
+/** Search mail across every visible folder by sender, subject, or body. */
+export function searchEmails(query: string): { id: string; folder: string; from: string; subject: string; date: string }[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  return listEmails()
+    .filter((e) => [e.from, e.fromEmail, e.subject, e.body].some((f) => f.toLowerCase().includes(q)))
+    .map((e) => ({ id: e.id, folder: e.folder, from: e.from, subject: e.subject, date: e.date }));
 }
 export function getEmail(id: string): Email | undefined {
   return listEmails().find((e) => e.id === id);
@@ -298,24 +445,38 @@ export function isMailUnread(id: string): boolean {
 
 /* ---------------- messages / chat search ---------------- */
 
-function msgVisible(m: { hiddenUntilFlag?: import("@/types/game").StoryFlag }): boolean {
+/** Story-flag visibility for a chat message or thread (t_observer stays hidden until it arrives). */
+export function msgVisible(m: { hiddenUntilFlag?: import("@/types/game").StoryFlag }): boolean {
   return !(m.hiddenUntilFlag && !useOS.getState().flags.has(m.hiddenUntilFlag));
 }
 
+/** Every currently visible chat message. */
+export function listMessages(): ChatMsg[] {
+  return CHAT_MESSAGES.filter(msgVisible);
+}
+
+/** Every currently visible thread. */
+export function listThreads() {
+  return THREADS.filter(msgVisible);
+}
+
 export function searchMessages(query: string): { threadId: string; threadName: string; time: string; body: string }[] {
-  const q = query.toLowerCase();
-  return CHAT_MESSAGES.filter((m) => msgVisible(m) && m.body.toLowerCase().includes(q)).map((m) => ({
-    threadId: m.threadId,
-    threadName: m.threadName,
-    time: m.time,
-    body: m.body,
-  }));
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  return listMessages()
+    .filter((m) => m.body.toLowerCase().includes(q))
+    .map((m) => ({
+      threadId: m.threadId,
+      threadName: m.threadName,
+      time: m.time,
+      body: m.body,
+    }));
 }
 export function getMessageThread(threadId: string): { name: string; messages: ChatMsg[] } {
   const t = THREADS.find((x) => x.id === threadId);
   return {
     name: t?.name ?? threadId,
-    messages: CHAT_MESSAGES.filter((m) => m.threadId === threadId && msgVisible(m)),
+    messages: listMessages().filter((m) => m.threadId === threadId),
   };
 }
 export function openMessagesThread(threadId: string): { ok: boolean; error?: string } {
@@ -370,6 +531,114 @@ export function flagLogDiscovery() {
   useOS.getState().addFlag("FOUND_0213_LOG");
   checkReconstructed();
   checkReconstructionAvailable();
+}
+
+/* ---------------- correlated timeline ---------------- */
+
+export const DEFAULT_TIMELINE_WINDOW = "01:45-02:40";
+
+export interface TimelineItem {
+  time: string;
+  source: "log" | "photo" | "message";
+  detail: string;
+  anomaly: boolean;
+}
+
+export interface TimelineResult {
+  window: string;
+  count: number;
+  totalInWindow: number;
+  has0213Cluster: boolean;
+  timeline: TimelineItem[];
+}
+
+/**
+ * Merge system logs, photo EXIF timestamps, and message traffic into one
+ * chronology for a `HH:MM-HH:MM` window. This is the correlation a human
+ * would need five open applications to assemble by hand — which is exactly
+ * why it belongs to the agent side of the desk.
+ */
+export function getTimeline(window = DEFAULT_TIMELINE_WINDOW, opts: { limit?: number; detailChars?: number } = {}): TimelineResult {
+  const limit = opts.limit ?? 30;
+  const detailChars = opts.detailChars ?? 120;
+  const w = window.trim() || DEFAULT_TIMELINE_WINDOW;
+
+  let startMin = 105; // 01:45
+  let endMin = 160; // 02:40
+  const parsed = w.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+  if (parsed) {
+    startMin = parseInt(parsed[1], 10) * 60 + parseInt(parsed[2], 10);
+    endMin = parseInt(parsed[3], 10) * 60 + parseInt(parsed[4], 10);
+    if (endMin < startMin) endMin += 24 * 60; // window crosses midnight
+  }
+  const toMin = (t: string) => {
+    const p = t.split(":");
+    return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+  };
+  const inWindow = (t: string) => {
+    const mm = toMin(t.slice(0, 5));
+    if (Number.isNaN(mm)) return false;
+    if (endMin >= 24 * 60) return mm >= startMin || mm <= endMin - 24 * 60;
+    return mm >= startMin && mm <= endMin;
+  };
+  const clip = (s: string) => s.replace(/\s+/g, " ").slice(0, detailChars);
+
+  const items: TimelineItem[] = [];
+  for (const l of LOGS) {
+    if (!inWindow(l.time)) continue;
+    items.push({
+      time: `${l.date} ${l.time}`,
+      source: "log",
+      detail: clip(l.detail),
+      anomaly: l.time.startsWith("02:13") || l.severity === "alert" || l.detail.toLowerCase().includes("gait mismatch"),
+    });
+  }
+  for (const p of PHOTOS) {
+    const t = p.exif.dateOriginal.slice(11, 19); // HH:MM:SS
+    if (!t || !inWindow(t)) continue;
+    items.push({
+      time: p.exif.dateOriginal.replace("T", " "),
+      source: "photo",
+      detail: clip(`${p.id} ${p.filename} — ${p.caption}`),
+      anomaly: p.id === "IMG_0044" || p.id === "IMG_0103",
+    });
+  }
+  for (const m of listMessages()) {
+    const timePart = m.time.includes(" ") ? m.time.split(" ")[1] : m.time;
+    if (!inWindow(timePart)) continue;
+    items.push({ time: m.time, source: "message", detail: clip(`${m.threadName}: ${m.body}`), anomaly: false });
+  }
+  items.sort((a, b) => a.time.localeCompare(b.time));
+
+  const timeline = items.slice(0, limit);
+  return {
+    window: w,
+    count: timeline.length,
+    totalInWindow: items.length,
+    has0213Cluster: timeline.some((x) => x.time.includes("02:13")),
+    timeline,
+  };
+}
+
+/* ---------------- cross-source correlation (declarative request_correlation) ---------------- */
+
+/**
+ * One term, every corpus the agent can read. Backs the Evidence board's
+ * `request_correlation` declarative form; the imperative equivalents are
+ * `search_files` + `search_messages`.
+ */
+export function correlateTerm(query: string): { query: string; files: number; messages: number; emails: number; summary: string } {
+  const q = query.trim();
+  const files = searchFiles(q).length;
+  const messages = searchMessages(q).length;
+  const emails = searchEmails(q).length;
+  return {
+    query: q,
+    files,
+    messages,
+    emails,
+    summary: `${files} file hit(s) · ${messages} message hit(s) · ${emails} mail hit(s)`,
+  };
 }
 
 /* ---------------- vault ---------------- */
@@ -590,19 +859,50 @@ export function markAgentCollaboration() {
   checkReconstructionAvailable();
 }
 
-export function checkReconstructionAvailable() {
+/* ---------------- case reconstruction gate ---------------- */
+
+/** The six investigative milestones; any four unlock reconstruction. */
+export const RECONSTRUCTION_MILESTONES: { flag: import("@/types/game").StoryFlag; label: string }[] = [
+  { flag: "DISCOVERED_ORPHEUS", label: "ORPHEUS research read" },
+  { flag: "FOUND_0213_LOG", label: "02:13 log cluster found" },
+  { flag: "IDENTIFIED_CONTACT", label: "the visitor identified" },
+  { flag: "DISCOVERED_SURVEILLANCE", label: "surveillance correlated" },
+  { flag: "VAULT_OPENED", label: "vestibule decrypted" },
+  { flag: "DISCOVERED_METADATA", label: "photo metadata surfaced" },
+];
+export const RECONSTRUCTION_REQUIRED = 4;
+
+export interface ReconstructionProgress {
+  /** milestones reached, out of RECONSTRUCTION_MILESTONES.length */
+  reached: number;
+  required: number;
+  remaining: number;
+  /** true once the agent has performed at least one machine-readable correlation */
+  collaborated: boolean;
+  available: boolean;
+  missing: string[];
+}
+
+/** What still stands between the player and closing the case. */
+export function reconstructionProgress(): ReconstructionProgress {
   const os = useOS.getState();
-  // Without ARIA, the case cannot be closed — this is the WebMCP demonstration gate.
-  // At least one machine-readable correlation must have been performed via tools.
-  if (!os.flags.has("COLLABORATED_WITH_ARIA")) return;
-  const needed: import("@/types/game").StoryFlag[] = [
-    "DISCOVERED_ORPHEUS",
-    "FOUND_0213_LOG",
-    "IDENTIFIED_CONTACT",
-    "DISCOVERED_SURVEILLANCE",
-    "VAULT_OPENED",
-    "DISCOVERED_METADATA",
-  ];
-  const count = needed.filter((f) => os.flags.has(f)).length;
-  if (count >= 4) os.addFlag("CASE_RECONSTRUCTION_AVAILABLE");
+  const reachedItems = RECONSTRUCTION_MILESTONES.filter((m) => os.flags.has(m.flag));
+  const reached = reachedItems.length;
+  const collaborated = os.flags.has("COLLABORATED_WITH_ARIA");
+  return {
+    reached,
+    required: RECONSTRUCTION_REQUIRED,
+    remaining: Math.max(0, RECONSTRUCTION_REQUIRED - reached),
+    collaborated,
+    available: os.flags.has("CASE_RECONSTRUCTION_AVAILABLE"),
+    missing: RECONSTRUCTION_MILESTONES.filter((m) => !os.flags.has(m.flag)).map((m) => m.label),
+  };
+}
+
+export function checkReconstructionAvailable() {
+  const p = reconstructionProgress();
+  // Without ARIA the case cannot be closed — this is the WebMCP demonstration
+  // gate: at least one machine-readable correlation must have run through a tool.
+  if (!p.collaborated) return;
+  if (p.reached >= RECONSTRUCTION_REQUIRED) useOS.getState().addFlag("CASE_RECONSTRUCTION_AVAILABLE");
 }

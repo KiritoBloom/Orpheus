@@ -151,17 +151,9 @@ plainly because plain thoughts are hard to misinterpret later:
 
 `;
 
-// Key passages get their line numbers computed once, here:
-const ANOMALY_LINES = ANOMALY_NOTES.split("\n");
-function lineOf(fragment: string): number {
-  const i = ANOMALY_LINES.findIndex((l) => l.includes(fragment));
-  return i >= 0 ? i + 1 : 1;
-}
-export const LINE_0213_PASSAGE = lineOf("02:13 is not a time");
-export const LINE_ORPHEUS_NAMING = lineOf("04 · WHY ORPHEUS");
-export const LINE_VISITOR = lineOf("05 · THE VISITOR");
-export const LINE_BEGIN_WITH_LIGHT = ANOMALY_NOTES.split("\n").length + 2; // appended below
-
+/* Key passages get their line numbers computed once, here, against the FULL
+   document (notes + final section) — the same string the filesystem serves, so
+   these constants always match what `show_in_document` resolves at runtime. */
 const ANOMALY_FINAL = `02:13 is not a time.
 
 It is the point at which the system becomes observable.
@@ -178,6 +170,16 @@ tomorrow is brave or stupid.
 
 const FULL_ANOMALY = ANOMALY_NOTES + ANOMALY_FINAL;
 export const ANOMALY_NOTES_FULL = FULL_ANOMALY;
+
+const ANOMALY_LINES = FULL_ANOMALY.split("\n");
+/** 1-based line of a phrase in anomaly_notes.txt — computed once, at module load. */
+function lineOf(fragment: string): number {
+  const i = ANOMALY_LINES.findIndex((l) => l.includes(fragment));
+  return i >= 0 ? i + 1 : -1;
+}
+/** The "02:13 is not a time." passage — the documented `show_in_document` target. */
+export const LINE_0213_PASSAGE = lineOf("02:13 is not a time");
+export const ANOMALY_NOTES_PATH = "/Research/ORPHEUS/anomaly_notes.txt";
 
 const CAL_01 = `dataset,pipeline_rev,n,mean_residual_urad,std_residual_urad,bias_term_urad,notes
 lhcb_charm,r4,118344,0.0021,0.9811,0.0004,cern open data 2019

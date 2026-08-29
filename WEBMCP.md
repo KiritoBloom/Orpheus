@@ -1,141 +1,193 @@
-# WEBMCP — Orpheus integration — a new horizon for human-agent co-presence
+# WEBMCP — how Orpheus uses the standard
 
-> Orpheus is a co-op game for the nights your friends are offline — and a proof that WebMCP makes co-presence real. Before, "playing with an AI" meant a chatbot beside your game, guessing at pixels while you drowned alone. After, you share one computer with complementary senses: **human eyes + machine recall, at one desk, with the browser as arbiter.** Not a replacement for people — just presence that eases strain when you're the only human in the room.
+> Orpheus is a co-op investigation for the nights nobody else is online. WebMCP is what makes the second seat real: the agent gets 25 narrow, auditable tools that operate the workstation, and the human keeps the one capability no tool exposes — looking. This document is the audit trail for that claim.
 
-## Current implementation — why co-op needs a shared desk
-
-- **Entry point:** `document.modelContext ?? navigator.modelContext` (feature-detected at load and re-checked for late injection). Poll 800 ms + `toolchange` re-attach for Atlas async injection.
-- **Registration:** `registerTool({ name, title, description, inputSchema, annotations, execute }, { signal? })` per the Aug 26 2026 W3C Draft; `navigator.modelContext` kept as compat alias. Chrome 150 requires `document.modelContext`. All 25 tools include `title`, budgets enforced.
-- **Secure context required** (HTTPS). `registerWebMCPTools()` bails cleanly if no host; the game remains playable but most efficient with an agent. Headers `Origin-Agent-Cluster: ?1` + `Permissions-Policy: tools=self` set in `next.config.ts`.
-- **Budgets per Chrome best practices:** 500 char desc / 150 param / 30 name / 1.5k output. `MAX_QUERY_LEN=200`, `MAX_OUTPUT_CHARS=1500`, `clampStr()` + `truncate()` on every path.
-
-The integration is **visible to the player** (windows open and scroll — trust-through-actuation per Sarah Drasner, so accompanied play *feels* accompanied), **inspectable by a judge** (`src/webmcp/register.ts` is a single, readable module), and **manually runnable** without a host (tray **LINK** — the Agent Link console — calls `document.modelContext.executeTool` when available, the underlying service otherwise; press **⚡ QUICK VERIFY** for the one-click 9 evals + 3 headline tool calls). Also includes a reusable declarative form component in `src/components/DeclarativeForm.tsx` and 3 visible declarative forms (Evidence → `request_correlation`, Files → `unlock_vault`, Photos → `inspect_photo`) plus 1 hidden `record_evidence` fallback in `GameRoot.tsx` — correct per `developer.chrome.com/docs/ai/webmcp/declarative-api`, with `toolparamdescription`, `agentInvoked` + `respondWith`, and `:tool-form-active` CSS.
-
-This is the horizon: not "agent automates your clicks" but **25 narrow, auditable tools that make a site operable by an external mind** while the human stays in control — so co-op doesn't require a second human online to feel like co-op. See `JUDGE_QUICKSTART.md` for the 90-second verification path (30s without an agent, 60s with Atlas/Chrome flag).
+Everything below is verifiable in this repo. `pnpm test:webmcp` checks the registry headless; **LINK → ⚡ QUICK VERIFY** checks it live in the browser with no agent required.
 
 ---
 
-## Tools (26)
+## The shape of the integration
 
-### Investigation — read-only (flat, always available)
+| | |
+|---|---|
+| Entry point | `document.modelContext ?? navigator.modelContext`, feature-detected, re-checked for late injection |
+| Imperative tools | **25**, all in `src/webmcp/register.ts` |
+| Declarative forms | **4**, from annotated HTML (`request_correlation`, `record_evidence_form`, `unlock_vault`, `inspect_photo`) |
+| Capability layer | `src/game/services.ts` — every tool and every UI component calls the same functions |
+| Budgets | 30 name · 500 description · 150 param · 200 input · 1500 output, enforced in code |
+| Annotations | every tool declares `readOnlyHint` explicitly; content-returning tools add `untrustedContentHint` |
+| Secure context | HTTPS required; registration bails cleanly with no host, and the game stays playable |
+| Headers | `Origin-Agent-Cluster: ?1`, `Permissions-Policy: tools=self`, `Cross-Origin-Opener-Policy: same-origin` (`next.config.ts`) |
 
-| Tool | Description | Input | Ann. |
+Three properties matter more than the counts:
+
+1. **Visible.** Every mutating tool changes what is on the player's screen. Windows open, documents scroll, a highlight pins, the terminal prints. You watch the agent work.
+2. **Asymmetric.** There is no `zoom`, no `click(x,y)`, no `type`, no screenshot. The agent cannot see pixels. That is enforced by absence — the capability does not exist to be misused.
+3. **Shared.** `services.ts` is the only module that knows how to open a file, scroll a document, unlock the vault, or search the corpus. Remove WebMCP and the agent loses every one of those abilities at once.
+
+---
+
+## Tools
+
+25 imperative tools, grouped by what they do to the machine.
+
+### Read — machine-readable data the human cannot skim
+
+`readOnlyHint: true`. The nine tools returning in-world prose also set `untrustedContentHint: true`, so a host treats file bodies, messages, and logs as **data, never instructions**.
+
+| Tool | What it returns | Input | Annotations |
 |---|---|---|---|
-| `get_investigation_context` | One-shot briefing: role, current flags, known people/paths, tone guidance. | `{}` | `readOnlyHint` |
-| `search_files` | Search filenames + readable contents; returns paths + excerpt + approx line. 25 max, 120-char excerpts. | `{ query }` | `readOnly + untrusted` |
-| `read_file` | Full text of a file by exact path (prefers `show_in_document` for long files so the PLAYER reads it on screen). 1.5k trunc. | `{ path }` | `readOnly + untrusted` |
-| `search_messages` | Full-text search over Daniel's on-device chat threads (`t_sarah`, `t_mom`, `t_voss`, `t_W`, `t_lab`, `t_it`). | `{ query }` | `readOnly + untrusted` |
-| `get_message_thread` | Entire thread by id. Bodies truncated 1.5k. | `{ threadId }` | `readOnly + untrusted` |
-| `open_messages_thread` | Open Messages on screen at that thread (visible to player). | `{ threadId }` | — (nav, destructive) |
-| `search_emails` | Search inbox/sent/drafts/archive/trash by sender/subject/body. | `{ query }` | `readOnly + untrusted` |
-| `get_email` | One mail by id. Body truncated 1.5k. | `{ emailId }` | `readOnly + untrusted` |
-| `get_image_metadata` | EXIF-style metadata (timestamps, GPS, camera, software, hash, file note) — the only thing the agent can know about a photo. | `{ photoId }` | `readOnly` |
-| `open_image` | Open the image on screen (the player must zoom). | `{ photoId }` | — (nav) |
-| `search_browser_history` | Search fictional history by title/URL. | `{ query }` | `readOnly + untrusted` |
-| `get_system_logs` | Append-only logs; optional filter (date, time like `02:13`, category, free text). The final night is fully logged. 50 max. | `{ filter? }` | `readOnly + untrusted` |
-| `get_timeline` | Merged 01:45–02:40 chronological timeline of logs, photo timestamps, and message saliency (30 max, 120-char detail). Use after 02:13 discovery — human would need 5 apps manually. | `{ window? }` | `readOnly + untrusted` |
-| `get_case_evidence` | Evidence board as recorded so far. | `{}` | `readOnly` |
+| `get_investigation_context` | Role briefing, live flags, progress, suggested next steps, known people and paths | `{}` | readOnly |
+| `search_files` | Paths + 120-char excerpts + approximate line, 25 max | `{ query }` | readOnly · untrusted |
+| `read_file` | Full text by exact path, truncated at 1500 chars with a `truncated` flag | `{ path }` | readOnly · untrusted |
+| `search_messages` | Full-text search across Daniel's on-device threads | `{ query }` | readOnly · untrusted |
+| `get_message_thread` | One entire thread by id | `{ threadId }` | readOnly · untrusted |
+| `search_emails` | Mail search by sender, subject, or body across five folders | `{ query }` | readOnly · untrusted |
+| `get_email` | One email's full text | `{ emailId }` | readOnly · untrusted |
+| `get_image_metadata` | EXIF: timestamps, GPS, camera, software, hash, note — plus a `lookHint` telling the player where to look | `{ photoId }` | readOnly |
+| `search_browser_history` | History by title or URL fragment | `{ query }` | readOnly · untrusted |
+| `get_system_logs` | Append-only logs, optional filter (date, `02:13`, category, free text), 50 max | `{ filter? }` | readOnly · untrusted |
+| `get_timeline` | Logs + photo EXIF + message traffic merged into one chronology for a `HH:MM-HH:MM` window | `{ window? }` | readOnly · untrusted |
+| `get_case_evidence` | The evidence board as recorded so far | `{}` | readOnly |
 
-### Navigation — mutating, **visible**
+### Navigate — the agent moving the player's screen
 
-| Tool | Description | Input |
+`readOnlyHint: false`, `destructiveHint: false`. Each one has a visible effect the judge can watch.
+
+| Tool | What the player sees | Input |
 |---|---|---|
-| `open_application` | Open one of `{ files, mail, messages, photos, browser, terminal, systemlog, evidence }`. | `{ application }` |
-| `focus_application` | Bring an already-open window foreground. | `{ application }` |
-| `open_file` | Open text/csv/sys/pdf-extract/image in the viewer. | `{ path }` |
-| `open_directory` | Navigate File Manager to a directory. | `{ path }` |
-| `open_email` | Open Mail at one email. | `{ emailId }` |
-| `open_browser_entry` | Open Browser at a history entry's cached page (`hist_...`). | `{ entryId }` |
-| `show_in_document` | **Agent's hero "look at THIS" primitive.** Opens the document (if closed), scrolls to a line, and *pins* a persistent highlight that stays until the player clicks, scrolls, types, or closes. Accepts either an explicit `line` OR a `query` (first match). Replaces the older `open_file` + `scroll_document_to_line` + `find_text_in_document` chain. | `{ path, line? }` or `{ path, query? }` |
-| `terminal_command` | `ls`, `cd`, `cat`, `open`, `search`, `unlock`, `help`, `clear`, `history` on the visible terminal. | `{ command }` |
+| `open_application` | Window appears and takes focus | `{ application }` |
+| `focus_application` | Z-order changes, title bar brightens | `{ application }` |
+| `open_file` | Text viewer opens with the document loaded | `{ path }` |
+| **`show_in_document`** | Document opens if closed, scrolls to the line, flashes, then **pins a persistent highlight** until the player clicks, scrolls, types, or dismisses it | `{ path, line? }` or `{ path, query? }` |
+| `open_directory` | File Manager navigates to that directory | `{ path }` |
+| `open_email` | Mail opens at that message | `{ emailId }` |
+| `open_browser_entry` | Browser opens the cached page | `{ entryId }` |
+| `open_messages_thread` | Messages opens at that thread | `{ threadId }` |
+| `open_image` | Photo viewer opens; the agent still cannot see it | `{ photoId }` |
+| `highlight_evidence` | Evidence card pulses amber and the board focuses | `{ evidenceId }` |
+| `open_evidence_board` | Evidence board opens | `{}` |
+| `terminal_command` | Terminal focuses and prints the output | `{ command }` |
 
-### Evidence
+`show_in_document` is the hero primitive. It replaces what used to be a three-call chain (`open_file` → `scroll_document_to_line` → `find_text_in_document`) and accepts either an explicit `line` or a `query` resolved to the first match, so the agent points at a passage in one round trip instead of quoting it into chat.
 
-| Tool | Input |
+### Write — guarded
+
+| Tool | Guard | Input |
+|---|---|---|
+| `record_evidence` | Only ids that exist in the evidence data are accepted; the agent cannot invent evidence | `{ evidenceId }` |
+
+### What deliberately does not exist
+
+No `click`, no `type`, no `zoom`, no `pan`, no `screenshot`, no `read_screen`. The only way for the agent to make the player see something visual is to open it and ask them to look.
+
+---
+
+## Declarative API
+
+Four annotated HTML forms, registered by the browser itself, per [the Declarative API guide](https://developer.chrome.com/docs/ai/webmcp/declarative-api). Three are visible surfaces in the apps; the fourth sits beside the correlation form on the Evidence board.
+
+| Form | Where | What it does |
+|---|---|---|
+| `request_correlation` | Evidence board | Searches files, messages, and mail for one term the player noticed |
+| `record_evidence_form` | Evidence board | Records one evidence id — the declarative twin of `record_evidence` |
+| `unlock_vault` | File Manager (once the private hint is found) | Submits the three-word passphrase |
+| `inspect_photo` | Photos | Returns EXIF plus a directional hint for one photo |
+
+`src/components/DeclarativeForm.tsx` is a single reusable component implementing the full contract:
+
+- `toolname` + `tooldescription` on the `<form>`, `toolparamdescription` on the input
+- **`toolautosubmit`**, so an agent invocation actually completes and `respondWith` returns a value instead of waiting for a human click
+- `SubmitEvent.agentInvoked` + `respondWith(Promise)`, with `preventDefault()` called **before** `respondWith` on every path — including validation failure, so an agent-invoked empty submit returns a structured error rather than falling through to a native navigation
+- window `toolactivated` / `toolcancel` read `toolName` **off the event**, as the spec defines it (a `detail` fallback remains for older builds)
+- `:tool-form-active` / `:tool-submit-active` focus indicators, shipped from `src/app/layout.tsx` behind an `@supports selector()` guard because those pseudo-classes are newer than the build's CSS parser
+
+---
+
+## Security
+
+Per [WebMCP tool security](https://developer.chrome.com/docs/ai/webmcp/secure-tools) and W3C §6.3–6.4.
+
+**Prompt injection.** Every tool returning in-world content sets `untrustedContentHint: true` alongside `readOnlyHint: true`. Daniel's files, mail, and messages are fiction written to be read — including a thread from an unknown contact — so the model must treat them as data. This closes the data × instructions × action triangle.
+
+**Annotations on everything.** All 25 tools declare `readOnlyHint` explicitly, reads and writes alike. A host never has to infer whether a call will change the user's screen. `pnpm test:webmcp` fails if any tool omits it, or if a navigation tool ever claims to be read-only.
+
+**Allowlist, not blocklist.** `terminal_command` accepts only `ls|cd|cat|open|search|unlock|help|clear|history` followed by `[A-Za-z0-9._/ -]`, capped at 200 chars. `;`, `&&`, `|`, backticks, and `$()` cannot appear at all. Seven negative cases are asserted headless and three more in the browser.
+
+**Budgets, enforced not documented.** Input is clamped before use. Per-field truncation applies to long bodies. And every tool return value passes through `applyOutputBudget()` in the registration wrapper: the serialized payload is measured, long strings are clipped, result arrays are halved until it fits 1500 chars, and a `budget` note tells the model to refine rather than assume it saw everything. The registry-wide budget is a real code path, not a claim — eval 5 proves it by budgeting an unfiltered `get_system_logs`.
+
+**No tool poisoning.** Every `name`, `title`, and `description` is a static string. Nothing is derived from user or in-world content. No tool takes more than three parameters, asserted by check 8.
+
+**Strict in code, loose in schema.** Schemas are plain JSON Schema. Validation is strict in the handler: absolute paths, non-empty queries, allowlisted commands, ids that must exist. Failures return `{ ok: false, error: "…" }` in plain language so the model can self-correct — never a throw that drops state.
+
+**Origin isolation.** `Origin-Agent-Cluster: ?1` and `Permissions-Policy: tools=self`. Single origin, so no `exposedTo` and no cross-origin exposure.
+
+---
+
+## Lifecycle
+
+Built for hosts that inject late, swap contexts, and change their minds.
+
+- **Detection** — `document.modelContext` first, `navigator.modelContext` as a compatibility fallback, `null` off-DOM.
+- **Registration is idempotent per context.** `registerWebMCPTools()` resolves `true` only when *every* tool registered. A partial failure keeps `registered` false, logs which tools failed, and lets the caller's poll retry — a silent half-registration cannot look like success. Duplicate-name `InvalidStateError` is treated as already-present, not as failure.
+- **`toolchange` actually re-registers.** `GameRoot` polls every 800 ms, re-attaches its listener when the context appears or is replaced, and calls registration again on every change. If a host clears the tool set, the tools come back.
+- **Unregistration is real.** The `AbortController` is stored, and `unregisterWebMCPTools()` calls `abort()` — the Chrome 153 path that detaches tools without cancelling in-flight executions. A host swap unregisters the old context before registering the new one.
+- **Cancellation is honoured.** `execute` receives `{ signal }` and checks `aborted` both before dispatch and after the handler resolves, so a cancelled call reports `{ ok: false, error: "cancelled" }` instead of silently mutating state.
+- **The LINK console uses the real path.** With a host present it calls `document.modelContext.getTools()` then `executeTool()` and labels the result `routed through document.modelContext.executeTool`. Without one it calls the handler directly and says so. `src/webmcp/register.ts` → `executeToolLikeHost()`.
+
+---
+
+## Verification
+
+Three suites, one source of truth. The 9 registry checks live in `src/webmcp/static-checks.ts` and run in *both* the headless runner and the in-browser panel, so the two can never disagree.
+
+**Headless — `pnpm test:webmcp`** (16 checks, no browser, no host). The first nine are the shared registry suite; the last seven are source-level checks the runner performs on the repo itself:
+
+```
+✓ registry: 25 tools · name ≤30 · description ≤500 · param ≤150
+✓ metadata: every tool declares a human-readable title
+✓ schemas: type:object · properties declared · required ⊆ properties
+✓ annotations: every tool declares readOnlyHint explicitly
+✓ security: content-returning tools mark readOnly + untrustedContentHint
+✓ annotations: mutating tools declare readOnlyHint:false
+✓ security: terminal_command allowlist permits verbs, blocks injection
+✓ surface: no tool takes more than 3 parameters
+✓ registry: unique names + callable execute()
+✓ budgets: register.ts constants match the documented limits
+✓ budgets: every tool result passes through applyOutputBudget()
+✓ declarative API: DeclarativeForm implements the full spec contract
+✓ declarative API: 4 visible forms wired into the apps
+✓ declarative API: :tool-form-active / :tool-submit-active styled behind @supports
+✓ lifecycle: registration, unregistration, and cancellation are real
+✓ architecture: tools delegate to services.ts, never reimplement game logic
+```
+
+The script parses `register.ts` with a brace-matching reader and **fails loudly** if it cannot read a tool, if a tool is defined but missing from `TOOL_DEFS`, or if the budget constants drift from the documented numbers. It reads those constants out of `register.ts` rather than restating them, so it cannot pass by agreeing with itself.
+
+**In-browser — LINK → RUN EVALS / ⚡ QUICK VERIFY** (`src/webmcp/selftest.ts`): 12 deterministic checks that call the real handlers against the real fixtures — the static suite, the briefing shape, excerpt budgets, the registry-wide output budget, cross-modal search, the 02:13 cluster, timeline merging, `show_in_document` resolving to the line `LINE_0213_PASSAGE` computes from the document text, out-of-range failure, vault gating on sealed photos, and the terminal allowlist. QUICK VERIFY adds three calls that **visibly move the desk**. Both snapshot investigation state and restore it afterward, so judging advances no checkpoints.
+
+Model-facing eval specs in the `messages` / `expectedCall` format: `src/webmcp/evals.md`.
+
+**End to end — `pnpm smoke` and `pnpm smoke:apps`** (headless Chrome against a running build). `smoke` boots the game to the desktop, opens LINK, presses ⚡ QUICK VERIFY, and asserts 15/15 plus that the text viewer actually opened — the actuation claim, verified by a machine rather than asserted in prose. `smoke:apps` opens all eight applications *through the `open_application` tool*, confirms the three declarative forms are in the DOM with `tooldescription`, `toolautosubmit`, and `toolparamdescription` set, drives `show_in_document` and `terminal_command`, walks the whole vault path (wrong passphrase → fragment archive, correct passphrase → decrypt → sealed photo becomes readable → `/Private` navigable), and fails on any uncaught page error. 27/27 at the time of writing.
+
+---
+
+## The 02:13 window — why this needs both seats
+
+After the vault opens, the workstation reopens a 90-second observability window every ~2.5 minutes. Inside it, one asymmetric pair completes the beat: **the human zooms the stopped clock in `DSC04655` past 2.5×** while **the agent calls `get_system_logs`**. `noteWindowHuman()` and `noteWindowAgent()` both live in `services.ts`; neither fires outside the window and neither counts alone. Sync both and `/Private/window_echo.txt` appears.
+
+This is the clearest answer to "what can people and agents do together that was impossible before." It is not a convenience. It is a two-player mechanic where one player is an agent, and it cannot exist without a web standard that lets a page hand an agent real, narrow capabilities while a human watches.
+
+---
+
+## Files a judge should open
+
+| File | Why |
 |---|---|
-| `record_evidence` | `{ evidenceId }` — only ids from `get_case_evidence` are valid |
-| `highlight_evidence` | `{ evidenceId }` — pulses an already-recorded card and focuses the board |
-| `open_evidence_board` | `{}` |
-
-No `click(x,y)`, `type`, or hidden screenshot tools exist. The agent cannot zoom, cannot see pixels, cannot read screen geometry. The only way to show a visual clue is to ask the player to look.
-
-### Security — prompt injection & tool hardening
-
-Per `developer.chrome.com/docs/ai/webmcp/secure-tools` + W3C WebMCP §6.3–6.4:
-
-- **Annotations:** every tool returning UGC/external fiction (`search_files`, `read_file`, `search_messages`, `get_message_thread`, `search_emails`, `get_email`, `search_browser_history`, `get_system_logs`, `get_timeline`) sets `untrustedContentHint: true` + `readOnlyHint: true` so the model treats file bodies as **data not instructions** (lethal trifecta mitigation: data × instructions × action). Pure system tools (`get_investigation_context`, `get_image_metadata`, `get_case_evidence`) stay `readOnly` only; mutating nav tools are neither. `terminal_command` is intentionally not readOnly.
-- **Budgets:** `MAX_QUERY_LEN=200`, `MAX_OUTPUT_CHARS=1500`, `description ≤500`, `param description ≤150`, `name ≤30` enforced via `clampStr()` + `truncate()` + `str().slice(0,150)` on every path per Chrome budgets.
-- **Strict validation, loose schema:** schemas are loose JSON Schema (`type: object` with `properties`/`required`/`enum`), code validates strictly (`path` must be absolute, `query` ≥1 char, `terminal_command` regex) and returns plain `{ok:false, error:"..."}` for self-correction (best-practices: “validate strictly in code, loosely in schema”).
-- **Allowlist, not blocklist:** `terminal_command` regex `^(ls|cd|cat|open|search|unlock|help|clear|history)(\s+[a-zA-Z0-9._\/\- ]*)?$` — only those verbs + `[A-Za-z0-9._/ -]`, so `; && | \` $()` injection is impossible; capped 200 chars per `secure-tools` input length guidance.
-- **No tool poisoning:** all `name/title/description` are static strings in `register.ts`, never derived from user content; no over-parameterization (1–2 params per tool, minimal `properties`).
-- **Origin isolation + Permissions Policy:** `next.config.ts` sets `Origin-Agent-Cluster: ?1` + `Permissions-Policy: tools=self` + `Cross-Origin-Opener-Policy: same-origin`; `SecureContext` (HTTPS) required, bails cleanly if no host; no `exposedTo` (single-origin, no cross-origin leakage).
-- **Cancellation:** `execute` receives `{signal}` and checks `signal.aborted` before running; registration uses `AbortSignal` for clean unregistration per Chrome 153 (prevents in-flight side effects).
-
----
-
-## Schemas & budgets
-
-Every `inputSchema` is JSON Schema: `type: "object"`, named `properties`, explicit `required`. Enums are used for `application`. Tool names are stable, lower_snake, ≤32 chars. Budgets enforced per `developer.chrome.com/docs/ai/webmcp/secure-tools`: 500 desc / 150 param / 30 name / 1.5k output — checked via `str().slice(0,150)` + `truncate()`.
-
-Errors are `{ ok: false, error: "<human>" }` — never a throw that drops state. `read_file` truncates at 1.5k with `truncated: true` flag so the agent can chain into `show_in_document` (with a `query` derived from the truncation marker) for the player to read the full passage on screen.
-
----
-
-## Visible effects — verify these
-
-| Call | What the player sees |
-|---|---|
-| `open_application` | Window appears and wins focus (`win-open-anim`, `sfx.windowOpen`) |
-| `focus_application` | Z-order and title-bar brighten |
-| `open_file` | Text viewer appears with the doc loaded |
-| `show_in_document` | Document opens (if closed), target line scrolls into view with `line-flash` + top-to-bottom `nav-sweep` overlay, then a persistent accent-tinted highlight pins the line until the player takes an explicit action. A ◆ DISMISS affordance appears in the toolbar. |
-| `open_image` | Photo viewer opens at that id |
-| `open_email` / `open_browser_entry` / `open_directory` / `open_messages_thread` | Corresponding app opens and navigates to that item |
-| `highlight_evidence` | Evidence card pulses amber 3× (`ev-highlight`) and board focuses |
-| `terminal_command` | Terminal focuses and prints the command's output on screen |
-
-`open_file` vs. `read_file`: the former navigates; the latter is read-only for the agent and must not be paired with an automatic dump.
-
----
-
-## Lifecycle and robustness
-
-- `registerWebMCPTools()` feature-detects `document.modelContext ?? navigator.modelContext`; retries on 800 ms poll + 1.2 s re-attach; observes `ModelContext`'s `toolchange` on live context (stale-capture bug fixed for Atlas late injection where initial `getModelContext()` is null). Supports `AbortSignal` unregistration per Chrome 153 without breaking in-flight executions; duplicate-name `InvalidStateError` is caught and warned.
-- Imperative + declarative: 25 imperative tools + 4 declarative forms (`request_correlation` in EvidenceApp, `unlock_vault` in FilesApp, `inspect_photo` in PhotosApp, `record_evidence` hidden fallback in `GameRoot.tsx`) — the `DeclarativeForm` component renders with `tooldescription`/`toolparamdescription`, `agentInvoked` + `respondWith(Promise)` handling, `toolactivated` window listener (audio + telemetry feedback), and `@supports selector(:tool-form-active)` CSS (`form:tool-form-active` dashed accent, `input:tool-submit-active` dashed amber) per `declarative-api` spec.
-- The Agent Link panel (`LINK` in tray / Ctrl+`) exercises every tool without a host by calling the execute handler directly when no WebMCP `executeTool` is available — valuable for judge testing and CI. Filter ◇ readOnly / ◆ nav / ⚑ untrusted. All tools show live `inputSchema` and budgets; headline tools arrive with ready-made example inputs prefilled so the documented judge path runs with zero typing.
-
----
-
-## Browser assumptions
-
-- Secure context (`https://` or `http://localhost` per browser).
-- Permissions Policy `allow="tools"` inherited as `self` for same-origin; cross-origin exposure uses `exposedTo`/`fromOrigins` per the April 2026 draft (not needed here — single-origin app).
-- A future spec may rename the entry point or swap `signal`-based unregistration for `unregisterTool` — the guard `document.modelContext ?? navigator.modelContext` and try/catch over `registerTool` are built for that.
-
----
-
-## Evals
-
-Seven evals covering isolation → ambiguous → ordered chain → end-to-end → the 02:13 co-op window per https://developer.chrome.com/docs/ai/webmcp/evals: `src/webmcp/evals.md`. Run via `document.modelContext.executeTool` (deterministic) or Inspector (probabilistic). Includes budgets + security negative test for `terminal_command`.
-
-## Judge path — 90 seconds
-
-See `JUDGE_QUICKSTART.md`. Fastest path without an agent: `LINK` → `get_system_logs {"filter":"02:13"}` → `get_timeline` → `show_in_document {"path":"/Research/ORPHEUS/anomaly_notes.txt","query":"02:13 is not a time"}` — watch the desktop move on your screen (line 145, the "02:13 is not a time" passage, with a persistent highlight that stays until you click, scroll, type, or close). With an agent (Atlas or Chrome flag): say "Something is reflected in DSC04821 — what is it?" and watch the handoff.
-
-## Pattern — beyond the game (co-op anywhere solo work strains people)
-
-The McDuff case is Instance 1 for gaming. The `src/game/services.ts` + `src/webmcp/register.ts` split ports anywhere a solo human would feel less strain with a partner at the desk:
-
-- **Co-op games & puzzle hunts** — your instance: mystery where solo players have a companion that remembers everything while they look closer
-- **Co-learning:** classroom archive digs — students describe visuals, agent surfaces context
-- **Co-investigation:** newsroom leak review, SOC night shift, research-integrity, e-discovery — same shape, an analyst alone on shift is not alone on the desk
-
-Replace `src/game/data/*` with your corpus, keep the 26 tool shapes, deploy one static site. No backend, no env keys, `idb-keyval` persistence — a community can self-host an accompanied desk in an afternoon. That's the horizon: not AI replacing people, but presence when people aren't there — because even light, honestly built co-presence eases the strain of doing hard things alone.
-
-## Files that matter to a judge
-
-- `JUDGE_QUICKSTART.md` — 90-second verification path (copy-paste for judging)
-- `src/webmcp/register.ts` — registry, lifecycle, tool list, schemas
-- `src/webmcp/evals.md` — 9 evals with messages/expectedCall/state (drives the in-browser RUN EVALS / ⚡ QUICK VERIFY panel; the CI companion `pnpm test:webmcp` runs 7 static budget + schema + security + declarative-API checks against `register.ts` without a browser)
-- `src/game/services.ts` — capability layer that makes WebMCP fundamental rather than decorative
-- `src/components/GameRoot.tsx` — hydration and the 26-tool audit surface (`LINK` console)
+| `src/webmcp/register.ts` | The registry: 25 tools, budgets, annotations, lifecycle, host-path execution |
+| `src/game/services.ts` | The shared capability layer — the reason WebMCP is fundamental here |
+| `src/components/DeclarativeForm.tsx` | The full declarative contract in one reusable component |
+| `src/webmcp/static-checks.ts` | The checks that run in both the browser and CI |
+| `src/webmcp/selftest.ts` | The 12 live deterministic evals behind RUN EVALS |
+| `src/webmcp/evals.md` | Model-facing eval specs |
+| `JUDGE_QUICKSTART.md` | The 30-second no-host path and the 60-second agent path |

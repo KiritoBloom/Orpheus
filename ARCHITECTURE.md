@@ -1,153 +1,164 @@
-# ARCHITECTURE — Orpheus / The McDuff Investigation — a blueprint for accompanied play and work
+# ARCHITECTURE — Orpheus / The McDuff Investigation
 
-> Before WebMCP, browsers were solo canvases and co-op without a friend was just solo. After, they are shared desks: **human eyes + machine recall, at one desk, with the interface as arbiter.** Orpheus proves it with a mystery you can play at 10pm when no one else is online — not AI friends, just presence that makes solitary sessions less straining. The fiction is Instance 1; the architecture is the horizon.
+> One rule runs through this codebase: **if the human can do it and the agent can do it, the logic exists exactly once.** `src/game/services.ts` is that once. The React apps call it; the WebMCP tools call it. Nothing is implemented twice, which is why removing WebMCP does not degrade the agent — it removes it entirely.
 
 ## Stack
 
-- **Next.js 16.3 (App Router, Turbopack, TypeScript)** — one static route (`/`); SSR-safe design (no `window` in render, guards at every edge).
-- **React 19** — almost everything is `"use client"`. One server component (`src/app/layout.tsx` + `src/app/page.tsx`) wraps a single client shell (`GameRoot`).
-- **Tailwind CSS 4** (`@import "tailwindcss"`) — the visual language is encoded in CSS variables at `src/app/globals.css` (CRT, workstation palette, animations, window states).
-- **Zustand 5** — live state (three stores) + persisted to **IndexedDB** via `idb-keyval` (key `orpheus-save-v1`).
-- **CSS only motion** — authentic 90s snap via stepped 80ms transitions; no `framer-motion` runtime (removed for bundle hygiene).
-- **Web Audio API** — sampled-first (`src/audio/engine.ts`: Kenney Interface/UI samples + the keypress pack under `public/sound-effects/unicae_games_keyboard_soundpack_1/Single Keys`), with procedural synth fallback if a sample fails to load.
-- **next/image + next/font** — `next/image` serves `/Images` as AVIF/WebP via `/_next/image` (deviceSizes 640-2048, 1yr immutable, `fetchPriority: high` for viewer, `lazy` for grid); `next/font/google` IBM Plex Mono `display:swap` via `src/app/layout.tsx` (no external @import, optimal CLS).
+- **Next.js 16.3** (App Router, Turbopack, TypeScript) — one static route (`/`), SSR-safe throughout (no `window` in render).
+- **React 19** — one server component (`layout.tsx` + `page.tsx`) wrapping a single client shell, `GameRoot`.
+- **Tailwind CSS 4** — the visual language lives in CSS variables in `src/app/globals.css` (CRT, palette, window states, animations).
+- **Zustand 5** — three live stores, persisted to **IndexedDB** via `idb-keyval` (key `orpheus-save-v1`).
+- **CSS-only motion** — stepped 80 ms transitions for authentic 90s snap. No animation runtime.
+- **Web Audio** — sampled-first (`src/audio/engine.ts`), procedural synthesis as fallback.
+- **next/image + next/font** — AVIF/WebP with a one-year immutable cache; IBM Plex Mono, `display: swap`.
 
-No server database, no auth, no external REST calls, no env keys.
+No server, no database, no authentication, no external API calls, no environment variables.
 
 ---
 
-## App structure
+## Layout
 
 ```
 src/
   app/
-    globals.css          design system + CRT + window states
-    layout.tsx           metadata / viewport / html shell
-    page.tsx             ← GameRoot
-  types/game.ts          every domain + state shape
+    globals.css            design system, CRT, window states
+    layout.tsx             metadata, viewport, WebMCP declarative focus styles
+    page.tsx               → GameRoot
+  types/game.ts            every domain and state shape
   game/
     data/
-      filesystem.ts      FsNode[] + all text/csv bodies (+ computed key lines)
-      emails.ts          Email[] (17: inbox 8 / sent 4 / drafts 2 / archive 2 / trash 1)
-      chatMessages.ts    THREADS (7: 6 historic + hidden t_observer) + CHAT_MESSAGES (34) — the 3 t_observer lines arrive mid-session (MYSTERY_MESSAGE)
-      browserHistory.ts  HISTORY (18) + CACHED_PAGES (17) — every history entry has a cached page
-      systemLogs.ts      LOGS (51: log_001–051, final night 02:13 fully logged)
-      evidence.ts        EVIDENCE[] (21: people 5 / events 6 / locations 2 / documents 5 / hypotheses 3)
-      photos.ts          PhotoMeta[] (12: 9 main + 3 private backup) + registry
+      filesystem.ts        FsNode[] + all document bodies + computed key lines
+      emails.ts            17 emails across 5 folders
+      chatMessages.ts      7 threads (6 historic + the unsourced t_observer), 35 messages
+      browserHistory.ts    18 entries + 17 cached pages
+      systemLogs.ts        51 entries; the final night fully logged
+      evidence.ts          21 items across 5 sections
+      photos.ts            12 photos with full EXIF (3 sealed in the private backup)
     state/
-      persistence.ts     idb-keyval single-record SaveData (version 1, debounced writes)
-      osStore.ts         phase/windows/focus/z/toasts/flags/vault/clock/settings + obsWindow/synchrony (transient)
-      ariaStore.ts       agent status (idle/reading/investigating/responding) for WebMCP feedback
-      investigationStore.ts  evidence set + highlight + four-question evaluation
-    services.ts          THE capability layer — every UI and tool goes through here
+      osStore.ts           phase, windows, focus, z-order, toasts, flags, vault,
+                           the 02:13 window, the synchrony counter, settings
+      ariaStore.ts         agent status (idle / reading / investigating / responding)
+      investigationStore.ts  evidence set, highlight, four-question evaluation
+      persistence.ts       one debounced idb-keyval record
+    services.ts            THE capability layer — 700 lines, every capability once
   webmcp/
-    register.ts          26 TOOL_DEFS + registration + host detection + TermBus
+    register.ts            25 tools, budgets, annotations, registration lifecycle
+    static-checks.ts       the 9 registry checks (browser + CI share this)
+    selftest.ts            12 live deterministic evals (RUN EVALS / QUICK VERIFY)
+    evals.md               model-facing eval specs
   components/
-    title/IrisTitle.tsx  diegetic aperture mechanism + orbiting menu + pre-menu calibration
-    boot/{BootSequence,MissionBriefing}.tsx  full-screen POST + briefing with Cherry MX soundpack
-    windows/WindowFrame.tsx  drag/min/max/close/focus/z
-    desktop/{Desktop,DesktopIcons}.tsx
-    taskbar/Taskbar.tsx  app buttons + agent status + LINK console
-    notifications/Toasts.tsx
-    applications/{ Files, Mail, Messages, Photos+ImageViewer, Browser, Terminal,
-                    SystemLog, Evidence, TextViewer}.tsx
-    art/photos.tsx       procedural SVG photographs (every clue is vector & zoomable)
-    AgentLinkPanel.tsx   judge console for all 25 tools (LINK)
-    GameRoot.tsx         lifecycle: title→boot→briefing→desktop→ending + hydration +
-                         WebMCP polling + hum/focus wiring
-    EndingSequence.tsx   staggered closes → iris → black
-  audio/engine.ts        hum, drone, Cherry clicks, ding, servo, chime, thud
+    DeclarativeForm.tsx    the full Declarative API contract, reusable
+    AgentLinkPanel.tsx     the judge console (LINK / Ctrl+`)
+    GameRoot.tsx           lifecycle, hydration, WebMCP registration, global FX
+    title/ boot/ desktop/ taskbar/ windows/ notifications/ applications/ icons/ art/
+  audio/engine.ts          hum, drone, key clicks, chimes, ambience
+scripts/
+  run-webmcp-tests.mjs     `pnpm test:webmcp` — parses register.ts, runs static-checks
+  smoke.mjs                `pnpm smoke` — headless Chrome, boots the game, QUICK VERIFY
+  smoke-apps.mjs           `pnpm smoke:apps` — every app via open_application, vault path
 ```
 
 ---
 
 ## Stores
 
-### osStore — the machine (`src/game/state/osStore.ts`)
-- `phase: "title"|"boot"|"briefing"|"desktop"|"ending"`, `hydrated`, `hasSaveProgress`
-- `windows: Record<WinId, WinState>` (singleton per app + `textviewer`/`imageviewer`), `focused`, `zTop`
-- `flags: Set<StoryFlag>`, `vaultUnlocked/vaultAttempts`, `clockStart`, `toasts[]`, `settings { crt,sound,reducedMotion,textScale }`
-- All mutations are store methods (`openApp`, `focusWindow`, `setGeom`, `addFlag`, ...). Fictional clock = March 10 09:12 + real elapsed.
+**osStore** — the machine. `phase` (`title → boot → briefing → desktop → ending`), one window state per app plus the text and image viewers, `flags: Set<StoryFlag>`, vault state and attempt count, the recurring `obsWindow`, the synchrony counter, toasts, and settings. Every mutation is a store method. The fictional clock is March 10, 09:12 plus real elapsed time.
 
-### ariaStore — agent status (`src/game/state/ariaStore.ts`)
-- `status: idle|reading|investigating|responding` + `statusDetail` — surfaced in Taskbar + AgentLinkPanel while WebMCP tools run. All read/search tools set `investigating`/`reading`; visible navigation tools set `responding` on success — the whole desk reacts to the agent, not just the windows it opens.
-- No chat/queue; WebMCP is the channel (ChatGPT).
+**ariaStore** — agent status only. Set by the tool layer as calls run, surfaced in the taskbar and the LINK console, so the whole desk reacts to the agent rather than just the window it opened. There is no chat state: WebMCP *is* the channel.
 
-### investigationStore — the case (`src/game/state/investigationStore.ts`)
-- `evidenceIds: Set<string>`, `highlightId`, `caseReport/ caseVerdicts`
-- `syncFlags(flags)` auto-unlocks `EvidenceItem`s whose `autoUnlockFlag` is set.
-- `submitCaseReport({q1..q4})` keywords → per-question `SUPPORTED|PARTIALLY|INSUFFICIENT` → global COMPLETE.
+**investigationStore** — the case. Evidence set, current highlight, and the four-question reconstruction with per-question verdicts (`SUPPORTED` / `PARTIALLY SUPPORTED` / `INSUFFICIENT`). `syncFlags()` auto-unlocks evidence whose `autoUnlockFlag` is set.
 
-### persistence — `src/game/state/persistence.ts`
-- One record (`orpheus-save-v1`), idb-keyval, version 1.
-- Debounced writes (400 ms) on every `updateSave` — flags, evidenceIds, vault, case report, settings. `hasProgress` derived from flags or `caseCompleteAt`.
-- `wipeSave()` erases both storage and the caller's live slices (GameRoot's `handleLaunch("new")` resets Zustand as well).
+**persistence** — a single record, debounced 400 ms. `wipeSave()` clears storage; `GameRoot`'s new-game path resets the live stores to match.
 
 ---
 
-## Service layer — why WebMCP is fundamental (the blueprint for the era)
+## The service layer — why WebMCP is fundamental
 
-`src/game/services.ts` is the only place that knows how to:
-open an app, focus, open a file, scroll to a line, find text, open a dir/email/history entry, manage photos and email read-state, search collections, get logs, record/highlight/open evidence, attempt the vault, and fire story hooks (`FOUND_PHOTO_017` on zoom≥2.5, `FOUND_PRIVATE_HINT` on reminder-card view, etc.).
+`src/game/services.ts` is the only module that knows how to open an application, focus a window, open a document, scroll and pin a line, find text, navigate a directory, open an email or history entry, search files, messages, mail, and history, merge a correlated timeline, read image metadata, attempt the vault, record and highlight evidence, and fire the story hooks that gate progress.
 
-Both the React UI and the WebMCP tools import and call this module. If you removed WebMCP, the external agent would lose every ability to operate the machine — investigation would be manual and incomplete. The audit trail of visible effects (window opens, sweeps, flashes, toasts) lives here. That is what makes this *agent-native* rather than agent-assisted: the UI and the agent share one capability layer, with the interface visibly mediating.
+Both sides call it:
 
-**Reusable pattern for the new era:** Replace `src/game/data/*` with your corpus (leak docs, incident logs, medical images, archive scans), keep the `services.ts` + `register.ts` split, and you have an accompanied desk for newsrooms, SOCs, oversight boards, or classrooms in an afternoon. No backend, no env keys, `idb-keyval` persistence — self-hostable in one static site.
+| Capability | Human path | Agent path |
+|---|---|---|
+| Open a document | `FilesApp` double-click → `openFile` | `open_file` → `openFile` |
+| Point at a passage | text viewer find bar → `findTextInDocument` | `show_in_document` → `showInDocument` |
+| Search the filesystem | Terminal `search` → `searchFiles` | `search_files` → `searchFiles` |
+| Unlock the vestibule | Terminal `unlock` → `attemptVault` | `terminal_command` / `unlock_vault` form → `attemptVault` |
+| Read system logs | `SystemLogApp` → `getSystemLogs` | `get_system_logs` → `getSystemLogs` |
+| Correlate a term | `request_correlation` form → `correlateTerm` | `search_files` + `search_messages` |
+| The 02:13 beat | zoom past the detent → `notePhotoInspection` → `noteWindowHuman` | `get_system_logs` → `noteWindowAgent` |
 
-Event wiring `UI ↔ services` uses five tiny single-channel buses (`SimpleBus` — `on(fn) → unsubscribe, emit(payload)`) for: File Manager navigation, photo focus, Mail selection, Messages thread selection, Browser history navigation, plus a `TermBus` for the terminal. The text viewer listens via `setDocListener` for `show_in_document` (which scrolls + pins) and also via `setDocDismissListener` for user-initiated dismiss events.
+Two capabilities are deliberately one-sided, and that asymmetry is the design:
+
+- **`notePhotoInspection`** is reachable only from the image viewer's zoom handler. No tool can call it, because no zoom tool exists.
+- **`getTimeline`** merges logs, photo EXIF, and message traffic into one chronology. Nothing in the UI produces it, because assembling it by hand is exactly the work the human should not have to do.
+
+`pnpm test:webmcp` enforces the rule structurally: `register.ts` may not import from `game/data/*`. If a tool starts reimplementing game logic instead of delegating, the check fails.
+
+Event wiring uses five tiny single-channel buses (`SimpleBus`: `on(fn) → unsubscribe`, `emit(payload)`) for File Manager navigation, photo focus, Mail selection, Messages threads, and Browser history, plus a `TermBus` for the terminal. The text viewer subscribes via `setDocListener` for scroll-and-pin and `setDocDismissListener` for user-initiated dismissal.
+
+**Reusable beyond the fiction.** Replace `src/game/data/*` with your corpus, keep the `services.ts` + `register.ts` split, and you have an accompanied desk for a newsroom, a SOC, an oversight board, or a classroom. One static site, no backend.
 
 ---
 
-## WebMCP lifecycle — built for the new fragmented host era
+## WebMCP lifecycle
 
-- `GameRoot` hydrates from IndexedDB, then calls `registerWebMCPTools()` once and polls every 800 ms for late `modelContext` (+ 1.2 s re-attach for late Atlas injection); it observes `toolchange`.
-- On success the 26 `TOOL_DEFS` are registered; input schemas are pure JSON Schema (`type: object` + `properties`/`required`/`enum`), `title`/`description`/`annotations` per W3C, `execute` handlers delegate to `services.ts` and return MCP-shaped objects (`{ ok, error? }` or typed results). Budgets enforced: 500 desc / 150 param / 30 name / 1.5k output.
-- No fallback assistant — WebMCP *is* the agent interface. During development the game remains playable without a host, but investigation is intentionally slower without an agent that can bulk-search and correlate. 25 tools: 14 read-only + 8 visible nav + 3 evidence (guarded). The nav set centres on the hero `show_in_document` primitive — opens the file, scrolls, and pins a persistent highlight on the resolved line. See `JUDGE_QUICKSTART.md` for 90-second verification (no host needed via `LINK`).
-- Both APIs per best practice: 25 imperative tools registered via `document.modelContext.registerTool` + 4 declarative forms. The reusable `src/components/DeclarativeForm.tsx` renders `<form toolname="…" tooldescription="…" toolparamdescription="…">` with `agentInvoked` + `respondWith(Promise)` + `toolactivated` window listener and `:tool-form-active` styling. 3 visible forms wired into the apps: `request_correlation` in Evidence (search files + messages from a player-noticed term), `unlock_vault` in Files (three-word passphrase), `inspect_photo` in Photos (metadata + directional hint per photo id). 1 hidden `record_evidence` fallback in `GameRoot.tsx`. See `JUDGE_QUICKSTART.md` for the 30-second verification path; the CI companion `pnpm test:webmcp` runs 7/7 static budget + schema + security + declarative-API checks against `register.ts` without a browser.
+`GameRoot` hydrates from IndexedDB, then registers tools and keeps them registered:
+
+- **Registration is idempotent per context** and resolves `true` only when every tool succeeded. A partial failure keeps the flag false, records which tools failed, and lets the poll retry — a half-registration can never look like success. Duplicate-name `InvalidStateError` counts as already-present.
+- **Polling every 800 ms** handles late injection (ChatGPT's browser injects asynchronously), re-attaching the `toolchange` listener whenever the context first appears or is swapped.
+- **`toolchange` re-registers.** If a host clears or replaces the tool set, the tools come back on the next event.
+- **Unregistration is real.** The `AbortController` is stored, and `unregisterWebMCPTools()` calls `abort()` — the Chrome 153 path that detaches without cancelling in-flight executions.
+- **Cancellation is honoured.** `execute` receives `{ signal }` and checks `aborted` before dispatch and again after the handler resolves.
+- **Every result is budgeted.** `applyOutputBudget()` wraps every return value: long strings clipped, result arrays halved until the serialized payload fits 1500 chars, with a `budget` note so the model refines rather than assuming completeness.
+
+25 tools: 12 read-only, 12 visible navigation, 1 guarded write. Plus 4 declarative forms registered by the browser from annotated HTML (`request_correlation`, `record_evidence_form`, `unlock_vault`, `inspect_photo`) via `src/components/DeclarativeForm.tsx`, which implements `toolautosubmit`, `agentInvoked` + `respondWith` after `preventDefault()` on every path, and reads `toolName` off the lifecycle events as the spec defines.
+
+Full tool table, security audit, and verification output: `WEBMCP.md`. Ninety-second verification path: `JUDGE_QUICKSTART.md`.
 
 ---
 
 ## Visual planes
 
-| Plane | Doc | Notes |
+| Plane | File | Notes |
 |---|---|---|
-| Iris title | `IrisTitle.tsx` | black → point of light → 11-blade aperture → slow ring spins → orbiting labels → contract-to-boot. Imperfection baked into blades; breathing core light; proximity response. |
-| Boot/briefing | `BootSequence`, `MissionBriefing` | full-screen POST + `AUTHORIZED INVESTIGATION PROTOCOL`; Cherry MX clicks per glyph; both skippable. |
-| Desktop | `Desktop.tsx` + `WindowFrame` + `Taskbar` + `DesktopIcons` | single-bg charcoal with faint grid + watermark; goose-eggs "satellite" icons; z-stack via `zTop`. |
-| Applications | per-app files | dense, monospace, thin bevels. Evidence board + File Manager are primary surfaces. |
-| Overlays | `AgentLinkPanel`, `Evidence` reconstruction modal, `EndingSequence` | `panel-raised` + `win-shadow`; ending closes windows staggered, contracts an iris, then **"It may have been looking for him."** |
-| FX | `globals.css` + `AudioEngine` | CRT scanlines + vignette + phosphor;`crtFlicker`; `line-flash`/`nav-sweep` on scroll;`ev-highlight`;`toast-in`; + live synth hum/drone/ticks + Cherry pack. |
+| Iris title | `title/IrisTitle.tsx` | black → a point of light → an 11-blade aperture assembles → orbiting menu labels → contracts into the boot. The title *is* the machine dormant. |
+| Boot / briefing | `boot/BootSequence.tsx`, `boot/MissionBriefing.tsx` | full-screen POST and authorisation protocol, key clicks per glyph, both skippable. |
+| Desktop | `desktop/Desktop.tsx`, `windows/WindowFrame.tsx`, `taskbar/Taskbar.tsx` | charcoal with a faint grid; drag, minimise, maximise, close, focus; z-stack via `zTop`. |
+| Applications | `applications/*` | dense monospace with thin bevels. Each app has its own metaphor: Mail is paper, Messages is bursts, Files is a volume listing. |
+| Overlays | `AgentLinkPanel`, reconstruction modal, `EndingSequence` | raised panels with hard shadows; the ending closes windows in sequence, contracts an iris, then one last line. |
+| FX | `globals.css`, `audio/engine.ts` | CRT scanlines, vignette, phosphor; `line-flash` and `nav-sweep` on agent scrolls; `ev-highlight`; toast entry; live hum and drone. |
 
-All colours derive from `--bg`/`--accent`/`--amber`/`--alert` variables; reduced-motion and CRT are CSS-class-toggled; text scale is `data-textscale`.
+Colours derive from `--bg` / `--accent` / `--amber` / `--alert`. Reduced motion and CRT are class toggles; text scale is a data attribute.
 
 ---
 
 ## Photos
 
-Twelve photographs live as PNG assets under `public/Images/` (rendered via `PhotoAsset` in `PhotosApp.tsx`). The three private-backup photos (`badge_scan`, `brass_plate`, `campus_map`) are file-system-only: the camera roll never lists them, and they open through `/Private/photo_backup` in Files (or via `open_image` once the vault is open). An earlier SVG fallback remains in `src/components/art/photos.tsx` but is not required for play. Clues are placed at realistic sizes — dim background detail at `zoom=1` that becomes legible when manually zoomed (reflection figure, badge clip glint, whiteboard micro-handwriting, clock hands, door-case, watch mid-beat truncation, etc.) and remain crisp to 9×.
+Twelve photographs as PNGs under `public/Images/`. The three private-backup photos (`badge_scan`, `brass_plate`, `campus_map`) are filesystem-only — absent from the camera roll and unreachable by tool until the vestibule is decrypted. Clues sit at realistic scale: barely-there detail at 1× that becomes legible on manual zoom (the reflected figure, a badge clip glint, whiteboard micro-handwriting, stopped clock hands, a door-camera timestamp, a health-band trace ending mid-beat) and stay crisp to 9×.
 
-The viewer (`ImageViewerApp`) handles `wheel` zoom (1–9×) + pan drag; `PhotosApp` is a grid. The agent has no zoom tools by design — enforced by absence, not policy.
+`ImageViewerApp` handles wheel zoom (1–9×) and pointer pan, with a detent at 2.5× that marks the threshold for "looking closely" and routes through `services.notePhotoInspection`. The agent has no zoom tool. Enforced by absence, not policy.
 
 ---
 
 ## Sound
 
-Synthesized + sampled in `AudioEngine`:
-- hum — 55 Hz sine + brown noise through lowpass
-- drone — detuned 54 / 54.6 triangle + 108.5 sine
-- Cherry KC 1000 clicks — 32 `keypress-*.wav` with random pitch 0.92–1.08, gain 0.34–0.52, lowpass 4.2–5.6k, stereo ±0.08, timing jitter ±3ms
-- ticks/clicks/dings via short noise bursts, band-pass + exponential envelopes; `ding` is 880+1318 Hz decaying.
-- Window open/close — keypress-pack **chunks** (rate 0.66–0.84, lowpass 3.0–3.8k, gain ~0.5): a satisfying mechanical latch; Kenney `open/close` samples at low volume as fallback.
-- Generic UI & minimize/maximize — keypress-pack **taps** (distinct rate/vol per action: click 1.0, minimize 1.06/lighter, maximize 0.9/firmer); the whole desk reads as one keyboard. Falls back to Kenney samples.
-- Ambience — the desk hums + a drive churns every ~40–80s, and faint **distant house sounds** (something fell, a door closing) drift in every ~70–150s, so the machine feels lived-in and the house feels inhabited.
+`src/audio/engine.ts`, sampled-first with synthesis as fallback:
 
-Master gain `0.78` via compressor, muteable from tray, respects `settings.sound`.
+- **hum** — 55 Hz sine plus brown noise through a lowpass
+- **drone** — detuned 54 / 54.6 triangles plus a 108.5 sine
+- **key clicks** — 32 Cherry-style samples, pitch 0.92–1.08, gain 0.34–0.52, lowpass 4.2–5.6 k, stereo ±0.08, timing jitter ±3 ms
+- **window open / close** — pitched-down key-pack chunks: a mechanical latch, not a UI blip
+- **UI and window controls** — key-pack taps with distinct rate and volume per action, so the whole desk reads as one keyboard
+- **ambience** — a drive churns every 40–80 s; faint distant house sounds (something falling, a door closing) drift in every 70–150 s
+
+Master gain 0.78 through a compressor, muteable from the tray.
 
 ---
 
 ## Extending
 
-- Add a document: entry in `filesystem.ts` (content as template literal) + a corresponding node in `buildFilesystem()`; long documents get key lines computed once at top. Don't forget `modified`/`sizeKb` and optional `hiddenUntilFlag`/`encrypted`/`requiresUnlock`.
-- Add a photo: SVG component in `art/photos.tsx` + entry in `photos.ts` (visible `date` + machine-exif). The reflected-person clue's zoom-check lives in `PhotosApp` at `zoom ≥ 2.5`.
-- Add an evidence item: row in `evidence.ts` + `autoUnlockFlag`; `services.onFileOpened` may wire its discovery.
-- Add a tool: `ToolDef` in `register.ts` + delegating service fn in `services.ts`; keep it semantic (one job, one schema).
+- **A document:** content template literal plus a node in `buildFilesystem()` in `filesystem.ts`. Long documents get key line numbers computed once at the top, against the full concatenated text.
+- **A photo:** a PNG in `public/Images/`, an entry in `photos.ts` with visible date and machine-only EXIF, and a source mapping in `PhotosApp`. If it needs a directional hint, add a case to `services.photoInspectionHint`.
+- **An evidence item:** a row in `evidence.ts` with an `autoUnlockFlag`; `services.onFileOpened` can wire its discovery.
+- **A tool:** a `ToolDef` in `register.ts` **plus** a delegating function in `services.ts`. Keep it semantic — one job, one schema, annotations declared. `pnpm test:webmcp` will reject it if it reaches past the service layer or omits `readOnlyHint`.

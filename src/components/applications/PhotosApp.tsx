@@ -4,7 +4,14 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import Image from "next/image";
 import type { PhotoMeta } from "@/types/game";
 import { PHOTOS, getPhoto } from "@/game/data/photos";
-import { getCurrentPhotoId, noteHumanAction, noteWindowHuman, openPhoto, photoFocusBus } from "@/game/services";
+import {
+  getCurrentPhotoId,
+  inspectPhoto,
+  notePhotoInspection,
+  openPhoto,
+  photoFocusBus,
+  ZOOM_INSPECTION_THRESHOLD,
+} from "@/game/services";
 import { useOS } from "@/game/state/osStore";
 import { sfx } from "@/audio/engine";
 import DeclarativeForm from "@/components/DeclarativeForm";
@@ -32,9 +39,6 @@ const PHOTO_SOURCES: Record<string, string> = {
 
 /* Private-backup photos live ONLY in /Private/photo_backup (Files app) — never in the camera roll. */
 const SEALED_COUNT = PHOTOS.filter((p) => p.inPrivateBackup).length;
-
-// cooldown for ARIA's reactive zoom toast — presence, not nagging
-let lastAriaZoomToastAt = 0;
 
 function PhotoAsset({
   id,
@@ -119,47 +123,22 @@ export function PhotosApp() {
         </span>
       </div>
       {/* Declarative tool: the agent can surface metadata + a directional hint natively */}
-      <div className="shrink-0 px-3 py-1.5 border-b border-line bg-surface flex items-center gap-2">
-        <span className="mono-xs text-faint shrink-0">SCRUTINIZE —</span>
+      <div className="shrink-0 px-3 py-1.5 border-b border-line bg-surface">
         <DeclarativeForm
           toolname="inspect_photo"
-          tooldescription="Ask ARIA to surface machine-readable metadata for a single photo (EXIF, timestamp, file note) and a hint about where in the image to look. The agent CANNOT see pixels — the player must inspect."
+          tooldescription="Surface machine-readable metadata for a single photo (EXIF, timestamp, file note) plus a hint about where in the image to look. You cannot see pixels — the player must inspect."
           paramName="photoId"
           paramDescription="Photo id (e.g. DSC04821) or partial filename. One photo at a time."
           placeholder="DSC04821 / IMG_0022 / badge_scan …"
           submitLabel="SCRUTINIZE"
+          label="SCRUTINIZE —"
           className="flex-1"
           onExecute={async (raw) => {
-            const q = raw.trim().toLowerCase().replace(/\.(png|jpg|jpeg)$/, "");
-            const photo =
-              PHOTOS.find((p) => p.id.toLowerCase() === q) ??
-              PHOTOS.find((p) => p.filename.toLowerCase().includes(q));
-            if (!photo) {
-              useOS.getState().pushToast({ app: "PHOTOS", title: "SCRUTINIZE", body: `no photo matches "${raw}"` });
-              sfx.error();
-              return `no photo matches "${raw}"`;
-            }
-            const meta = getPhoto(photo.id);
-            if (photo.inPrivateBackup && !useOS.getState().vaultUnlocked) {
-              useOS.getState().pushToast({ app: "PHOTOS", title: "SCRUTINIZE", body: `${photo.filename} is sealed in /Private/photo_backup` });
-              sfx.error();
-              return `${photo.filename} is sealed — unlock the vestibule first.`;
-            }
-            const hint =
-              photo.id === "DSC04821"
-                ? "Hint: window glass, lower half — a figure holds a phone with a reversed badge glint."
-                : photo.id === "DSC04655"
-                ? "Hint: a stopped wall clock. Note the minute hand."
-                : photo.id === "IMG_0022"
-                ? "Hint: a reminder card photographed through glass."
-                : photo.id === "IMG_0044"
-                ? "Hint: a door camera timestamp — bottom-right corner."
-                : photo.id === "IMG_0103"
-                ? "Hint: a health-band trace — the line ends mid-beat."
-                : `Caption: ${meta?.caption ?? "no caption"}.`;
-            useOS.getState().addFlag("DISCOVERED_METADATA");
-            sfx.chime();
-            return `${photo.filename} — ${meta?.exif.dateOriginal ?? "unknown date"} · ${meta?.exif.camera ?? "?"} · ${meta?.exif.gpsLabel ?? "?"}. ${hint}`;
+            const r = inspectPhoto(raw);
+            useOS.getState().pushToast({ app: "PHOTOS", title: "SCRUTINIZE", body: r.message });
+            if (r.ok) sfx.chime();
+            else sfx.error();
+            return r.message;
           }}
         />
       </div>
@@ -238,35 +217,18 @@ export function ImageViewerApp() {
     window.addEventListener("pointerup", up);
   };
 
-  // zoom milestone hook for story flags (e.g., reflection discovery) + detent bump
+  // zoom milestone hook — manual inspection is the human's exclusive capability.
+  // All flags, toasts, and co-op beats live in services.notePhotoInspection so
+  // the UI never duplicates game logic.
   useEffect(() => {
-    const crossed = prevZoomRef.current < 2.5 && zoom >= 2.5;
+    const crossed = prevZoomRef.current < ZOOM_INSPECTION_THRESHOLD && zoom >= ZOOM_INSPECTION_THRESHOLD;
     prevZoomRef.current = zoom;
     if (!crossed) return;
     sfx.typeTick();
     setBump(true);
-    setTimeout(() => setBump(false), 40);
-    noteHumanAction(); // the human is inspecting — synchrony rhythm
-    if (photoId === "DSC04821") {
-      // reuse the same flag logic as the service layer
-      const osApi = useOS.getState();
-      osApi.addFlag("FOUND_PHOTO_017");
-      osApi.pushToast({
-        app: "PHOTOS",
-        title: "DSC04821.JPG",
-        body: "Something is reflected in the glass.",
-      });
-    } else if (photoId === "DSC04655") {
-      noteWindowHuman(); // 02:13 window — human side (the stopped clock)
-    } else if (Date.now() - lastAriaZoomToastAt > 180_000) {
-      // ARIA reacts when the human goes quiet over a photo — presence, not automation
-      lastAriaZoomToastAt = Date.now();
-      useOS.getState().pushToast({
-        app: "ARIA",
-        title: "ZOOM NOTED",
-        body: "You've gone quiet. Describe what you see — I'll find what it connects to.",
-      });
-    }
+    const t = setTimeout(() => setBump(false), 40);
+    notePhotoInspection(photoId, zoom);
+    return () => clearTimeout(t);
   }, [zoom, photoId]);
 
   const meta: PhotoMeta | undefined = getPhoto(photoId);
@@ -319,14 +281,13 @@ export function ImageViewerApp() {
 
         {/* zoom readout */}
         <div className="absolute bottom-2 right-2 panel-inset px-2 py-0.5 text-[10px] text-dim select-none">
-          ZOOM {(zoom * 100).toFixed(0)}%{zoom >= 2.5 ? " · MANUAL INSPECTION" : ""}
+          ZOOM {(zoom * 100).toFixed(0)}%{zoom >= ZOOM_INSPECTION_THRESHOLD ? " · MANUAL INSPECTION" : ""}
         </div>
         {zoom <= 1.02 && (
           <div className="absolute bottom-2 left-2 text-[9.5px] text-faint select-none pointer-events-none">
             SCROLL TO ZOOM · DRAG TO PAN — inspect closely; ARIA cannot see this
           </div>
-        )}
-      </div>
+        )}      </div>
 
       {/* info bar — intentionally limited fields for the PLAYER */}
       {showInfo && (

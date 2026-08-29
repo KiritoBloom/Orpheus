@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CHAT_MESSAGES, THREADS } from "@/game/data/chatMessages";
-import { markThreadRead, messagesThreadBus } from "@/game/services";
+import { THREADS } from "@/game/data/chatMessages";
+import { listMessages, listThreads, markThreadRead, messagesThreadBus } from "@/game/services";
 import { useOS } from "@/game/state/osStore";
 import { sfx } from "@/audio/engine";
 
@@ -29,9 +29,12 @@ export default function MessagesApp() {
   const readThreadIds = useOS((s) => s.readThreadIds);
   const flags = useOS((s) => s.flags);
 
-  // hiddenUntilFlag gating — e.g., the unexplained thread only appears once MYSTERY_MESSAGE is set
-  const visibleMsgs = CHAT_MESSAGES.filter((m) => !(m.hiddenUntilFlag && !flags.has(m.hiddenUntilFlag)));
-  const visibleThreads = THREADS.filter((t) => !(t.hiddenUntilFlag && !flags.has(t.hiddenUntilFlag)));
+  // Visibility is one predicate in the service layer (services.msgVisible) — the
+  // unexplained t_observer thread appears only once MYSTERY_MESSAGE is set.
+  // `flags` is read above so this recomputes when the thread arrives.
+  void flags;
+  const visibleMsgs = listMessages();
+  const visibleThreads = listThreads();
 
   const threads = visibleThreads.filter(
     (t) =>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Email, MailFolder } from "@/types/game";
-import { mailSelectBus, markEmailRead } from "@/game/services";
+import { listEmails, mailSelectBus, markEmailRead } from "@/game/services";
 import { useOS } from "@/game/state/osStore";
 import { sfx } from "@/audio/engine";
 
@@ -18,22 +18,16 @@ const FOLDERS: { id: MailFolder; label: string }[] = [
   { id: "trash", label: "TRASH" },
 ];
 
-let EMAILS_CACHE: Email[] = [];
-
-export function primeMailCache(emails: Email[]) {
-  EMAILS_CACHE = emails;
-}
-
 export default function MailApp() {
   const [folder, setFolder] = useState<MailFolder>("inbox");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [emails, setEmails] = useState<Email[]>([]);
   const readMailIds = useOS((s) => s.readMailIds);
+  const flags = useOS((s) => s.flags);
 
-  function setFolderByEmail(id: string) {
-    const em = EMAILS_CACHE.find((e) => e.id === id);
-    if (em) setFolder(em.folder);
-  }
+  // Visibility comes from the service layer, same as the WebMCP search_emails
+  // tool — `flags` is read so hidden mail appears the moment its flag is set.
+  void flags;
+  const emails: Email[] = listEmails();
 
   function isUnread(em: Email): boolean {
     if (readMailIds.has(em.id)) return false;
@@ -41,14 +35,12 @@ export default function MailApp() {
   }
 
   useEffect(() => {
-    import("@/game/data/emails").then((m) => {
-      EMAILS_CACHE = m.EMAILS;
-      setEmails([...m.EMAILS]);
-    });
     return mailSelectBus.on((id) => {
-      setFolderByEmail(String(id));
-      setSelectedId(String(id));
-      markEmailRead(String(id));
+      const mailId = String(id);
+      const em = listEmails().find((e) => e.id === mailId);
+      if (em) setFolder(em.folder);
+      setSelectedId(mailId);
+      markEmailRead(mailId);
     });
   }, []);
 

@@ -40,6 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# agent tooling
+.opencode/
+
 # submission draft — never commit (local persuasive draft for Devpost form)
 SUBMISSION_DRAFT.md
 SUBMISSION_DRAFT.txt

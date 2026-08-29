@@ -145,21 +145,12 @@ html, body {
 :focus-visible { outline: 1px dashed var(--accent); outline-offset: 1px; }
 
 /* ---------- declarative WebMCP focus indicator ---------- */
-/* Chrome WebMCP Declarative API — :tool-form-active / :tool-submit-active are emerging-spec
-   pseudo-classes (Chrome 149+, https://developer.chrome.com/docs/ai/webmcp/declarative-api).
-   Build warnings from PostCSS/LightningCSS ("not recognized as valid pseudo-class") are expected
-   until parsers update — the @supports guard ensures no runtime impact in other browsers.
-   When agent invokes declarative form, browser applies :tool-form-active + :tool-submit-active */
-@supports selector(:tool-form-active) {
-  form:tool-form-active {
-    outline: 1px dashed var(--accent);
-    outline-offset: 2px;
-  }
-  :is(input:tool-submit-active, button:tool-submit-active) {
-    outline: 1px dashed var(--amber);
-    outline-offset: 1px;
-  }
-}
+/* The Declarative API's :tool-form-active / :tool-submit-active pseudo-classes
+   (https://developer.chrome.com/docs/ai/webmcp/declarative-api) are newer than
+   the CSS parsers in the build pipeline, which would drop the rule at compile
+   time. They are therefore injected verbatim at runtime from src/app/layout.tsx
+   behind an @supports guard — see WEBMCP_STYLES there. Keeping them out of this
+   file keeps the production build warning-free without weakening the feature. */
 
 /* ---------- blinking block cursor ---------- */
 @keyframes blinkBlock { 0%,49% {opacity:1;} 50%,100% {opacity:0;} }
@@ -307,59 +298,59 @@ html, body {
 
 /* ---------- taskbar — authentic 90s CDE/Windows95 ---------- */
 .taskbar-90s {
-  background: #1e2e2a;
-  border-top: 2px solid #3d4a45;
-  box-shadow: inset 0 1px 0 #4a5a53;
-  height: 30px;
+  background: #22332d;
+  border-top: 2px solid #46554e;
+  box-shadow: inset 0 1px 0 #55655d;
+  height: 36px;
 }
 .task-btn-90s {
   min-width: 32px;
-  height: 22px;
-  background: #2a3a35;
-  border-top: 2px solid #4a5a53;
-  border-left: 2px solid #4a5a53;
+  height: 26px;
+  background: #2c3d37;
+  border-top: 2px solid #4f6058;
+  border-left: 2px solid #4f6058;
   border-right: 2px solid #0a0f0e;
   border-bottom: 2px solid #0a0f0e;
-  box-shadow: inset 1px 1px 0 rgba(255,255,255,0.07);
-  color: var(--text-faint);
-  font-size: 9px;
-  letter-spacing: 0.14em;
+  box-shadow: inset 1px 1px 0 rgba(255,255,255,0.08);
+  color: var(--text-dim);
+  font-size: 10px;
+  letter-spacing: 0.12em;
   border-radius: 0;
 }
-.task-btn-90s:hover { background: #32423d; color: var(--text); }
+.task-btn-90s:hover { background: #35473f; color: var(--text); }
 .task-btn-90s:active, .task-btn-90s.is-active {
-  background: #151f1c;
+  background: #131c19;
   border-top: 2px solid #0a0f0e;
   border-left: 2px solid #0a0f0e;
-  border-right: 2px solid #4a5a53;
-  border-bottom: 2px solid #4a5a53;
-  box-shadow: inset 1px 1px 2px rgba(0,0,0,0.5);
+  border-right: 2px solid #4f6058;
+  border-bottom: 2px solid #4f6058;
+  box-shadow: inset 1px 1px 2px rgba(0,0,0,0.55);
   color: var(--accent);
 }
 .task-start-90s {
-  height: 22px;
-  background: #2a3a35;
-  border-top: 2px solid #4a5a53;
-  border-left: 2px solid #4a5a53;
+  height: 26px;
+  background: #2c3d37;
+  border-top: 2px solid #4f6058;
+  border-left: 2px solid #4f6058;
   border-right: 2px solid #0a0f0e;
   border-bottom: 2px solid #0a0f0e;
-  box-shadow: inset 1px 1px 0 rgba(255,255,255,0.07);
+  box-shadow: inset 1px 1px 0 rgba(255,255,255,0.08);
 }
 .task-start-90s:active {
-  background: #151f1c;
+  background: #131c19;
   border-top: 2px solid #0a0f0e;
   border-left: 2px solid #0a0f0e;
-  border-right: 2px solid #4a5a53;
-  border-bottom: 2px solid #4a5a53;
+  border-right: 2px solid #4f6058;
+  border-bottom: 2px solid #4f6058;
 }
 .task-btn { min-width: 92px; }
 .task-ind { width:5px; height:5px; background: var(--accent); box-shadow: 0 0 5px rgba(127,174,139,.8); }
 .taskbar-inset {
-  background: #0f1a17;
+  background: #0c1512;
   border-top: 2px solid #0a0f0e;
   border-left: 2px solid #0a0f0e;
-  border-right: 2px solid #3d4a45;
-  border-bottom: 2px solid #3d4a45;
+  border-right: 2px solid #46554e;
+  border-bottom: 2px solid #46554e;
   box-shadow: inset 1px 1px 2px rgba(0,0,0,0.5);
 }
 

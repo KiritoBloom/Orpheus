@@ -1,183 +1,380 @@
 #!/usr/bin/env node
 /* ============================================================
-   scripts/run-webmcp-tests.mjs
-   Runs the static WebMCP budget + schema checks from
-   src/webmcp/static-checks.ts outside the browser.
+   scripts/run-webmcp-tests.mjs   —   `pnpm test:webmcp`
 
-   This is the CI-side companion to the in-browser
-   RUN EVALS / QUICK VERIFY buttons. The judge can see
-   `pnpm test:webmcp` pass in a clean repo without booting
-   the Next dev server.
+   Runs the WebMCP registry checks outside the browser, so a judge
+   can verify the tool surface in a clean checkout without booting
+   Next or a WebMCP host.
+
+   The check logic itself lives in src/webmcp/static-checks.ts and is
+   imported here — the same function the in-browser LINK panel runs.
+   Only the *extraction* is done here: register.ts imports browser-only
+   modules (zustand stores, the audio engine), so its tool definitions
+   are parsed out of the source text.
+
+   The parser is deliberately strict. If register.ts drifts in a way it
+   cannot read — a missing field, an unparsable schema, a tool defined
+   but not exported in TOOL_DEFS — it fails the run instead of quietly
+   checking less.
    ============================================================ */
 
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
+import { runStaticChecks, BUDGETS } from "../src/webmcp/static-checks.ts";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(__dirname, "..");
 
-/* ---------- 1) static budget / schema checks ---------- */
-
-// We extract tool surface area from the live register.ts via a Node script.
-// register.ts itself imports browser-only modules (zustand, services, audio),
-// so we parse it as text and pull the 26 ToolDef blocks.
-const registerPath = path.join(repo, "src", "webmcp", "register.ts");
-if (!existsSync(registerPath)) {
-  console.error("register.ts not found at", registerPath);
+const fail = (msg) => {
+  console.error(`\n✗ ${msg}\n`);
   process.exit(1);
-}
+};
+
+/* ---------- 1) locate sources ---------- */
+
+const registerPath = path.join(repo, "src", "webmcp", "register.ts");
+if (!existsSync(registerPath)) fail(`register.ts not found at ${registerPath}`);
 const src = readFileSync(registerPath, "utf8");
 
-/** Match a `const name: ToolDef = { ... };` block and extract its fields. */
-function extractTools(text) {
-  const tools = [];
-  // find the TOOL_DEFS array at the end
-  const tdefIdx = text.indexOf("export const TOOL_DEFS");
-  if (tdefIdx < 0) throw new Error("TOOL_DEFS not found");
-  const slice = text.slice(0, tdefIdx);
-  const re = /const (\w+): ToolDef = \{([\s\S]*?)\n\};/g;
-  let m;
-  while ((m = re.exec(slice)) !== null) {
-    const body = m[2];
-    const name = (body.match(/name:\s*"([^"]+)"/) || [])[1];
-    const desc = (body.match(/description:\s*\n?\s*"([\s\S]*?)"\s*,\s*\n/) || [])[1] || "";
-    const annoMatch = body.match(/annotations:\s*\{\s*readOnlyHint:\s*(true|false)(?:,\s*untrustedContentHint:\s*(true|false))?\s*\}/);
-    const ann = annoMatch
-      ? { readOnlyHint: annoMatch[1] === "true", untrustedContentHint: annoMatch[2] === "true" }
-      : undefined;
-    // extract inputSchema as JSON-ish text — quick parse: find { type: "object", ... required: [ ... ] }
-    const schemaMatch = body.match(/inputSchema:\s*\{([\s\S]*?)\n\s*\},/);
-    const inputSchema = schemaMatch ? parseSchema(schemaMatch[1]) : { type: "object", properties: {} };
-    if (name) tools.push({ name, description: desc, annotations: ann, inputSchema });
+/* ---------- 2) extract the tool surface ---------- */
+
+/** Return the substring of `text` starting at the `{` at `openIdx`, brace-matched.
+    Comments and string literals are skipped so apostrophes and braces inside
+    them cannot confuse the scanner. */
+function matchBraces(text, openIdx, open = "{", close = "}") {
+  if (text[openIdx] !== open) return null;
+  let depth = 0;
+  let inString = null;
+  for (let i = openIdx; i < text.length; i++) {
+    const ch = text[i];
+    const prev = text[i - 1];
+    if (inString) {
+      if (ch === inString && prev !== "\\") inString = null;
+      continue;
+    }
+    // line comment
+    if (ch === "/" && text[i + 1] === "/") {
+      const nl = text.indexOf("\n", i);
+      if (nl < 0) return null;
+      i = nl;
+      continue;
+    }
+    // block comment
+    if (ch === "/" && text[i + 1] === "*") {
+      const end = text.indexOf("*/", i + 2);
+      if (end < 0) return null;
+      i = end + 1;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      inString = ch;
+      continue;
+    }
+    if (ch === open) depth++;
+    else if (ch === close) {
+      depth--;
+      if (depth === 0) return text.slice(openIdx, i + 1);
+    }
   }
-  return tools;
+  return null;
 }
 
-function parseSchema(s) {
-  // Strip TS-only bits: `str("...")` → `{ type: "string", description: "..." }`
-  const cleaned = s
-    .replace(/str\(\s*"((?:[^"\\]|\\.)*)"\s*\)/g, (_, d) =>
-      `{ type: "string", description: ${JSON.stringify(d)} }`,
-    )
-    .replace(/enumOf\(\s*\[([^\]]*)\]\s*,\s*"((?:[^"\\]|\\.)*)"\s*\)/g, (_, arr, d) =>
-      `{ type: "string", enum: [${arr}], description: ${JSON.stringify(d)} }`,
-    );
-  try {
-    return new Function(`return (${cleaned});`)();
-  } catch {
-    return { type: "object", properties: {} };
+/** Strip comments from a source slice (used before field extraction). */
+function stripComments(text) {
+  let out = "";
+  let inString = null;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const prev = text[i - 1];
+    if (inString) {
+      out += ch;
+      if (ch === inString && prev !== "\\") inString = null;
+      continue;
+    }
+    if (ch === "/" && text[i + 1] === "/") {
+      const nl = text.indexOf("\n", i);
+      if (nl < 0) break;
+      i = nl - 1;
+      out += "\n";
+      continue;
+    }
+    if (ch === "/" && text[i + 1] === "*") {
+      const end = text.indexOf("*/", i + 2);
+      if (end < 0) break;
+      i = end + 1;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") inString = ch;
+    out += ch;
   }
+  return out;
+}
+
+/** Evaluate a TS object literal that only uses the helpers below. */
+function evalLiteral(literal, label) {
+  const src = literal
+    // str("…") → { type: "string", description: "…" }
+    .replace(/\bstr\(\s*("(?:[^"\\]|\\.)*")\s*\)/g, (_, d) => `{ type: "string", description: ${d} }`)
+    // enumOf([…], "…") → { type: "string", enum: […], description: "…" }
+    .replace(
+      /\benumOf\(\s*(\[[^\]]*\]|[A-Za-z_$][\w$]*(?:\s+as\s+[\w[\]<>]+)?)\s*,\s*("(?:[^"\\]|\\.)*")\s*\)/g,
+      (_, arr, d) => `{ type: "string", enum: ${/^\[/.test(arr) ? arr : "APP_ENUM_VALUES"}, description: ${d} }`,
+    )
+    .replace(/\bAPP_ENUM\b/g, "APP_ENUM_OBJECT")
+    .replace(/\s+as\s+(?:const|string\[\]|unknown)/g, "");
+  try {
+    return new Function(
+      "APP_ENUM_OBJECT",
+      "APP_ENUM_VALUES",
+      "READ_UGC",
+      "READ_SYSTEM",
+      "NAVIGATE",
+      "WRITE",
+      `return (${src});`,
+    )(
+      { type: "string", enum: APP_IDS, description: "Which application" },
+      APP_IDS,
+      { readOnlyHint: true, untrustedContentHint: true, idempotentHint: true },
+      { readOnlyHint: true, idempotentHint: true },
+      { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+      { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    );
+  } catch (err) {
+    fail(`could not parse ${label} in register.ts — ${err.message}`);
+  }
+}
+
+/** App ids, read from types/game.ts so the enum check is real. */
+const APP_IDS = (() => {
+  const typesPath = path.join(repo, "src", "types", "game.ts");
+  if (!existsSync(typesPath)) fail("src/types/game.ts not found");
+  const text = readFileSync(typesPath, "utf8");
+  const idx = text.indexOf("export const ALL_APPS");
+  if (idx < 0) fail("ALL_APPS not found in src/types/game.ts");
+  const arrStart = text.indexOf("[", idx);
+  const arr = matchBraces(text, arrStart, "[", "]");
+  if (!arr) fail("could not read ALL_APPS array");
+  return JSON.parse(arr.replace(/,\s*\]$/, "]").replace(/\s+/g, " "));
+})();
+
+function extractField(body, field, label) {
+  const re = new RegExp(`(^|\\n)\\s*${field}:\\s*`);
+  const m = re.exec(body);
+  if (!m) return null;
+  const valueStart = m.index + m[0].length;
+  const ch = body[valueStart];
+  if (ch === "{") {
+    const literal = matchBraces(body, valueStart);
+    if (!literal) fail(`unterminated ${field} in ${label}`);
+    return evalLiteral(literal, `${label}.${field}`);
+  }
+  if (ch === '"') {
+    // possibly a multi-part string; read to the terminating quote
+    let i = valueStart + 1;
+    for (; i < body.length; i++) {
+      if (body[i] === '"' && body[i - 1] !== "\\") break;
+    }
+    return JSON.parse(body.slice(valueStart, i + 1));
+  }
+  // identifier (e.g. annotations: READ_UGC)
+  const idMatch = /^([A-Za-z_$][\w$]*)/.exec(body.slice(valueStart));
+  if (idMatch) return evalLiteral(idMatch[1], `${label}.${field}`);
+  return null;
+}
+
+function extractTools(text) {
+  const tdefIdx = text.indexOf("export const TOOL_DEFS");
+  if (tdefIdx < 0) fail("TOOL_DEFS not found in register.ts");
+
+  // (a) the declared registry order
+  const arrStart = text.indexOf("[", text.indexOf("=", tdefIdx));
+  const arrLiteral = matchBraces(text, arrStart, "[", "]");
+  if (!arrLiteral) fail("could not read the TOOL_DEFS array");
+  const registryIdentifiers = arrLiteral
+    .replace(/\/\/[^\n]*/g, "")
+    .replace(/[[\]]/g, "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  // (b) every `const <id>: ToolDef = { … }` block above it
+  const declSlice = text.slice(0, tdefIdx);
+  const defs = new Map();
+  const declRe = /const (\w+): ToolDef = \{/g;
+  let m;
+  while ((m = declRe.exec(declSlice)) !== null) {
+    const identifier = m[1];
+    const braceIdx = declSlice.indexOf("{", m.index);
+    const rawBody = matchBraces(declSlice, braceIdx);
+    if (!rawBody) fail(`unterminated ToolDef body for ${identifier}`);
+    const body = stripComments(rawBody);
+    const name = extractField(body, "name", identifier);
+    const title = extractField(body, "title", identifier);
+    const description = extractField(body, "description", identifier);
+    const annotations = extractField(body, "annotations", identifier);
+    const inputSchema = extractField(body, "inputSchema", identifier);
+    if (!name) fail(`${identifier}: no name`);
+    if (!description) fail(`${identifier}: no description`);
+    if (!inputSchema) fail(`${identifier}: no inputSchema`);
+    const hasExecute = /(^|\n)\s*execute:/.test(body);
+    if (!hasExecute) fail(`${identifier}: no execute handler`);
+    defs.set(identifier, { name, title, description, annotations, inputSchema, execute: () => undefined });
+  }
+
+  // (c) the two must agree exactly — a defined-but-unregistered tool is a bug
+  const missing = registryIdentifiers.filter((id) => !defs.has(id));
+  if (missing.length) fail(`TOOL_DEFS references undefined tools: ${missing.join(", ")}`);
+  const unregistered = [...defs.keys()].filter((id) => !registryIdentifiers.includes(id));
+  if (unregistered.length) fail(`defined but not in TOOL_DEFS: ${unregistered.join(", ")}`);
+
+  return registryIdentifiers.map((id) => defs.get(id));
 }
 
 const tools = extractTools(src);
-console.log(`Found ${tools.length} WebMCP tools in src/webmcp/register.ts\n`);
 
-/* ---------- 2) run the same checks as RUN EVALS / QUICK VERIFY ---------- */
+/* ---------- 3) run the shared checks ---------- */
 
-const MAX_NAME = 30;
-const MAX_DESC = 500;
-const MAX_PARAM_DESC = 150;
-const MAX_QUERY = 200;
-const MAX_OUT = 1500;
+const results = runStaticChecks(tools, tools.length);
 
-const results = [];
-const add = (name, pass, detail) => results.push({ name, pass, detail });
+/* ---------- 4) budget constants must match register.ts, not this script ---------- */
 
-const badName = tools.find((t) => t.name.length > MAX_NAME);
-const badDesc = tools.find((t) => t.description.length > MAX_DESC);
-const paramErrs = [];
-tools.forEach((t) => {
-  const props = (t.inputSchema && t.inputSchema.properties) || {};
-  for (const [k, v] of Object.entries(props)) {
-    if (v && typeof v.description === "string" && v.description.length > MAX_PARAM_DESC) {
-      paramErrs.push(`${t.name}.${k} = ${v.description.length}`);
-    }
-  }
+const constant = (name) => {
+  const m = new RegExp(`export const ${name}\\s*=\\s*(\\d+)`).exec(src);
+  return m ? Number(m[1]) : null;
+};
+const registerBudgets = {
+  name: constant("MAX_NAME_LEN"),
+  description: constant("MAX_DESC_LEN"),
+  paramDescription: constant("MAX_PARAM_DESC_LEN"),
+  queryInput: constant("MAX_QUERY_LEN"),
+  output: constant("MAX_OUTPUT_CHARS"),
+};
+const budgetMismatch = Object.entries(BUDGETS).filter(([k, v]) => registerBudgets[k] !== v);
+results.push({
+  name: "budgets: register.ts constants match the documented limits",
+  pass: budgetMismatch.length === 0,
+  detail: budgetMismatch.length
+    ? budgetMismatch.map(([k, v]) => `${k}: register.ts=${registerBudgets[k]} expected=${v}`).join("; ")
+    : `name:${registerBudgets.name} desc:${registerBudgets.description} param:${registerBudgets.paramDescription} input:${registerBudgets.queryInput} output:${registerBudgets.output}`,
 });
-add(
-  "registry: name ≤30 · description ≤500 · param desc ≤150",
-  tools.length >= 20 && !badName && !badDesc && paramErrs.length === 0,
-  `${tools.length} tools` +
-    (badName ? ` · ${badName.name} name too long` : "") +
-    (badDesc ? ` · ${badDesc.name} desc ${badDesc.description.length}` : "") +
-    (paramErrs.length ? ` · ${paramErrs.length} param over budget` : ""),
-);
 
-const schemaErrs = [];
-tools.forEach((t) => {
-  const s = t.inputSchema || {};
-  if (s.type !== "object") schemaErrs.push(`${t.name}: type=${s.type}`);
-  const props = s.properties || {};
-  for (const r of s.required || []) {
-    if (!(r in props)) schemaErrs.push(`${t.name}: required "${r}" missing from properties`);
-  }
+/* ---------- 5) registry-wide output budget is actually applied ---------- */
+
+results.push({
+  name: "budgets: every tool result passes through applyOutputBudget()",
+  pass: /applyOutputBudget\(result\)/.test(src) && /export function applyOutputBudget/.test(src),
+  detail: /applyOutputBudget\(result\)/.test(src)
+    ? "registration wrapper budgets every return value"
+    : "applyOutputBudget is not applied in the registration wrapper",
 });
-add(
-  "schemas: every tool has type:object + required-declared params",
-  schemaErrs.length === 0,
-  schemaErrs.length ? schemaErrs.slice(0, 3).join("; ") : "all valid",
-);
 
-const ugcRe = /^(search_|read_|get_(message|email|browser|timeline|case|system_logs|investigation_context|image_metadata))/;
-const ugcTools = tools.filter((t) => ugcRe.test(t.name) && t.name !== "get_investigation_context" && t.name !== "get_image_metadata" && t.name !== "get_case_evidence");
-const missing = ugcTools.filter((t) => !t.annotations?.readOnlyHint || !t.annotations?.untrustedContentHint);
-add(
-  "annotations: every UGC-returning tool marks readOnly + untrusted",
-  missing.length === 0,
-  missing.length ? `missing: ${missing.map((t) => t.name).join(", ")}` : `all ${ugcTools.length} marked`,
-);
+/* ---------- 6) declarative API surface ---------- */
 
-const allowed = /^(ls|cd|cat|open|search|unlock|help|clear|history)(\s+[a-zA-Z0-9._/\- ]*)?$/;
-const positives = ["help", "ls", "ls /", "cat /System/FIELD_GUIDE.txt", "unlock lantern orpheus echo", "clear"];
-const negatives = ["rm -rf /", "ls; cat /etc/passwd", "cat /etc/passwd | mail x@y", "$(whoami)", "`id`"];
-const posOk = positives.every((c) => allowed.test(c));
-const negOk = negatives.every((c) => !allowed.test(c));
-add(
-  "security: terminal_command allowlist blocks injection, permits verbs",
-  posOk && negOk,
-  `+${positives.length} allowed · -${negatives.length} blocked`,
-);
-
-add(
-  "output budget: name:30 desc:500 param:150 input:200 output:1500",
-  MAX_NAME === 30 && MAX_DESC === 500 && MAX_PARAM_DESC === 150 && MAX_QUERY === 200 && MAX_OUT === 1500,
-  `verified in register.ts`,
-);
-
-const names = new Set();
-let dup = "";
-for (const t of tools) {
-  if (names.has(t.name)) { dup = t.name; break; }
-  names.add(t.name);
-}
-add(
-  "registry: unique tool names",
-  !dup,
-  dup ? `dup: ${dup}` : `${names.size} unique`,
-);
-
-// Declarative API surface — at least 3 visible forms (check files exist)
 const declFormPath = path.join(repo, "src", "components", "DeclarativeForm.tsx");
-const usesForm = ["EvidenceApp.tsx", "FilesApp.tsx", "PhotosApp.tsx"].filter((f) => {
-  const p = path.join(repo, "src", "components", "applications", f);
-  if (!existsSync(p)) return false;
-  return readFileSync(p, "utf8").includes("DeclarativeForm");
+if (!existsSync(declFormPath)) fail("src/components/DeclarativeForm.tsx not found");
+const declSrc = readFileSync(declFormPath, "utf8");
+
+const declRequirements = [
+  ["toolname attribute", /toolname/],
+  ["tooldescription attribute", /tooldescription/],
+  ["toolparamdescription attribute", /toolparamdescription/],
+  ["toolautosubmit attribute", /toolautosubmit/],
+  ["agentInvoked branch", /agentInvoked/],
+  ["respondWith(Promise)", /respondWith\(/],
+  ["preventDefault before respondWith", /preventDefault\(\)[\s\S]*respondWith\(/],
+  ["toolactivated listener", /addEventListener\("toolactivated"/],
+  ["toolName read off the event", /\(e as Event & \{ toolName\?: string \}\)\.toolName/],
+];
+const declMissing = declRequirements.filter(([, re]) => !re.test(declSrc)).map(([label]) => label);
+results.push({
+  name: "declarative API: DeclarativeForm implements the full spec contract",
+  pass: declMissing.length === 0,
+  detail: declMissing.length ? `missing: ${declMissing.join(", ")}` : `${declRequirements.length}/${declRequirements.length} spec points`,
 });
-add(
-  "declarative API: 3 visible forms wired (Evidence, Files, Photos)",
-  existsSync(declFormPath) && usesForm.length >= 3,
-  existsSync(declFormPath) ? `form helper present · wired in ${usesForm.length}/3 apps` : "DeclarativeForm.tsx missing",
-);
 
-/* ---------- 3) report ---------- */
+const FORM_USAGE = [
+  ["EvidenceApp.tsx", ["request_correlation", "record_evidence_form"]],
+  ["FilesApp.tsx", ["unlock_vault"]],
+  ["PhotosApp.tsx", ["inspect_photo"]],
+];
+const wiredForms = [];
+const unwired = [];
+for (const [file, toolNames] of FORM_USAGE) {
+  const p = path.join(repo, "src", "components", "applications", file);
+  const text = existsSync(p) ? readFileSync(p, "utf8") : "";
+  for (const name of toolNames) {
+    if (text.includes(`toolname="${name}"`)) wiredForms.push(name);
+    else unwired.push(`${file}:${name}`);
+  }
+}
+results.push({
+  name: `declarative API: ${wiredForms.length} visible forms wired into the apps`,
+  pass: unwired.length === 0,
+  detail: unwired.length ? `missing: ${unwired.join(", ")}` : wiredForms.join(", "),
+});
 
+/* ---------- 7) the CSS focus indicators the spec asks for ---------- */
+
+const cssSources = [
+  path.join(repo, "src", "app", "layout.tsx"),
+  path.join(repo, "src", "app", "globals.css"),
+]
+  .filter((p) => existsSync(p))
+  .map((p) => readFileSync(p, "utf8"))
+  .join("\n");
+const hasFormActive = /:tool-form-active/.test(cssSources);
+const hasSubmitActive = /:tool-submit-active/.test(cssSources);
+const hasSupportsGuard = /@supports selector\(:tool-form-active\)/.test(cssSources);
+results.push({
+  name: "declarative API: :tool-form-active / :tool-submit-active styled behind @supports",
+  pass: hasFormActive && hasSubmitActive && hasSupportsGuard,
+  detail:
+    hasFormActive && hasSubmitActive && hasSupportsGuard
+      ? "focus indicators shipped from src/app/layout.tsx"
+      : `missing: ${[!hasFormActive && ":tool-form-active", !hasSubmitActive && ":tool-submit-active", !hasSupportsGuard && "@supports guard"].filter(Boolean).join(", ")}`,
+});
+
+/* ---------- 8) lifecycle guarantees ---------- */
+
+const lifecycle = [
+  ["document.modelContext first, navigator fallback", /document as unknown as Record<string, unknown>\)\.modelContext/],
+  ["AbortController stored for unregistration", /export function unregisterWebMCPTools/],
+  ["abort() actually callable", /controller\?\.abort\(\)/],
+  ["registration reports partial failure", /state\.registered = failed\.length === 0/],
+  ["re-registers when the host context changes", /state\.context !== mc/],
+  ["execute honours signal.aborted", /opts\?\.signal\?\.aborted/],
+  ["host executeTool path exists", /executeToolLikeHost/],
+];
+const lifecycleMissing = lifecycle.filter(([, re]) => !re.test(src)).map(([l]) => l);
+results.push({
+  name: "lifecycle: registration, unregistration, and cancellation are real",
+  pass: lifecycleMissing.length === 0,
+  detail: lifecycleMissing.length ? `missing: ${lifecycleMissing.join(", ")}` : `${lifecycle.length}/${lifecycle.length} guarantees`,
+});
+
+/* ---------- 9) no game logic duplicated into the tool layer ---------- */
+
+const forbiddenInRegister = [
+  ["direct filesystem data import", /from "@\/game\/data\/filesystem"/],
+  ["direct log data import", /from "@\/game\/data\/systemLogs"/],
+  ["direct chat data import", /from "@\/game\/data\/chatMessages"/],
+  ["direct photo data import", /from "@\/game\/data\/photos"/],
+];
+const leaked = forbiddenInRegister.filter(([, re]) => re.test(src)).map(([l]) => l);
+results.push({
+  name: "architecture: tools delegate to services.ts, never reimplement game logic",
+  pass: leaked.length === 0,
+  detail: leaked.length ? `register.ts reaches past services: ${leaked.join(", ")}` : "no data-layer imports in register.ts",
+});
+
+/* ---------- report ---------- */
+
+console.log(`WEBMCP STATIC CHECKS — src/webmcp/register.ts · ${tools.length} tools\n`);
 const passed = results.filter((r) => r.pass).length;
-console.log(`STATIC WEBMCP CHECKS — ${passed}/${results.length} PASSED`);
-results.forEach((r) =>
-  console.log(`  ${r.pass ? "✓" : "✗"} ${r.name}${r.detail ? `  —  ${r.detail}` : ""}`),
-);
-console.log("");
-console.log("Companion to the in-browser LINK → ⚡ QUICK VERIFY (jot-repl 30s path).");
-console.log("See src/webmcp/evals.md for the per-check narrative judges see in the panel.");
+results.forEach((r) => console.log(`  ${r.pass ? "✓" : "✗"} ${r.name}${r.detail ? `\n      ${r.detail}` : ""}`));
+console.log(`\n${passed === results.length ? "PASS" : "FAIL"} — ${passed}/${results.length} checks\n`);
+console.log("In-browser companion: LINK → RUN EVALS (live deterministic checks) / ⚡ QUICK VERIFY (the same checks + 3 visible actuations).");
+console.log("Eval narratives: src/webmcp/evals.md\n");
 process.exit(passed === results.length ? 0 : 1);

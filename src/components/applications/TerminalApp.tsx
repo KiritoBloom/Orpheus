@@ -148,16 +148,11 @@ export default function TerminalApp() {
         break;
       }
       case "search": {
-        const q = rest.join(" ").toLowerCase();
+        const q = rest.join(" ").trim();
         if (!q) { push({ text: "usage: search <text>", cls: "text-dim" }); break; }
-        const hits = S.fsList().filter(
-          (n) =>
-            !(n.hiddenUntilFlag && !os.flags.has(n.hiddenUntilFlag)) &&
-            !(n.requiresUnlock && !os.vaultUnlocked) &&
-            (n.name.toLowerCase().includes(q) || n.content?.toLowerCase().includes(q))
-        );
-        if (hits.length === 0) push({ text: `no matches for '${q}'`, cls: "text-dim" });
-        else hits.slice(0, 12).forEach((h) => push({ text: `${h.kind === "dir" ? "/" : ""}${h.path}` }));
+        const hits = S.searchFiles(q, { limit: 12 });
+        if (hits.length === 0) push({ text: `no matches for '${q.toLowerCase()}'`, cls: "text-dim" });
+        else hits.forEach((h) => push({ text: `${h.kind === "dir" ? "/" : ""}${h.path}` }));
         break;
       }
       case "unlock": runUnlock(rest); break;

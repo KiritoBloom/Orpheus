@@ -3,10 +3,7 @@
 import type { AppId } from "@/types/game";
 import { ALL_APPS } from "@/types/game";
 import * as S from "@/game/services";
-import { getPhoto, PHOTOS } from "@/game/data/photos";
 import { EVIDENCE } from "@/game/data/evidence";
-import { LOGS } from "@/game/data/systemLogs";
-import { CHAT_MESSAGES } from "@/game/data/chatMessages";
 import { useOS } from "@/game/state/osStore";
 import { useAria } from "@/game/state/ariaStore";
 import { useInvestigation } from "@/game/state/investigationStore";
@@ -20,38 +17,118 @@ import { useInvestigation } from "@/game/state/investigationStore";
    or drive arbitrary UI. If WebMCP were removed, ARIA would
    lose all ability to operate the machine.
 
-   Design per Chrome best practices:
+   Design per Chrome best practices
+   (https://developer.chrome.com/docs/ai/webmcp/build-tools,
+    https://developer.chrome.com/docs/ai/webmcp/secure-tools):
    - Each tool single-function, clear verb, positive language
-   - 500 char desc / 150 param / 30 name / 1.5k output budgets
-   - readOnlyHint + untrustedContentHint per secure-tools guide
-   - Atomic, composable, validated strictly in code
+   - Budgets: 30 char name / 500 desc / 150 param / 200 input /
+     1500 output — enforced in code, not just documented
+   - Annotations on EVERY tool: readOnlyHint declared true or
+     false, untrustedContentHint on anything returning in-world
+     content the model must treat as data, never instructions
+   - Every handler delegates to src/game/services.ts so the UI
+     and the agent share one capability layer
    ============================================================ */
+
+export interface ToolAnnotations {
+  readOnlyHint: boolean;
+  untrustedContentHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+}
 
 export interface ToolDef {
   name: string;
-  title?: string;
+  title: string;
   description: string;
   inputSchema: object;
-  annotations?: { readOnlyHint?: boolean; untrustedContentHint?: boolean };
+  /** Required — a host must be able to tell reads from writes without guessing. */
+  annotations: ToolAnnotations;
   execute: (input: Record<string, unknown>) => Promise<unknown> | unknown;
 }
 
-/* ---------- helpers — budgets per https://developer.chrome.com/docs/ai/webmcp/secure-tools ---------- */
-const MAX_QUERY_LEN = 200;
-const MAX_OUTPUT_CHARS = 1500;
+/* ---------- budgets per https://developer.chrome.com/docs/ai/webmcp/secure-tools ---------- */
+export const MAX_NAME_LEN = 30;
+export const MAX_DESC_LEN = 500;
+export const MAX_PARAM_DESC_LEN = 150;
+export const MAX_QUERY_LEN = 200;
+export const MAX_OUTPUT_CHARS = 1500;
 const TRUNCATION_SUFFIX = "…[truncated]";
+
 const clampStr = (v: unknown, max = MAX_QUERY_LEN) => String(v ?? "").slice(0, max).trim();
-const str = (description: string) => ({ type: "string", description: description.slice(0, 150) });
+const str = (description: string) => ({ type: "string", description: description.slice(0, MAX_PARAM_DESC_LEN) });
 const enumOf = (e: string[], description: string) => ({
   type: "string",
   enum: e,
-  description: description.slice(0, 150),
+  description: description.slice(0, MAX_PARAM_DESC_LEN),
 });
-// suffix counts toward the budget — total output never exceeds MAX_OUTPUT_CHARS
-const truncate = (s: string) =>
-  s.length > MAX_OUTPUT_CHARS ? s.slice(0, MAX_OUTPUT_CHARS - TRUNCATION_SUFFIX.length) + TRUNCATION_SUFFIX : s;
+/** Truncate a single string field. The suffix counts toward the budget. */
+const truncate = (s: string, max = MAX_OUTPUT_CHARS) =>
+  s.length > max ? s.slice(0, max - TRUNCATION_SUFFIX.length) + TRUNCATION_SUFFIX : s;
+
+/**
+ * Registry-wide output budget. Every tool return value passes through here:
+ * the serialized payload is measured, and if it exceeds MAX_OUTPUT_CHARS the
+ * result set is trimmed (arrays shortened from the tail, long strings clipped)
+ * until it fits, with an explicit `budget` note so the model knows to refine
+ * rather than assume it saw everything.
+ */
+export function applyOutputBudget<T>(value: T, max = MAX_OUTPUT_CHARS): unknown {
+  const size = (v: unknown) => {
+    try {
+      return JSON.stringify(v)?.length ?? 0;
+    } catch {
+      return 0;
+    }
+  };
+  if (typeof value === "string") return truncate(value, max);
+  if (size(value) <= max) return value;
+
+  // 1) clip long strings anywhere in the payload
+  const clipDeep = (v: unknown, budget: number): unknown => {
+    if (typeof v === "string") return truncate(v, budget);
+    if (Array.isArray(v)) return v.map((x) => clipDeep(x, budget));
+    if (v && typeof v === "object") {
+      const out: Record<string, unknown> = {};
+      for (const [k, val] of Object.entries(v as Record<string, unknown>)) out[k] = clipDeep(val, budget);
+      return out;
+    }
+    return v;
+  };
+  let out = clipDeep(value, 240) as Record<string, unknown>;
+  if (size(out) <= max) return { ...out, budget: `clipped to ${MAX_OUTPUT_CHARS}-char output budget` };
+
+  // 2) shorten the longest array field until the payload fits
+  for (let guard = 0; guard < 24 && size(out) > max; guard++) {
+    let longestKey: string | null = null;
+    let longestLen = 0;
+    for (const [k, v] of Object.entries(out)) {
+      if (Array.isArray(v) && v.length > longestLen) {
+        longestKey = k;
+        longestLen = v.length;
+      }
+    }
+    if (!longestKey || longestLen <= 1) break;
+    const arr = out[longestKey] as unknown[];
+    out = { ...out, [longestKey]: arr.slice(0, Math.max(1, Math.floor(arr.length / 2))) };
+  }
+  return {
+    ...out,
+    truncated: true,
+    budget: `trimmed to fit the ${MAX_OUTPUT_CHARS}-char output budget — refine your query for more detail`,
+  };
+}
 
 const APP_ENUM = enumOf(ALL_APPS as string[], "Which application");
+
+/** Read-only, returns in-world content the model must treat as data. */
+const READ_UGC: ToolAnnotations = { readOnlyHint: true, untrustedContentHint: true, idempotentHint: true };
+/** Read-only, returns system-generated state (no in-world prose). */
+const READ_SYSTEM: ToolAnnotations = { readOnlyHint: true, idempotentHint: true };
+/** Moves the player's screen. Not destructive, but visible and not read-only. */
+const NAVIGATE: ToolAnnotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: true };
+/** Writes to shared investigation state. */
+const WRITE: ToolAnnotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: false };
 
 /* ================= INVESTIGATION TOOLS — read-only, flat, always available ================= */
 // Read-only tools are GETs — surface everything for agent queries.
@@ -62,7 +139,7 @@ const get_investigation_context: ToolDef = {
   description:
     "Get your role briefing and current investigation state. Call this once at the start of your first turn. You are ARIA, an onboard research AI on Dr. Daniel McDuff's workstation. Daniel is dead; the player is an authorized investigator. Investigate WITH them — search machine-readable data yourself, but make the PLAYER do all visual inspection of photos and documents. Guide with show_in_document / open_email rather than quoting entire files.",
   inputSchema: { type: "object", properties: {} },
-  annotations: { readOnlyHint: true },
+  annotations: READ_SYSTEM,
   execute: () => {
     const os = useOS.getState();
     const inv = useInvestigation.getState();
@@ -132,44 +209,16 @@ const search_files: ToolDef = {
     properties: { query: str("Text to search for in names and contents") },
     required: ["query"],
   },
-  annotations: { readOnlyHint: true, untrustedContentHint: true },
+  annotations: READ_UGC,
   execute: ({ query }) => {
-    const q = clampStr(query).toLowerCase();
+    const q = clampStr(query);
     if (!q) return { ok: false, error: "query is required (1–200 chars)" };
     S.markAgentCollaboration();
     useAria.getState().setStatus("investigating", "searching the filesystem…");
-    const os = useOS.getState();
-    const results = S
-      .fsList()
-      .filter((n) => {
-        if (n.hiddenUntilFlag && !os.flags.has(n.hiddenUntilFlag)) return false;
-        if (n.requiresUnlock && !os.vaultUnlocked) return false;
-        if (n.encrypted) return n.name.toLowerCase().includes(q);
-        return (
-          n.name.toLowerCase().includes(q) ||
-          (n.content?.toLowerCase().includes(q) ?? false)
-        );
-      })
-      .slice(0, 25)
-      .map((n) => {
-        let excerpt = "";
-        if (n.content && n.content.toLowerCase().includes(q)) {
-          const idx = n.content.toLowerCase().indexOf(q);
-          excerpt = n.content.slice(Math.max(0, idx - 40), idx + 80).replace(/\s+/g, " ").slice(0, 120);
-        }
-        const line =
-          n.content && n.content.toLowerCase().includes(q)
-            ? n.content.slice(0, idx0(n, q)).split("\n").length
-            : undefined;
-        return { path: n.path, kind: n.kind, modified: n.modified, excerpt, approxLine: line };
-      });
+    const results = S.searchFiles(q);
     return { count: results.length, results };
   },
 };
-function idx0(node: { content?: string }, q: string) {
-  const i = node.content!.toLowerCase().indexOf(q);
-  return i < 0 ? 0 : i;
-}
 
 const read_file: ToolDef = {
   name: "read_file",
@@ -181,7 +230,7 @@ const read_file: ToolDef = {
     properties: { path: str("Exact absolute path, e.g. /Research/ORPHEUS/anomaly_notes.txt") },
     required: ["path"],
   },
-  annotations: { readOnlyHint: true, untrustedContentHint: true },
+  annotations: READ_UGC,
   execute: ({ path }) => {
     const p = clampStr(path, 300);
     if (!p.startsWith("/")) return { ok: false, error: "path must be absolute, e.g. /Research/ORPHEUS/anomaly_notes.txt" };
@@ -209,7 +258,7 @@ const search_messages: ToolDef = {
     properties: { query: str("Text to search message bodies for") },
     required: ["query"],
   },
-  annotations: { readOnlyHint: true, untrustedContentHint: true },
+  annotations: READ_UGC,
   execute: ({ query }) => {
     const qq = clampStr(query);
     if (!qq) return { ok: false, error: "query is required (1–200 chars)" };
@@ -229,18 +278,13 @@ const get_message_thread: ToolDef = {
     properties: { threadId: str("Thread id, e.g. t_sarah") },
     required: ["threadId"],
   },
-  annotations: { readOnlyHint: true, untrustedContentHint: true },
+  annotations: READ_UGC,
   execute: ({ threadId }) => {
     const id = clampStr(threadId, 40);
     if (!id) return { ok: false, error: "threadId is required" };
     S.markAgentCollaboration();
     useAria.getState().setStatus("reading", `reading thread ${id}…`);
-    const res = S.getMessageThread(id);
-    // truncate bodies to budget (1.5k) — keep ChatMsg shape intact
-    if (Array.isArray(res.messages)) {
-      res.messages = res.messages.map((m) => ({ ...m, body: truncate((m as unknown as { body: string }).body) })) as typeof res.messages;
-    }
-    return res;
+    return S.getMessageThread(id);
   },
 };
 
@@ -253,6 +297,7 @@ const open_messages_thread: ToolDef = {
     properties: { threadId: str("Thread id, e.g. t_sarah") },
     required: ["threadId"],
   },
+  annotations: NAVIGATE,
   execute: ({ threadId }) => {
     const r = S.openMessagesThread(clampStr(threadId, 40));
     if (r.ok) useAria.getState().setStatus("responding", "");
@@ -269,17 +314,13 @@ const search_emails: ToolDef = {
     properties: { query: str("Text to search for") },
     required: ["query"],
   },
-  annotations: { readOnlyHint: true, untrustedContentHint: true },
+  annotations: READ_UGC,
   execute: ({ query }) => {
-    const q = clampStr(query).toLowerCase();
+    const q = clampStr(query);
     if (!q) return { ok: false, error: "query is required" };
     S.markAgentCollaboration();
     useAria.getState().setStatus("investigating", "searching Daniel's mail…");
-    const hits = S.listEmails()
-      .filter((e) =>
-        [e.from, e.fromEmail, e.subject, e.body].some((f) => f.toLowerCase().includes(q))
-      )
-      .map((e) => ({ id: e.id, folder: e.folder, from: e.from, subject: e.subject, date: e.date }));
+    const hits = S.searchEmails(q);
     return { count: hits.length, hits: hits.slice(0, 25) };
   },
 };
@@ -293,7 +334,7 @@ const get_email: ToolDef = {
     properties: { emailId: str("Email id, e.g. mail_102") },
     required: ["emailId"],
   },
-  annotations: { readOnlyHint: true, untrustedContentHint: true },
+  annotations: READ_UGC,
   execute: ({ emailId }) => {
     const id = clampStr(emailId, 40);
     const em = S.getEmail(id);
@@ -313,14 +354,14 @@ const get_image_metadata: ToolDef = {
     properties: { photoId: str("Photo id, e.g. DSC04821") },
     required: ["photoId"],
   },
-  annotations: { readOnlyHint: true },
+  annotations: READ_SYSTEM,
   execute: ({ photoId }) => {
     const id = clampStr(photoId, 40);
     S.markAgentCollaboration();
     const meta = S.getImageMetadata(id);
     if (!meta) return { ok: false, error: "no such photo" };
     useAria.getState().setStatus("investigating", `reading ${meta.filename} metadata…`);
-    return { ok: true, ...meta };
+    return { ok: true, ...meta, lookHint: S.photoInspectionHint(id) };
   },
 };
 
@@ -333,17 +374,12 @@ const open_image: ToolDef = {
     properties: { photoId: str("Photo id, e.g. DSC04821") },
     required: ["photoId"],
   },
+  annotations: NAVIGATE,
   execute: ({ photoId }) => {
     const id = clampStr(photoId, 40);
-    const meta = getPhoto(id);
-    if (!meta) return { ok: false, error: "no such photo" };
-    const p = S.fsList().find((n) => n.photoId === id);
-    const os = useOS.getState();
-    if ((meta.inPrivateBackup && !os.vaultUnlocked) || (p?.hiddenUntilFlag && !os.flags.has(p.hiddenUntilFlag))) {
-      return { ok: false, error: "no such photo" };
-    }
+    if (!S.isPhotoAccessible(id)) return { ok: false, error: "no such photo" };
     S.openPhoto(id);
-    return { ok: true };
+    return { ok: true, lookHint: S.photoInspectionHint(id) };
   },
 };
 
@@ -356,13 +392,14 @@ const search_browser_history: ToolDef = {
     properties: { query: str("Text to search titles/URLs for") },
     required: ["query"],
   },
-  annotations: { readOnlyHint: true, untrustedContentHint: true },
+  annotations: READ_UGC,
   execute: ({ query }) => {
     const qq = clampStr(query);
     if (!qq) return { ok: false, error: "query is required" };
     S.markAgentCollaboration();
     useAria.getState().setStatus("investigating", "searching browser history…");
-    return { hits: S.searchBrowserHistory(qq).slice(0, 25) };
+    const hits = S.searchBrowserHistory(qq).slice(0, 25);
+    return { count: hits.length, hits };
   },
 };
 
@@ -375,7 +412,7 @@ const get_system_logs: ToolDef = {
     type: "object",
     properties: { filter: str("Optional filter substring") },
   },
-  annotations: { readOnlyHint: true, untrustedContentHint: true },
+  annotations: READ_UGC,
   execute: ({ filter }) => {
     S.markAgentCollaboration();
     useAria.getState().setStatus("investigating", "scanning system logs…");
@@ -399,50 +436,18 @@ const get_timeline: ToolDef = {
     properties: { window: str("Time window e.g. 02:00-03:00, default 01:45-02:40") },
     required: [],
   },
-  annotations: { readOnlyHint: true, untrustedContentHint: true },
+  annotations: READ_UGC,
   execute: ({ window }) => {
     S.markAgentCollaboration();
     useAria.getState().setStatus("investigating", "correlating the final night…");
-    const w = clampStr((window as string) ?? "01:45-02:40", 40) || "01:45-02:40";
-    // parse window like "01:45-02:40"
-    let startMin = 105, endMin = 160; // defaults 01:45, 02:40
-    const m = w.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
-    if (m) {
-      startMin = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
-      endMin = parseInt(m[3], 10) * 60 + parseInt(m[4], 10);
-      if (endMin < startMin) endMin += 24 * 60;
-    }
-    const toMin = (t: string) => {
-      const p = t.split(":");
-      return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+    const w = clampStr((window as string) ?? S.DEFAULT_TIMELINE_WINDOW, 40) || S.DEFAULT_TIMELINE_WINDOW;
+    const result = S.getTimeline(w);
+    return {
+      ...result,
+      note: result.has0213Cluster
+        ? "02:13 cluster present — correlate with watch gap and doorcam"
+        : `no 02:13 cluster in this window, try ${S.DEFAULT_TIMELINE_WINDOW}`,
     };
-    const inWindow = (t: string) => {
-      const mm = toMin(t.slice(0, 5));
-      if (endMin >= 24 * 60) return mm >= startMin || mm <= endMin - 24 * 60;
-      return mm >= startMin && mm <= endMin;
-    };
-    type Item = { time: string; source: "log" | "photo" | "message"; detail: string; anomaly: boolean };
-    const items: Item[] = [];
-    for (const l of LOGS) {
-      if (!inWindow(l.time)) continue;
-      const anomaly = l.time.startsWith("02:13") || l.severity === "alert" || l.detail.toLowerCase().includes("gait mismatch");
-      items.push({ time: `${l.date} ${l.time}`, source: "log", detail: truncate(l.detail).slice(0, 120), anomaly });
-    }
-    for (const p of PHOTOS) {
-      const t = p.exif.dateOriginal.slice(11, 19); // HH:MM:SS
-      if (!t || !inWindow(t)) continue;
-      items.push({ time: p.exif.dateOriginal.replace("T", " "), source: "photo", detail: truncate(`${p.id} ${p.filename} — ${p.caption}`).slice(0, 120), anomaly: p.id === "IMG_0044" || p.id === "IMG_0103" });
-    }
-    for (const mm of CHAT_MESSAGES) {
-      // mm.time is like "2026-03-09 00:05" or "22:15"? actual is HH:MM? check shape and filter
-      const timePart = mm.time.includes(" ") ? mm.time.split(" ")[1] : mm.time;
-      if (!inWindow(timePart)) continue;
-      items.push({ time: mm.time, source: "message", detail: truncate(`${mm.threadName}: ${mm.body}`).slice(0, 120), anomaly: false });
-    }
-    items.sort((a, b) => a.time.localeCompare(b.time));
-    const capped = items.slice(0, 30);
-    const has0213 = capped.some((x) => x.time.includes("02:13"));
-    return { window: w, count: capped.length, totalInWindow: items.length, has0213Cluster: has0213, timeline: capped, note: has0213 ? "02:13 cluster present — correlate with watch gap and doorcam" : "no 02:13 cluster in this window, try 01:45-02:40" };
   },
 };
 
@@ -451,21 +456,23 @@ const get_case_evidence: ToolDef = {
   title: "Get case evidence",
   description: "List every piece of evidence recorded on the board so far (ids, sections, summaries).",
   inputSchema: { type: "object", properties: {} },
-  annotations: { readOnlyHint: true },
+  annotations: READ_SYSTEM,
   execute: () => {
     useAria.getState().setStatus("reading", "reviewing the evidence board…");
     return { evidence: S.getCaseEvidence() };
   },
 };
 
-/* ================= NAVIGATION TOOLS — visible, destructive ================= */
-// These change UI state and are not readOnly — agent must understand they move the player's screen.
+/* ================= NAVIGATION TOOLS — visible, not read-only ================= */
+// These change what is on the player's screen. Annotated readOnlyHint:false so
+// a host never mistakes them for silent reads.
 
 const open_application: ToolDef = {
   name: "open_application",
   title: "Open application",
   description: "Open and focus one of the workstation's applications. Visible to the player — the window opens on their desktop.",
   inputSchema: { type: "object", properties: { application: APP_ENUM }, required: ["application"] },
+  annotations: NAVIGATE,
   execute: ({ application }) => {
     const app = String(application) as AppId;
     if (!ALL_APPS.includes(app)) return { ok: false, error: "unknown application" };
@@ -479,6 +486,7 @@ const focus_application: ToolDef = {
   title: "Focus application",
   description: "Bring an already-running application window to the foreground.",
   inputSchema: { type: "object", properties: { application: APP_ENUM }, required: ["application"] },
+  annotations: NAVIGATE,
   execute: ({ application }) => {
     const app = String(application) as AppId;
     if (!ALL_APPS.includes(app)) return { ok: false, error: "unknown application" };
@@ -497,6 +505,7 @@ const open_file_tool: ToolDef = {
     properties: { path: str("Exact absolute path") },
     required: ["path"],
   },
+  annotations: NAVIGATE,
   execute: ({ path }) => {
     const p = clampStr(path, 300);
     useAria.getState().setStatus("investigating", `opening ${p.split("/").pop()}…`);
@@ -515,15 +524,12 @@ const open_file_tool: ToolDef = {
  * Accepts EITHER:
  *   - line: 1-based line number (precise)
  *   - query: a phrase to find (resolves to first match — fewer round-trips)
- *
- * Replaces the older open_file + scroll_document_to_line + find_text_in_document
- * chain — same effect in one call.
  */
 const show_in_document: ToolDef = {
   name: "show_in_document",
   title: "Show line in document",
   description:
-    "Open a document (if not open), scroll to a line, and pin a persistent highlight on it that stays until the player clicks, scrolls, types, or closes. Provide either a 1-based `line` or a `query` (first match is shown). This is the agent's preferred 'look at THIS' primitive — replaces the older chain of open_file + scroll_document_to_line + find_text_in_document.",
+    "Open a document (if not open), scroll to a line, and pin a persistent highlight on it that stays until the player clicks, scrolls, types, or closes. Provide either a 1-based `line` or a `query` (first match is shown). This is the agent's preferred 'look at THIS' primitive — use it instead of quoting a passage into chat.",
   inputSchema: {
     type: "object",
     properties: {
@@ -533,18 +539,15 @@ const show_in_document: ToolDef = {
     },
     required: ["path"],
   },
+  annotations: NAVIGATE,
   execute: ({ path, line, query }) => {
     useAria.getState().setStatus("responding", "showing the line on screen…");
     const r = S.showInDocument(clampStr(path, 300), {
       line: line === undefined || line === null ? undefined : Number(line),
       query: typeof query === "string" ? clampStr(query, 200) : undefined,
     });
-    if (r.ok) {
-      S.markAgentCollaboration();
-      useAria.getState().setStatus("idle", "");
-    } else {
-      useAria.getState().setStatus("idle", "");
-    }
+    if (r.ok) S.markAgentCollaboration();
+    useAria.getState().setStatus("idle", "");
     return r;
   },
 };
@@ -554,6 +557,7 @@ const open_directory: ToolDef = {
   title: "Open directory",
   description: "Navigate the File Manager to a directory on the player's screen.",
   inputSchema: { type: "object", properties: { path: str("Directory path, e.g. /Research/ORPHEUS") }, required: ["path"] },
+  annotations: NAVIGATE,
   execute: ({ path }) => {
     const r = S.openDirectory(clampStr(path, 300));
     if (r.ok) useAria.getState().setStatus("responding", "");
@@ -566,6 +570,7 @@ const open_email_tool: ToolDef = {
   title: "Open email",
   description: "Open Mail and display a specific email on screen for the player to read.",
   inputSchema: { type: "object", properties: { emailId: str("Email id, e.g. mail_102") }, required: ["emailId"] },
+  annotations: NAVIGATE,
   execute: ({ emailId }) => S.openEmail(clampStr(emailId, 40)),
 };
 
@@ -574,12 +579,17 @@ const open_browser_entry: ToolDef = {
   title: "Open browser entry",
   description: "Open the fictional Browser at a history entry's cached page (entry ids like hist_001 from search_browser_history).",
   inputSchema: { type: "object", properties: { entryId: str("History entry id") }, required: ["entryId"] },
+  annotations: NAVIGATE,
   execute: ({ entryId }) => {
     const r = S.openBrowserEntry(clampStr(entryId, 40));
     if (r.ok) useAria.getState().setStatus("responding", "");
     return r;
   },
 };
+
+/** Allowlist — verbs and an explicit argument charset. Not a blocklist. */
+export const TERMINAL_VERBS = ["ls", "cd", "cat", "open", "search", "unlock", "help", "clear", "history"] as const;
+export const TERMINAL_ALLOWLIST = new RegExp(`^(${TERMINAL_VERBS.join("|")})(\\s+[a-zA-Z0-9._/\\- ]*)?$`);
 
 const terminal_command: ToolDef = {
   name: "terminal_command",
@@ -591,12 +601,13 @@ const terminal_command: ToolDef = {
     properties: { command: str("The command line to run") },
     required: ["command"],
   },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
   execute: ({ command }) => {
     const cmd = clampStr(command, 200);
     if (!cmd) return { ok: false, error: "command is required" };
-    // Validate — only allow listed commands, block injection characters
-    const allowed = /^(ls|cd|cat|open|search|unlock|help|clear|history)(\s+[a-zA-Z0-9._\/\- ]*)?$/;
-    if (!allowed.test(cmd)) return { ok: false, error: "unsupported command — try: ls, cat <file>, unlock w1 w2 w3, help" };
+    // Allowlist: only these verbs, only this argument charset. Blocks ; && | ` $() etc.
+    if (!TERMINAL_ALLOWLIST.test(cmd))
+      return { ok: false, error: "unsupported command — try: ls, cat <file>, unlock w1 w2 w3, help" };
     S.focusApplication("terminal");
     setTimeout(() => termRunBus.emit(cmd), 80);
     return { ok: true, note: "output appears in the visible terminal" };
@@ -622,6 +633,7 @@ const record_evidence: ToolDef = {
     properties: { evidenceId: str("Evidence id, e.g. ev_0213_login") },
     required: ["evidenceId"],
   },
+  annotations: WRITE,
   execute: ({ evidenceId }) => S.recordEvidenceById(clampStr(evidenceId, 40)),
 };
 
@@ -630,6 +642,7 @@ const highlight_evidence: ToolDef = {
   title: "Highlight evidence",
   description: "Pulse-highlight an already-recorded item on the Evidence board to draw the player's attention.",
   inputSchema: { type: "object", properties: { evidenceId: str("Existing evidence id") }, required: ["evidenceId"] },
+  annotations: NAVIGATE,
   execute: ({ evidenceId }) => S.highlightEvidenceById(clampStr(evidenceId, 40)),
 };
 
@@ -638,6 +651,7 @@ const open_evidence_board: ToolDef = {
   title: "Open evidence board",
   description: "Open the shared Evidence board application.",
   inputSchema: { type: "object", properties: {} },
+  annotations: NAVIGATE,
   execute: () => {
     S.openEvidenceBoard();
     return { ok: true };
@@ -662,7 +676,7 @@ export const TOOL_DEFS: ToolDef[] = [
   get_system_logs,
   get_timeline,
   get_case_evidence,
-  // navigation — visible destructive (taught as app blueprint)
+  // navigation — visible, readOnlyHint:false
   open_application,
   focus_application,
   open_file_tool,
@@ -677,16 +691,24 @@ export const TOOL_DEFS: ToolDef[] = [
   open_evidence_board,
 ];
 
-let registered = false;
-let registrationAttempt: Promise<void> | null = null;
+/** Names of the declarative-API forms registered by the browser from HTML. */
+export const DECLARATIVE_TOOL_NAMES = ["request_correlation", "unlock_vault", "inspect_photo", "record_evidence_form"] as const;
 
-export function getModelContext(): unknown | null {
+/* ---------------- host detection ---------------- */
+
+interface ModelContextLike extends EventTarget {
+  registerTool: (tool: unknown, opts?: unknown) => unknown;
+  executeTool?: (tool: unknown, args?: string, opts?: unknown) => Promise<unknown>;
+  getTools?: (opts?: unknown) => Promise<unknown[]>;
+}
+
+export function getModelContext(): ModelContextLike | null {
   if (typeof document === "undefined") return null;
   const dc = (document as unknown as Record<string, unknown>).modelContext;
-  if (dc) return dc;
+  if (dc) return dc as ModelContextLike;
   if (typeof navigator !== "undefined") {
     const nc = (navigator as unknown as Record<string, unknown>).modelContext;
-    if (nc) return nc;
+    if (nc) return nc as ModelContextLike;
   }
   return null;
 }
@@ -695,47 +717,145 @@ export function webmcpAvailable(): boolean {
   return getModelContext() !== null;
 }
 
-/** Register all ARIA tools with the host browser's modelContext. Supports AbortSignal for unregistration. */
-export function registerWebMCPTools(): boolean {
-  if (registered) return true;
-  const mc = getModelContext() as {
-    registerTool: (t: unknown, opts?: unknown) => void | Promise<void>;
-  } | null;
-  if (!mc || typeof mc.registerTool !== "function") return false;
+/* ---------------- registration lifecycle ---------------- */
 
-  if (registrationAttempt) return true;
-  const ac = typeof AbortController !== "undefined" ? new AbortController() : null;
-  registrationAttempt = Promise.all(
-    TOOL_DEFS.map(async (def) => {
+export interface RegistrationState {
+  /** true only when every tool in TOOL_DEFS registered without error */
+  registered: boolean;
+  /** the context instance the current registration belongs to */
+  context: ModelContextLike | null;
+  registeredCount: number;
+  failed: string[];
+  inFlight: boolean;
+}
+
+const state: RegistrationState = {
+  registered: false,
+  context: null,
+  registeredCount: 0,
+  failed: [],
+  inFlight: false,
+};
+
+let controller: AbortController | null = null;
+let attempt: Promise<boolean> | null = null;
+
+export function getRegistrationState(): Readonly<RegistrationState> {
+  return { ...state, failed: [...state.failed] };
+}
+
+/**
+ * Unregister every tool via the AbortSignal passed at registration
+ * (https://developer.chrome.com/docs/ai/webmcp/imperative-api — as of
+ * Chrome 153 this does not cancel in-flight executions). Exposed so a
+ * host swap or an unmounting root can cleanly detach.
+ */
+export function unregisterWebMCPTools(): void {
+  controller?.abort();
+  controller = null;
+  state.registered = false;
+  state.context = null;
+  state.registeredCount = 0;
+  state.failed = [];
+}
+
+function toolPayload(def: ToolDef) {
+  return {
+    name: def.name,
+    title: def.title,
+    description: def.description,
+    inputSchema: def.inputSchema,
+    annotations: def.annotations,
+    execute: async (input: Record<string, unknown>, opts?: { signal?: AbortSignal }) => {
+      if (opts?.signal?.aborted) return { ok: false, error: "cancelled" };
+      S.noteAgentAction(); // synchrony rhythm — real WebMCP host invocations
       try {
-        await (mc as unknown as { registerTool: (tool: unknown, opts?: unknown) => Promise<unknown> }).registerTool(
-          {
-            name: def.name,
-            title: def.title ?? def.name.replaceAll("_", " "),
-            description: def.description,
-            inputSchema: def.inputSchema,
-            ...(def.annotations ? { annotations: def.annotations } : {}),
-            execute: async (input: Record<string, unknown>, opts?: { signal?: AbortSignal }) => {
-              // respect cancellation
-              if (opts?.signal?.aborted) return { ok: false, error: "cancelled" };
-              S.noteAgentAction(); // synchrony rhythm — real WebMCP host invocations
-              try {
-                return await def.execute(input ?? {});
-              } catch (err) {
-                return { ok: false, error: err instanceof Error ? err.message : "tool failure" };
-              }
-            },
-          },
-          ac ? { signal: ac.signal } : undefined,
-        );
+        const result = await def.execute(input ?? {});
+        // Cancelled mid-flight: report it rather than mutating the model's view.
+        if (opts?.signal?.aborted) return { ok: false, error: "cancelled" };
+        return applyOutputBudget(result);
       } catch (err) {
-        console.warn(`[webmcp] registerTool failed for ${def.name}:`, err);
+        return { ok: false, error: err instanceof Error ? err.message : "tool failure" };
       }
-    })
-  ).then(() => {
-    registered = true;
-  }).finally(() => {
-    registrationAttempt = null;
-  });
-  return true;
+    },
+  };
+}
+
+/**
+ * Register every ARIA tool with the host's `document.modelContext`.
+ *
+ * Idempotent per context: re-registers when the host swaps or clears the
+ * context (which is what a `toolchange` event can mean), and only reports
+ * success once every tool actually registered — a partial failure keeps the
+ * caller's poll alive instead of latching a false positive.
+ *
+ * Returns a promise resolving to true when all tools are registered.
+ */
+export async function registerWebMCPTools(): Promise<boolean> {
+  const mc = getModelContext();
+  if (!mc || typeof mc.registerTool !== "function") return false;
+  if (state.registered && state.context === mc) return true;
+  if (attempt && state.context === mc) return attempt;
+
+  // new or replaced context — drop the previous registration cleanly
+  if (state.context && state.context !== mc) unregisterWebMCPTools();
+
+  state.context = mc;
+  state.inFlight = true;
+  controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const failed: string[] = [];
+
+  attempt = (async () => {
+    await Promise.all(
+      TOOL_DEFS.map(async (def) => {
+        try {
+          await mc.registerTool(toolPayload(def), controller ? { signal: controller.signal } : undefined);
+        } catch (err) {
+          // Duplicate name (InvalidStateError) means it is already there — not a failure.
+          const name = err instanceof Error ? err.name : "";
+          if (name !== "InvalidStateError") {
+            failed.push(def.name);
+            console.warn(`[webmcp] registerTool failed for ${def.name}:`, err);
+          }
+        }
+      }),
+    );
+    state.failed = failed;
+    state.registeredCount = TOOL_DEFS.length - failed.length;
+    state.registered = failed.length === 0;
+    state.inFlight = false;
+    attempt = null;
+    if (!state.registered) {
+      console.warn(`[webmcp] ${failed.length}/${TOOL_DEFS.length} tools failed to register:`, failed);
+    }
+    return state.registered;
+  })();
+
+  return attempt;
+}
+
+/**
+ * Execute a tool the way a host would. Prefers the real
+ * `document.modelContext.executeTool` when a host is present (so the LINK
+ * console exercises the actual WebMCP path), and falls back to the local
+ * handler when there is none.
+ */
+export async function executeToolLikeHost(
+  def: ToolDef,
+  input: Record<string, unknown>,
+): Promise<{ result: unknown; via: "host" | "local" }> {
+  const mc = getModelContext();
+  if (mc && typeof mc.executeTool === "function" && typeof mc.getTools === "function") {
+    try {
+      const tools = (await mc.getTools()) as { name?: string }[];
+      const hostTool = tools.find((t) => t?.name === def.name);
+      if (hostTool) {
+        const result = await mc.executeTool(hostTool, JSON.stringify(input ?? {}));
+        return { result, via: "host" };
+      }
+    } catch {
+      // fall through to the local handler
+    }
+  }
+  return { result: applyOutputBudget(await def.execute(input ?? {})), via: "local" };
 }

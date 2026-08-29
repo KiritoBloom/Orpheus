@@ -5,6 +5,7 @@ import type { EvidenceSection } from "@/types/game";
 import { useInvestigation } from "@/game/state/investigationStore";
 import { useOS } from "@/game/state/osStore";
 import { EVIDENCE } from "@/game/data/evidence";
+import { reconstructionProgress } from "@/game/services";
 import { sfx } from "@/audio/engine";
 import DeclarativeForm from "@/components/DeclarativeForm";
 
@@ -27,10 +28,11 @@ export default function EvidenceApp() {
   const [tab, setTab] = useState<EvidenceSection>("people");
   const [recon, setRecon] = useState(false);
   const items = inv.getVisibleEvidence().filter((e) => e.section === tab);
-  const totalEvidence = EVIDENCE.length; // dynamic 20 -> 100% now reachable
+  const totalEvidence = EVIDENCE.length;
   const collected = inv.getVisibleEvidence().length;
   const progress = Math.round((collected / totalEvidence) * 100);
-  const collaborated = os.flags.has("COLLABORATED_WITH_ARIA");
+  const progressGate = reconstructionProgress();
+  const collaborated = progressGate.collaborated;
 
   return (
     <div className="flex flex-col h-full text-[12px]">
@@ -43,38 +45,48 @@ export default function EvidenceApp() {
         <span className="text-[9px] tracking-[0.12em] text-faint">{progress}%</span>
         <span className="hidden sm:inline text-[9px] tracking-[0.12em] text-faint">· {collaborated ? "WebMCP + eyes" : "ask ARIA to correlate"}</span>
       </div>
-      {/* Declarative tool: the agent can request a correlation search natively */}
-      <div className="shrink-0 px-3 py-1.5 border-b border-line bg-surface">
+      {/* Declarative tools — the agent can drive these natively via HTML.
+          https://developer.chrome.com/docs/ai/webmcp/declarative-api */}
+      <div className="shrink-0 px-3 py-1.5 border-b border-line bg-surface flex flex-col gap-1.5">
         <DeclarativeForm
           toolname="request_correlation"
-          tooldescription="Ask ARIA to search the machine for a term the player noticed. Returns file + message hits."
+          tooldescription="Search the whole workstation for a term the player noticed. Returns how many files, messages, and emails mention it, so you know where to look next."
           paramName="query"
-          paramDescription="A term the player saw — a name, place, object, or number to search across files and messages."
+          paramDescription="A term the player saw — a name, place, object, or number to correlate across files, messages, and mail."
           placeholder="e.g. badge, kestrel, 02:13…"
           submitLabel="CORRELATE"
+          label="CORRELATE —"
           onExecute={async (query) => {
             const S = await import("@/game/services");
-            // file search (inline — mirrors the WebMCP search_files tool)
-            const os = useOS.getState();
-            const q = query.toLowerCase();
-            const fileHits = S.fsList().filter((n) => {
-              if (n.hiddenUntilFlag && !os.flags.has(n.hiddenUntilFlag)) return false;
-              if (n.requiresUnlock && !os.vaultUnlocked) return false;
-              return (
-                n.name.toLowerCase().includes(q) ||
-                (n.content?.toLowerCase().includes(q) ?? false)
-              );
-            });
-            const msgs = S.searchMessages(query);
-            const f = fileHits.length;
-            const m = msgs.length;
+            const r = S.correlateTerm(query);
             useOS.getState().pushToast({
               app: "ARIA",
-              title: `CORRELATE "${query}"`,
-              body: `${f} file hit(s) · ${m} message hit(s). Open Files or Messages to inspect.`,
+              title: `CORRELATE "${r.query}"`,
+              body: `${r.summary}. Open Files, Messages, or Mail to inspect.`,
             });
             sfx.chime();
-            return `Searched "${query}": ${f} file hit(s), ${m} message hit(s).`;
+            return `Searched "${r.query}": ${r.summary}.`;
+          }}
+        />
+        <DeclarativeForm
+          toolname="record_evidence_form"
+          tooldescription="Record one already-discovered item on the shared Evidence board by its id. Ids come from get_case_evidence; invented ids are rejected."
+          paramName="evidenceId"
+          paramDescription="Evidence id from get_case_evidence, e.g. ev_0213_login. One id per submission."
+          placeholder="e.g. ev_0213_login"
+          submitLabel="RECORD"
+          label="RECORD —"
+          onExecute={async (id) => {
+            const S = await import("@/game/services");
+            const r = S.recordEvidenceById(id.trim());
+            if (r.ok) {
+              sfx.chime();
+              useOS.getState().pushToast({ app: "EVIDENCE", title: "RECORDED", body: `${id.trim()} added to the board.` });
+              return `Recorded ${id.trim()} on the evidence board.`;
+            }
+            sfx.error();
+            useOS.getState().pushToast({ app: "EVIDENCE", title: "NOT RECORDED", body: r.error ?? "rejected" });
+            return `Not recorded: ${r.error ?? "rejected"}`;
           }}
         />
       </div>
@@ -108,7 +120,11 @@ export default function EvidenceApp() {
           </button>
         ) : (
           <span className="hidden md:inline-flex items-center m-1 px-2 text-[9px] tracking-[0.14em] text-faint">
-            {collected >= 6 ? `${6 - collected % 6} more for reconstruction` : "keep investigating"}
+            {!progressGate.collaborated
+              ? "ASK ARIA TO CORRELATE"
+              : progressGate.remaining > 0
+                ? `${progressGate.remaining} MORE MILESTONE${progressGate.remaining === 1 ? "" : "S"}`
+                : "KEEP INVESTIGATING"}
           </span>
         )}
       </div>

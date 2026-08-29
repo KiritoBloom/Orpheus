@@ -2,26 +2,53 @@
 
 import { useEffect, useState } from "react";
 import { useAria } from "@/game/state/ariaStore";
-import { TOOL_DEFS, webmcpAvailable } from "@/webmcp/register";
+import {
+  DECLARATIVE_TOOL_NAMES,
+  MAX_DESC_LEN,
+  MAX_OUTPUT_CHARS,
+  MAX_PARAM_DESC_LEN,
+  TOOL_DEFS,
+  executeToolLikeHost,
+  getRegistrationState,
+  webmcpAvailable,
+} from "@/webmcp/register";
 import { runDeterministicSelfTests, runQuickVerify } from "@/webmcp/selftest";
 
 /* ============================================================
    AGENT LINK PANEL — judge/dev console.
-   Lists every registered WebMCP tool and lets you execute any
-   of them manually against the live machine. Open with the
-   LINK button in the tray or Ctrl+`.
+
+   Lists every registered WebMCP tool and executes any of them
+   against the live machine. When a WebMCP host is present the
+   call goes through `document.modelContext.executeTool`, so this
+   console exercises the real path rather than a local shortcut;
+   without a host it falls back to the tool handler directly and
+   labels which route it took.
+
+   Open with the LINK button in the tray or Ctrl+`.
    ============================================================ */
+
+type Filter = "all" | "read" | "nav" | "evidence";
 
 export default function AgentLinkPanel({ onClose }: { onClose: () => void }) {
   const [available, setAvailable] = useState(false);
+  const [registration, setRegistration] = useState(() => getRegistrationState());
   const [selected, setSelected] = useState<string>(TOOL_DEFS[0].name);
-  const [args, setArgs] = useState("{}");
+  const [args, setArgs] = useState(() => defaultArgs(TOOL_DEFS[0]));
   const [output, setOutput] = useState("—");
   const [busy, setBusy] = useState(false);
-  const [filter, setFilter] = useState<"all" | "read" | "nav" | "evidence">("all");
+  const [filter, setFilter] = useState<Filter>("all");
   const status = useAria((s) => s.status);
 
-  useEffect(() => { setAvailable(webmcpAvailable()); }, []); // eslint-disable-line react-hooks/set-state-in-effect
+  // Host detection is asynchronous — poll briefly so the banner reflects reality.
+  useEffect(() => {
+    const sync = () => {
+      setAvailable(webmcpAvailable());
+      setRegistration(getRegistrationState());
+    };
+    sync();
+    const id = setInterval(sync, 800);
+    return () => clearInterval(id);
+  }, []);
 
   const def = TOOL_DEFS.find((t) => t.name === selected)!;
 
@@ -30,8 +57,12 @@ export default function AgentLinkPanel({ onClose }: { onClose: () => void }) {
     setOutput("…");
     try {
       const input = JSON.parse(args || "{}");
-      const result = await def.execute(input as Record<string, unknown>);
-      setOutput(JSON.stringify(result, null, 2).slice(0, 4000));
+      const { result, via } = await executeToolLikeHost(def, input as Record<string, unknown>);
+      const routed =
+        via === "host"
+          ? "▸ routed through document.modelContext.executeTool (real host path)"
+          : "▸ no host present — called the tool handler directly";
+      setOutput(`${routed}\n\n${JSON.stringify(result, null, 2).slice(0, 4000)}`);
     } catch (e) {
       setOutput(`ERROR: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -45,8 +76,9 @@ export default function AgentLinkPanel({ onClose }: { onClose: () => void }) {
       const passed = rs.filter((r) => r.pass).length;
       setOutput(
         `DETERMINISTIC EVALS — ${passed}/${rs.length} PASSED  (src/webmcp/evals.md)\n\n` +
-          rs.map((r) => `${r.pass ? "✓" : "✗"} ${r.name}${r.detail ? `  —  ${r.detail}` : ""}`).join("\n") +
-          `\n\nnote: state-safe — investigation state is snapshotted and fully restored; the checks advance no checkpoints.`,
+          rs.map((r) => `${r.pass ? "✓" : "✗"} ${r.name}${r.detail ? `\n    ${r.detail}` : ""}`).join("\n") +
+          `\n\nState-safe: investigation state is snapshotted and fully restored — no checkpoints advanced.` +
+          `\nThe same registry checks run headless via \`pnpm test:webmcp\`.`,
       );
     } catch (e) {
       setOutput(`ERROR: ${e instanceof Error ? e.message : String(e)}`);
@@ -54,38 +86,25 @@ export default function AgentLinkPanel({ onClose }: { onClose: () => void }) {
     setBusy(false);
   }
 
-  /** One-click judge verification — runs the 9 deterministic evals + 3
-   *  visible-actuation tool calls (system logs → timeline → show_in_document
-   *  to pin line 145 on the "02:13 is not a time" passage). State-safe:
-   *  investigation state is snapshotted and restored, so this advances
-   *  no checkpoints.
-   *
-   *  Differs from RUN EVALS: RUN EVALS only inspects return values; QUICK
-   *  VERIFY also ACTUATES the desk (the document viewer opens, scrolls,
-   *  and pins a persistent highlight during the run), proving the
-   *  visible-actuation contract.
-   */
   async function quickVerify() {
     setBusy(true);
-    setOutput("… running 9 evals + 3 visible-actuation tool calls");
+    setOutput("… running deterministic evals + 3 visible-actuation tool calls");
     try {
       const r = await runQuickVerify();
       const lines: string[] = [];
-      const banner =
+      lines.push(
         r.summary === "pass"
           ? `✅ WEBMCP VERIFIED — ${r.passed}/${r.total} checks passed`
-          : `⚠ WEBMCP PARTIAL — ${r.passed}/${r.total} checks passed`;
-      lines.push(banner);
+          : `⚠ WEBMCP PARTIAL — ${r.passed}/${r.total} checks passed`,
+      );
       lines.push("");
-      // deterministic evals
       lines.push(`▸ DETERMINISTIC EVALS — ${r.evals.filter((x) => x.pass).length}/${r.evals.length} PASSED`);
       r.evals.forEach((e) => lines.push(`  ${e.pass ? "✓" : "✗"} ${e.name}`));
       lines.push("");
-      // visible-actuation tool calls
       lines.push(`▸ VISIBLE-ACTUATION TOOL CALLS — ${r.toolCalls.filter((x) => x.pass).length}/${r.toolCalls.length} PASSED`);
       r.toolCalls.forEach((c) => lines.push(`  ${c.pass ? "✓" : "✗"} ${c.name}` + (c.detail ? `  —  ${c.detail}` : "")));
       lines.push("");
-      lines.push("The document viewer scrolled on screen during the scroll check.");
+      lines.push("The document viewer opened, scrolled, and pinned a highlight during the run — that was the agent moving your screen.");
       lines.push("State-safe: investigation state was snapshotted and restored — no checkpoints advanced.");
       setOutput(lines.join("\n"));
     } catch (e) {
@@ -93,6 +112,21 @@ export default function AgentLinkPanel({ onClose }: { onClose: () => void }) {
     }
     setBusy(false);
   }
+
+  const visibleTools = TOOL_DEFS.filter((t) => {
+    if (filter === "all") return true;
+    if (filter === "read") return t.annotations.readOnlyHint;
+    if (filter === "evidence") return t.name.includes("evidence");
+    return !t.annotations.readOnlyHint; // nav / write
+  });
+
+  const hostLine = available
+    ? registration.registered
+      ? `● WEBMCP HOST DETECTED — all ${TOOL_DEFS.length} tools registered to document.modelContext`
+      : registration.inFlight
+        ? "◐ WEBMCP HOST DETECTED — registering tools…"
+        : `⚠ WEBMCP HOST DETECTED — ${registration.registeredCount}/${TOOL_DEFS.length} registered${registration.failed.length ? ` (failed: ${registration.failed.join(", ")})` : ""}`
+    : "○ NO WEBMCP HOST — tools callable locally from this console";
 
   return (
     <div className="fixed inset-0 z-[800] grid place-items-center bg-black/70" onClick={onClose}>
@@ -106,47 +140,61 @@ export default function AgentLinkPanel({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="px-3 py-2 border-b border-line text-[10.5px] leading-relaxed">
-          <span className={available ? "text-accent" : "text-amber"}>
-            {available ? "● WEBMCP HOST DETECTED — tools are registered to document.modelContext" : "○ NO WEBMCP HOST — tools callable locally (LINK console)"}
+          <span className={available && registration.registered ? "text-accent" : "text-amber"}>{hostLine}</span>
+          <span className="text-faint">
+            {" "}· AGENT STATUS: {status.toUpperCase()} · {TOOL_DEFS.length} IMPERATIVE + {DECLARATIVE_TOOL_NAMES.length} DECLARATIVE
+            {" "}· BUDGETS: {MAX_DESC_LEN} desc / {MAX_PARAM_DESC_LEN} param / {MAX_OUTPUT_CHARS} out
           </span>
-          <span className="text-faint"> · AGENT STATUS: {status.toUpperCase()} · {TOOL_DEFS.length} TOOLS · BUDGETS: 500 desc / 150 param / 1.5k out</span>
           <div className="mt-1 flex gap-1">
             {(["all", "read", "nav", "evidence"] as const).map((f) => (
-              <button key={f} onClick={() => setFilter(f)} className={`px-1.5 py-0.5 text-[9px] tracking-[0.12em] border ${filter === f ? "bg-sel text-accent border-accentdim" : "text-faint border-line"}`}>{f.toUpperCase()}</button>
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-1.5 py-0.5 text-[9px] tracking-[0.12em] border ${filter === f ? "bg-sel text-accent border-accentdim" : "text-faint border-line"}`}
+              >
+                {f.toUpperCase()}
+              </button>
             ))}
-            <span className="ml-auto text-[9px] text-faint">◇ readOnly · ◆ nav/write · ⚑ untrusted</span>
+            <span className="ml-auto text-[9px] text-faint">◇ readOnly · ◆ nav/write · ⚑ untrusted content</span>
           </div>
         </div>
 
         <div className="flex-1 min-h-0 grid grid-cols-[240px_1fr]">
           <div className="border-r border-line overflow-y-auto py-1">
-            {TOOL_DEFS.filter((t) => {
-              if (filter === "all") return true;
-              if (filter === "read") return !!t.annotations?.readOnlyHint;
-              if (filter === "nav") return !t.annotations?.readOnlyHint && !t.name.startsWith("record") && !t.name.startsWith("highlight");
-              if (filter === "evidence") return t.name.includes("evidence");
-              return true;
-            }).map((t) => (
+            {visibleTools.map((t) => (
               <button
                 key={t.name}
                 onClick={() => { setSelected(t.name); setArgs(defaultArgs(t)); }}
                 className={`block w-full text-left px-3 py-[3px] text-[11px] truncate flex items-center gap-1 ${
                   selected === t.name ? "bg-sel text-accent" : "text-dim hover:text-txt"
                 }`}
-                title={t.title ?? t.name}
+                title={`${t.title} — ${t.annotations.readOnlyHint ? "read-only" : "moves the player's screen"}`}
               >
-                <span>{t.annotations?.readOnlyHint ? "◇" : "◆"}</span><span className="truncate">{t.name}</span>{t.annotations?.untrustedContentHint && <span className="text-amber text-[9px]">⚑</span>}
+                <span>{t.annotations.readOnlyHint ? "◇" : "◆"}</span>
+                <span className="truncate">{t.name}</span>
+                {t.annotations.untrustedContentHint && <span className="text-amber text-[9px]">⚑</span>}
               </button>
             ))}
+            <div className="mt-2 pt-2 border-t border-line px-3">
+              <div className="text-[9px] tracking-[0.14em] text-faint">DECLARATIVE (HTML FORMS)</div>
+              {DECLARATIVE_TOOL_NAMES.map((n) => (
+                <div key={n} className="text-[10.5px] text-faint truncate" title="Registered by the browser from annotated HTML — invoke from an agent, not this console">
+                  ▤ {n}
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="flex flex-col min-h-0 p-3 gap-2">
-            <div className="text-[11px] text-dim leading-snug max-h-[72px] overflow-y-auto">{def.description}</div>
+            <div className="text-[11px] text-dim leading-snug max-h-[72px] overflow-y-auto">
+              <span className="text-txt">{def.title}</span> — {def.description}
+            </div>
             <textarea
               className="field-dark text-[11.5px] p-2 h-[110px] resize-none"
               value={args}
               onChange={(e) => setArgs(e.target.value)}
               spellCheck={false}
+              aria-label={`arguments for ${def.name}`}
             />
             <div className="flex items-center gap-2">
               <button className="btn-bevel text-[11px] px-4" disabled={busy} onClick={run}>
@@ -156,7 +204,7 @@ export default function AgentLinkPanel({ onClose }: { onClose: () => void }) {
                 className="btn-bevel text-[11px] px-3"
                 disabled={busy}
                 onClick={runEvals}
-                title="9 deterministic checks per src/webmcp/evals.md — no host needed"
+                title="Deterministic in-browser checks per src/webmcp/evals.md — no host needed, state-safe"
               >
                 RUN EVALS
               </button>
@@ -164,7 +212,7 @@ export default function AgentLinkPanel({ onClose }: { onClose: () => void }) {
                 className="btn-bevel text-[11px] px-3 !bg-accent/20 !border-accent !text-accent"
                 disabled={busy}
                 onClick={quickVerify}
-                title="One-click judge verification: 9 evals + 3 visible-actuation tool calls. Differs from RUN EVALS — actually moves the desk (show_in_document opens + scrolls + pins a persistent highlight)."
+                title="One-click judge verification: the deterministic evals plus 3 tool calls that visibly move the desk (show_in_document opens, scrolls, and pins a highlight)."
               >
                 ⚡ QUICK VERIFY
               </button>
@@ -199,6 +247,8 @@ const EXAMPLE_ARGS: Record<string, string> = {
   open_image: JSON.stringify({ photoId: "DSC04821" }),
   open_browser_entry: JSON.stringify({ entryId: "hist_003" }),
   terminal_command: JSON.stringify({ command: "help" }),
+  record_evidence: JSON.stringify({ evidenceId: "ev_0213_login" }),
+  highlight_evidence: JSON.stringify({ evidenceId: "ev_daniel" }),
 };
 
 function defaultArgs(t: (typeof TOOL_DEFS)[number]): string {
@@ -208,7 +258,7 @@ function defaultArgs(t: (typeof TOOL_DEFS)[number]): string {
   const obj: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(props)) {
     const schema = v as { enum?: string[]; type: string };
-    obj[k] = schema.enum ? schema.enum[0] : schema.type === "number" ? 1 : schema.type === "array" ? ["msg_0001"] : "";
+    obj[k] = schema.enum ? schema.enum[0] : schema.type === "number" ? 1 : "";
   }
   if (Object.keys(obj).length === 0) return "{}";
   return JSON.stringify(obj);

@@ -5,7 +5,7 @@ import { loadSave } from "@/game/state/persistence";
 import { useOS } from "@/game/state/osStore";
 import { useAria } from "@/game/state/ariaStore";
 import { useInvestigation } from "@/game/state/investigationStore";
-import { registerWebMCPTools, getModelContext } from "@/webmcp/register";
+import { registerWebMCPTools, getModelContext, getRegistrationState } from "@/webmcp/register";
 import { sfx } from "@/audio/engine";
 import IrisTitle from "@/components/title/IrisTitle";
 import BootSequence from "@/components/boot/BootSequence";
@@ -63,34 +63,42 @@ export default function GameRoot() {
     })();
   }, [hydrate]);
 
-  /* ---------- webmcp registration (poll for late injection) ---------- */
-  // Atlas + Chrome 149 inject async — poll + live toolchange
+  /* ---------- webmcp registration (poll + toolchange re-register) ---------- */
+  // Hosts inject `document.modelContext` asynchronously (Atlas notably late),
+  // and may replace or clear the tool set — so registration is idempotent per
+  // context and re-runs on every `toolchange`.
   useEffect(() => {
     if (!ready) return;
-    registerWebMCPTools();
-    const id = setInterval(() => {
-      if (registerWebMCPTools()) clearInterval(id);
-    }, 800);
-    const onChange = () => registerWebMCPTools();
-    // Re-acquire on each change — initial getModelContext() is often null at hydration
-    const attach = () => {
-      const mc = getModelContext() as EventTarget | null;
+    let cancelled = false;
+    const attach = (mc: EventTarget | null) => {
       mc?.addEventListener?.("toolchange", onChange as EventListener);
       return mc;
     };
-    let mc = attach();
-    // If still null, retry attach after 1.2s (late injection typical for Atlas)
-    let attachId: ReturnType<typeof setTimeout> | null = null;
-    if (!mc) {
-      attachId = setTimeout(() => {
-        mc = attach();
-      }, 1200);
-    }
+    const onChange = () => {
+      if (!cancelled) void registerWebMCPTools();
+    };
+
+    let attached: EventTarget | null = attach(getModelContext());
+    void registerWebMCPTools();
+
+    // Poll until every tool is registered against a live context, re-attaching
+    // the toolchange listener if the context appears (or is swapped) later.
+    const id = setInterval(() => {
+      if (cancelled) return;
+      const mc = getModelContext() as EventTarget | null;
+      if (mc && mc !== attached) {
+        attached?.removeEventListener?.("toolchange", onChange as EventListener);
+        attached = attach(mc);
+      }
+      void registerWebMCPTools().then((ok) => {
+        if (ok && getRegistrationState().registered) clearInterval(id);
+      });
+    }, 800);
+
     return () => {
+      cancelled = true;
       clearInterval(id);
-      if (attachId) clearTimeout(attachId);
-      mc?.removeEventListener?.("toolchange", onChange as EventListener);
-      // also try current context in case it changed
+      attached?.removeEventListener?.("toolchange", onChange as EventListener);
       (getModelContext() as EventTarget | null)?.removeEventListener?.("toolchange", onChange as EventListener);
     };
   }, [ready]);
@@ -268,30 +276,29 @@ export default function GameRoot() {
   }, []);
 
   /* ---------- declarative tool lifecycle — agent fills a form ---------- */
-  // Chrome's Declarative API fires `toolactivated` on the form element when
-  // the host agent starts filling it, and `toolcancel` if the user aborts.
-  // We forward those to toasts so the player sees the desk respond.
+  // Per the Declarative API, `toolactivated` fires on the window once the agent
+  // has pre-filled a form's fields, and `toolcancel` when it aborts or resets.
+  // Both carry `toolName` as a property ON THE EVENT (not in `detail`).
   useEffect(() => {
+    const nameOf = (e: Event) =>
+      (e as Event & { toolName?: string }).toolName ??
+      (e as CustomEvent<{ toolName?: string }>).detail?.toolName ??
+      "tool";
     const onActivated = (e: Event) => {
-      const ce = e as CustomEvent<{ toolName?: string }>;
-      const name = ce.detail?.toolName ?? "record_evidence";
       useOS.getState().pushToast({
         app: "WEBMCP",
         title: "TOOL ACTIVATED",
-        body: `${name} — agent is filling the form`,
+        body: `${nameOf(e)} — agent is filling the form`,
       });
     };
     const onCancel = (e: Event) => {
-      const ce = e as CustomEvent<{ toolName?: string }>;
-      const name = ce.detail?.toolName ?? "record_evidence";
-      useOS.getState().pushToast({ app: "WEBMCP", title: "TOOL CANCELLED", body: name });
+      useOS.getState().pushToast({ app: "WEBMCP", title: "TOOL CANCELLED", body: nameOf(e) });
     };
-    // capture phase catches events dispatched on form elements before they bubble
-    window.addEventListener("toolactivated" as never, onActivated as never, true);
-    window.addEventListener("toolcancel" as never, onCancel as never, true);
+    window.addEventListener("toolactivated" as never, onActivated as never);
+    window.addEventListener("toolcancel" as never, onCancel as never);
     return () => {
-      window.removeEventListener("toolactivated" as never, onActivated as never, true);
-      window.removeEventListener("toolcancel" as never, onCancel as never, true);
+      window.removeEventListener("toolactivated" as never, onActivated as never);
+      window.removeEventListener("toolcancel" as never, onCancel as never);
     };
   }, []);
 
@@ -394,33 +401,6 @@ export default function GameRoot() {
 
       {/* cinematic event moments — dim + amber rim on mystery messages & 02:13 */}
       <EventFlash />
-
-      {/* ---------- declarative WebMCP tool — https://developer.chrome.com/docs/ai/webmcp/declarative-api ---------- */}
-      {/* Both imperative + declarative per best practices. Uses toolname/tooldescription/toolparamdescription + agentInvoked/respondWith. Offscreen but focusable so :tool-form-active outline shows when agent invokes. */}
-      <form
-        id="webmcp-declarative-evidence"
-        {...({ toolname: "record_evidence", tooldescription: "Record evidence via form — alternative to record_evidence tool" } as unknown as React.FormHTMLAttributes<HTMLFormElement>)}
-        onSubmit={(e) => {
-          const se = e as unknown as SubmitEvent & { agentInvoked?: boolean; respondWith?: (p: Promise<unknown>) => void };
-          const fd = new FormData(e.currentTarget as HTMLFormElement);
-          const id = String(fd.get("evidenceId") || "").trim();
-          if (!id) return;
-          if (se.agentInvoked && se.respondWith) {
-            e.preventDefault();
-            const p = import("@/game/services").then((S) => S.recordEvidenceById(id));
-            se.respondWith(p);
-            return;
-          }
-          e.preventDefault();
-          void import("@/game/services").then((S) => S.recordEvidenceById(id));
-        }}
-        // Offscreen but not display:none so browser can focus and apply :tool-form-active (Chrome declarative guide)
-        style={{ position: "absolute", left: "-9999px", width: "1px", height: "1px", overflow: "hidden" }}
-        aria-hidden
-      >
-        <input name="evidenceId" type="hidden" defaultValue="ev_daniel" {...({ toolparamdescription: "Evidence id, e.g. ev_0213_login" } as unknown as React.InputHTMLAttributes<HTMLInputElement>)} />
-        <button type="submit" style={{ display: "none" }} tabIndex={-1} aria-hidden>Submit</button>
-      </form>
     </div>
   );
 }
