@@ -6,6 +6,7 @@ import type { FsNode } from "@/types/game";
 import * as S from "@/game/services";
 import { useOS } from "@/game/state/osStore";
 import { sfx } from "@/audio/engine";
+import DeclarativeForm from "@/components/DeclarativeForm";
 
 /* ============================================================
    FILE MANAGER — dense two-pane browser with STATUS column
@@ -122,6 +123,40 @@ export default function FilesApp() {
           <span className="text-[11px] tracking-wide text-txt truncate flex-1">{cwd}</span>
           {seeking && <span className="text-[9px] tracking-[0.14em] text-amber animate-pulse shrink-0">SEEK…</span>}
         </div>
+
+        {/* Declarative tool: the agent can attempt the vault passphrase natively */}
+        {!os.vaultUnlocked && os.flags.has("FOUND_PRIVATE_HINT") && (
+          <div className="shrink-0 px-3 py-1.5 border-b border-line bg-surface2 flex items-center gap-3">
+            <span className="mono-xs text-amber shrink-0">UNLOCK VESTIBULE —</span>
+            <DeclarativeForm
+              toolname="unlock_vault"
+              tooldescription="Submit the three-word passphrase Daniel photographed on his desk. Three words, in the correct order. Wrong attempts reveal a fragment archive."
+              paramName="passphrase"
+              paramDescription="Three words separated by single spaces — e.g. 'lantern orpheus echo'. The order matters."
+              placeholder="lantern orpheus echo"
+              submitLabel="UNLOCK"
+              className="flex-1"
+              onExecute={async (passphrase) => {
+                const words = passphrase.split(/\s+/).filter(Boolean);
+                const r = S.attemptVault(words);
+                if (r.result === "success") {
+                  sfx.chime();
+                  useOS.getState().pushToast({
+                    app: "FILES",
+                    title: "VESTIBULE DECRYPTED",
+                    body: "/Private is now accessible.",
+                  });
+                  S.openApplication("files");
+                  setTimeout(() => S.filesNavigateBus.emit("/Private"), 80);
+                  return "Vault unlocked. /Private is now accessible.";
+                }
+                sfx.error();
+                useOS.getState().pushToast({ app: "FILES", title: "VAULT", body: r.message });
+                return r.message;
+              }}
+            />
+          </div>
+        )}
 
         {/* column header */}
         <div className="grid grid-cols-[minmax(0,2.4fr)_70px_120px_60px_86px] shrink-0 px-2 h-[26px] items-center mono-xs text-faint border-b border-line bg-surface2">

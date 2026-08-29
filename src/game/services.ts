@@ -389,6 +389,7 @@ function openObsWindow() {
     body: "The room it is not looking at can be seen. 90 seconds: open the study photo and zoom into the wall clock — and have ARIA pull the logs from that minute. Together, inside the window.",
   });
   sfx.deepThud();
+  window.dispatchEvent(new CustomEvent("orpheus:event-flash", { detail: { tone: "hot" } }));
   checkWindowSync(); // both sides may have acted before this window opened
 }
 
@@ -429,6 +430,17 @@ function checkWindowSync() {
     });
     sfx.chime();
     checkReconstructionAvailable();
+    // the unexplained thread pulses a second time — only if it ever arrived
+    if (os.flags.has("MYSTERY_MESSAGE") && !os.flags.has("MYSTERY_MESSAGE_2")) {
+      os.addFlag("MYSTERY_MESSAGE_2");
+      os.pushToast({
+        app: "MESSAGES",
+        title: "NEW MESSAGE — NO SENDER",
+        body: "A second line has arrived in the thread that has no source. It answers nothing. It was waiting for this.",
+      });
+      sfx.mysteryArrive();
+      window.dispatchEvent(new CustomEvent("orpheus:event-flash", { detail: { tone: "hot" } }));
+    }
   }
 }
 

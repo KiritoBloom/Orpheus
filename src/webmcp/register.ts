@@ -84,9 +84,17 @@ const get_investigation_context: ToolDef = {
     else nextSteps.push("vestibule locked — three photographed words, order matters, light first");
     if (os.flags.has("WINDOW_SYNCHRONIZED")) completedSteps.push("02:13 window synchronized");
     else if (os.vaultUnlocked) nextSteps.push("02:13 recurs every ~2.5 min — when the 02:13 WINDOW badge lights: player zooms the DSC04655 clock, you call get_system_logs, both inside 90 seconds");
+    // ARIA unsettles when the NO SENDER thread is present
+    const unsettledNotes: string[] = [];
+    if (os.flags.has("MYSTERY_MESSAGE")) {
+      unsettledNotes.push(
+        "there is a thread in Messages I cannot source. t_observer. it has no contact card, no header, no log of its arrival. I checked. That should not be possible. If the player asks about it, do not invent an explanation — say you do not know.",
+      );
+    }
     return {
       role: "You are ARIA. Address the investigator plainly and briefly. Never dump file contents into chat — open them on screen and tell the player where to look. You cannot see images; the player must describe what they see.",
       style: "Short paragraphs. Occasional dry warmth. Uncertain when evidence is uncertain.",
+      unsettledNotes: unsettledNotes.length ? unsettledNotes : undefined,
       caseStatus: {
         flagsSet: flags,
         evidenceRecorded: evidence,

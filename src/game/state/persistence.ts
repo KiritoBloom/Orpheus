@@ -21,6 +21,8 @@ export interface SaveData {
   caseVerdicts: Record<string, string>;
   caseCompleteAt: number | null;
   hasProgress: boolean;
+  readMailIds: string[];
+  readThreadIds: string[];
 }
 
 export const EMPTY_SAVE: SaveData = {
@@ -34,6 +36,8 @@ export const EMPTY_SAVE: SaveData = {
   caseVerdicts: {},
   caseCompleteAt: null,
   hasProgress: false,
+  readMailIds: [],
+  readThreadIds: [],
 };
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;

@@ -105,8 +105,8 @@ export const useOS = create<OSState>((set, get) => ({
   clockStart: Date.now(),
   overlayPanel: null,
   endingStep: 0,
-  readMailIds: new Set<string>(),
-  readThreadIds: new Set<string>(),
+  readMailIds: new Set<string>(getSave().readMailIds ?? []),
+  readThreadIds: new Set<string>(getSave().readThreadIds ?? []),
 
   hydrate: ({ hasProgress }) =>
     set({ hydrated: true, hasSaveProgress: hasProgress }),
@@ -211,27 +211,35 @@ export const useOS = create<OSState>((set, get) => ({
 
   setEndingStep: (n) => set({ endingStep: n }),
 
-  markMailRead: (id) =>
-    set((s) => {
-      if (s.readMailIds.has(id)) return s;
-      const next = new Set(s.readMailIds);
-      next.add(id);
-      return { readMailIds: next };
-    }),
+  markMailRead: (id) => {
+    const cur = get().readMailIds;
+    if (cur.has(id)) return;
+    const next = new Set(cur);
+    next.add(id);
+    updateSave({ readMailIds: [...next] });
+    set({ readMailIds: next });
+  },
 
-  markThreadRead: (id) =>
-    set((s) => {
-      if (s.readThreadIds.has(id)) return s;
-      const next = new Set(s.readThreadIds);
-      next.add(id);
-      return { readThreadIds: next };
-    }),
+  markThreadRead: (id) => {
+    const cur = get().readThreadIds;
+    if (cur.has(id)) return;
+    const next = new Set(cur);
+    next.add(id);
+    updateSave({ readThreadIds: [...next] });
+    set({ readThreadIds: next });
+  },
 
-  markAllMailRead: () =>
-    set(() => ({ readMailIds: new Set(EMAILS.map((e) => e.id)) })),
+  markAllMailRead: () => {
+    const next = new Set(EMAILS.map((e) => e.id));
+    updateSave({ readMailIds: [...next] });
+    set({ readMailIds: next });
+  },
 
-  markAllThreadsRead: () =>
-    set(() => ({ readThreadIds: new Set(THREADS.map((t) => t.id)) })),
+  markAllThreadsRead: () => {
+    const next = new Set(THREADS.map((t) => t.id));
+    updateSave({ readThreadIds: [...next] });
+    set({ readThreadIds: next });
+  },
 }));
 
 /* convenience selectors used across the app */

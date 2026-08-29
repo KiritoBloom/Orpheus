@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:webmcp": "node --experimental-strip-types --no-warnings scripts/run-webmcp-tests.mjs"
   },
   "dependencies": {
     "idb-keyval": "^6.3.0",

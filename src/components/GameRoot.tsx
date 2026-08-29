@@ -13,6 +13,7 @@ import MissionBriefing from "@/components/boot/MissionBriefing";
 import Desktop from "@/components/desktop/Desktop";
 import Toasts from "@/components/notifications/Toasts";
 import EndingSequence from "@/components/EndingSequence";
+import EventFlash from "@/components/EventFlash";
 
 /* ============================================================
    GAME ROOT — the machine lifecycle.
@@ -45,6 +46,8 @@ export default function GameRoot() {
         settings: save.settings,
         vaultUnlocked: save.unlockedVault,
         vaultAttempts: save.vaultAttempts,
+        readMailIds: new Set(save.readMailIds ?? []),
+        readThreadIds: new Set(save.readThreadIds ?? []),
       });
       // ariaStore now only holds status; no chat persistence needed
       useAria.setState({ status: "idle", statusDetail: "" });
@@ -142,6 +145,7 @@ export default function GameRoot() {
         body: "Received while you were reading the desk. It answers nothing.",
       });
       sfx.mysteryArrive();
+      window.dispatchEvent(new CustomEvent("orpheus:event-flash", { detail: { tone: "cold" } }));
     }, 110_000 + Math.random() * 30_000);
     return () => clearTimeout(id);
   }, [phase]);
@@ -194,6 +198,14 @@ export default function GameRoot() {
             body: "I can search everything. You can see what I cannot. Tell me what you see → watch me move.",
           });
         }, 1400);
+        // Judge verification hint — surfaces once, points to the no-host 30s path
+        setTimeout(() => {
+          useOS.getState().pushToast({
+            app: "ARIA",
+            title: "JUDGE? 30-SEC PATH",
+            body: "Tray → LINK → ⚡ QUICK VERIFY — 9 evals + 3 tool calls, no host needed.",
+          });
+        }, 3000);
       }
       // No else branch: returning investigators choose when to open Files themselves.
     }, 900);
@@ -370,6 +382,9 @@ export default function GameRoot() {
 
       {/* always-on toasts — hidden behind title's own vignette but fine */}
       {phase === "desktop" && <Toasts />}
+
+      {/* cinematic event moments — dim + amber rim on mystery messages & 02:13 */}
+      <EventFlash />
 
       {/* ---------- declarative WebMCP tool — https://developer.chrome.com/docs/ai/webmcp/declarative-api ---------- */}
       {/* Both imperative + declarative per best practices. Uses toolname/tooldescription/toolparamdescription + agentInvoked/respondWith. Offscreen but focusable so :tool-form-active outline shows when agent invokes. */}

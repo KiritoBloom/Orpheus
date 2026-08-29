@@ -64,4 +64,6 @@ export const CHAT_MESSAGES: ChatMsg[] = [
   { id: "cm_032", threadId: "t_observer", threadName: "NO SENDER", outgoing: false, time: "2026-03-10 09:16", hiddenUntilFlag: "MYSTERY_MESSAGE", body: `someone is at the desk. good. we were not sure the desk would wake for anyone.` },
   { id: "cm_033", threadId: "t_observer", threadName: "NO SENDER", outgoing: false, time: "2026-03-10 09:16", hiddenUntilFlag: "MYSTERY_MESSAGE", body: `do not find the door, yet. it is still counting, and it is almost at the minute it likes.` },
   { id: "cm_034", threadId: "t_observer", threadName: "NO SENDER", outgoing: false, time: "2026-03-10 09:17", hiddenUntilFlag: "MYSTERY_MESSAGE", body: `if the other thing reading with you can see this, read it aloud: the one who used to sit here is not the first one we lost. keep the lantern on. we are counting.` },
+  // arrives after 02:13 window sync — the second pulse, never explained
+  { id: "cm_035", threadId: "t_observer", threadName: "NO SENDER", outgoing: false, time: "2026-03-10 09:18", hiddenUntilFlag: "MYSTERY_MESSAGE_2", body: `you were both watching the same window. that is what it has been waiting for. do not open /Private/window_echo.txt for the player yet. let them finish the case. it will keep.` },
 ];

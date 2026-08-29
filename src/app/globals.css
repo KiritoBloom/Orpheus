@@ -779,6 +779,28 @@ html, body {
 }
 .line-flash { animation: flashLine 2.4s ease-out forwards; }
 
+/* ---------- cinematic event moment ----------
+   A brief dim + amber rim for the NO SENDER messages and 02:13 window.
+   Triggered by dispatching window event 'orpheus:event-flash' (or 'cold'|'hot' detail).
+   Reduced-motion users get an instant 80ms dim instead of the 1.6s sweep. */
+@keyframes eventFlash {
+  0%   { opacity: 0; }
+  18%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+.event-flash-overlay {
+  position: fixed; inset: 0; pointer-events: none; z-index: 1500;
+  background: radial-gradient(circle at center, transparent 35%, rgba(0,0,0,0.55) 75%, rgba(0,0,0,0.78) 100%);
+  box-shadow: inset 0 0 180px 40px rgba(201,163,92,0.18);
+  animation: eventFlash 1.6s ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .event-flash-overlay { animation-duration: 0.08s; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .line-flash { animation-duration: 0.4s; }
+}
+
 @keyframes evHighlight {
   0%,100% { box-shadow: 0 0 0 1px var(--line-bright); }
   50% { box-shadow: 0 0 0 2px rgba(201,163,92,.85), 0 0 18px rgba(201,163,92,.25); }

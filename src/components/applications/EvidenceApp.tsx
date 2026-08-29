@@ -6,6 +6,7 @@ import { useInvestigation } from "@/game/state/investigationStore";
 import { useOS } from "@/game/state/osStore";
 import { EVIDENCE } from "@/game/data/evidence";
 import { sfx } from "@/audio/engine";
+import DeclarativeForm from "@/components/DeclarativeForm";
 
 /* ============================================================
    EVIDENCE BOARD — investigation workspace.
@@ -41,6 +42,41 @@ export default function EvidenceApp() {
         </div>
         <span className="text-[9px] tracking-[0.12em] text-faint">{progress}%</span>
         <span className="hidden sm:inline text-[9px] tracking-[0.12em] text-faint">· {collaborated ? "WebMCP + eyes" : "ask ARIA to correlate"}</span>
+      </div>
+      {/* Declarative tool: the agent can request a correlation search natively */}
+      <div className="shrink-0 px-3 py-1.5 border-b border-line bg-surface">
+        <DeclarativeForm
+          toolname="request_correlation"
+          tooldescription="Ask ARIA to search the machine for a term the player noticed. Returns file + message hits."
+          paramName="query"
+          paramDescription="A term the player saw — a name, place, object, or number to search across files and messages."
+          placeholder="e.g. badge, kestrel, 02:13…"
+          submitLabel="CORRELATE"
+          onExecute={async (query) => {
+            const S = await import("@/game/services");
+            // file search (inline — mirrors the WebMCP search_files tool)
+            const os = useOS.getState();
+            const q = query.toLowerCase();
+            const fileHits = S.fsList().filter((n) => {
+              if (n.hiddenUntilFlag && !os.flags.has(n.hiddenUntilFlag)) return false;
+              if (n.requiresUnlock && !os.vaultUnlocked) return false;
+              return (
+                n.name.toLowerCase().includes(q) ||
+                (n.content?.toLowerCase().includes(q) ?? false)
+              );
+            });
+            const msgs = S.searchMessages(query);
+            const f = fileHits.length;
+            const m = msgs.length;
+            useOS.getState().pushToast({
+              app: "ARIA",
+              title: `CORRELATE "${query}"`,
+              body: `${f} file hit(s) · ${m} message hit(s). Open Files or Messages to inspect.`,
+            });
+            sfx.chime();
+            return `Searched "${query}": ${f} file hit(s), ${m} message hit(s).`;
+          }}
+        />
       </div>
       {!collaborated && (
         <div className="shrink-0 px-3 py-1.5 bg-amber/10 border-b border-amber/20 text-[10px] tracking-[0.12em] text-amber flex items-center gap-2">

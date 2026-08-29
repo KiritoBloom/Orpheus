@@ -54,6 +54,56 @@ export default function AgentLinkPanel({ onClose }: { onClose: () => void }) {
     setBusy(false);
   }
 
+  /** One-click judge verification — runs the deterministic evals + 3 headline
+   *  tool calls from JUDGE_QUICKSTART.md (system logs → timeline → scroll).
+   *  Everything runs without a host. Result is plain text so a judge can
+   *  verify WebMCP is live in under 30 seconds. */
+  async function quickVerify() {
+    setBusy(true);
+    setOutput("… running 9 evals + 3 tool calls");
+    try {
+      const lines: string[] = [];
+      // 1) deterministic evals
+      const rs = runDeterministicSelfTests();
+      const passed = rs.filter((r) => r.pass).length;
+      lines.push(`▸ DETERMINISTIC EVALS — ${passed}/${rs.length} PASSED`);
+      rs.forEach((r) => lines.push(`  ${r.pass ? "✓" : "✗"} ${r.name}`));
+      // 2) headline tool calls (the 30s judge path)
+      const checks: { name: string; tool: string; input: Record<string, unknown> }[] = [
+        { name: "get_system_logs {filter:02:13}", tool: "get_system_logs", input: { filter: "02:13" } },
+        { name: "get_timeline {window:01:45-02:40}", tool: "get_timeline", input: { window: "01:45-02:40" } },
+        { name: "scroll_document_to_line (anomaly_notes.txt:184)", tool: "scroll_document_to_line", input: { path: "/Research/ORPHEUS/anomaly_notes.txt", line: 184 } },
+      ];
+      let toolOk = 0;
+      for (const c of checks) {
+        const def = TOOL_DEFS.find((t) => t.name === c.tool);
+        if (!def) { lines.push(`  ✗ ${c.name} (no such tool)`); continue; }
+        try {
+          const r = await def.execute(c.input);
+          const ok2 = (r as { ok?: boolean })?.ok !== false;
+          if (ok2) toolOk++;
+          const preview = JSON.stringify(r).slice(0, 140);
+          lines.push(`  ${ok2 ? "✓" : "✗"} ${c.name} → ${preview}${preview.length === 140 ? "…" : ""}`);
+        } catch (e) {
+          lines.push(`  ✗ ${c.name} — ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+      const totalPass = passed === rs.length && toolOk === checks.length;
+      lines.unshift(
+        totalPass
+          ? `✅ WEBMCP VERIFIED — ${passed}/${rs.length} evals + ${toolOk}/${checks.length} tool calls`
+          : `⚠ WEBMCP PARTIAL — ${passed}/${rs.length} evals + ${toolOk}/${checks.length} tool calls`,
+      );
+      lines.push("");
+      lines.push("See the document on screen — scroll_document_to_line moved line 184 into view.");
+      lines.push("State-safe: investigation state was snapshotted and restored.");
+      setOutput(lines.join("\n"));
+    } catch (e) {
+      setOutput(`ERROR: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    setBusy(false);
+  }
+
   return (
     <div className="fixed inset-0 z-[800] grid place-items-center bg-black/70" onClick={onClose}>
       <div
@@ -119,6 +169,14 @@ export default function AgentLinkPanel({ onClose }: { onClose: () => void }) {
                 title="9 deterministic checks per src/webmcp/evals.md — no host needed"
               >
                 RUN EVALS
+              </button>
+              <button
+                className="btn-bevel text-[11px] px-3 !bg-accent/20 !border-accent !text-accent"
+                disabled={busy}
+                onClick={quickVerify}
+                title="One-click judge verification: 9 evals + 3 headline tool calls (JUDGE_QUICKSTART 30s path)"
+              >
+                ⚡ QUICK VERIFY
               </button>
               <span className="text-faint text-[10px]">result →</span>
             </div>

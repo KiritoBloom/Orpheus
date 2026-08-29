@@ -7,6 +7,7 @@ import { PHOTOS, getPhoto } from "@/game/data/photos";
 import { getCurrentPhotoId, noteHumanAction, noteWindowHuman, openPhoto, photoFocusBus } from "@/game/services";
 import { useOS } from "@/game/state/osStore";
 import { sfx } from "@/audio/engine";
+import DeclarativeForm from "@/components/DeclarativeForm";
 
 /* ============================================================
    PHOTO ALBUM — grid + viewer window with manual zoom/pan.
@@ -116,6 +117,51 @@ export function PhotosApp() {
             ? `${SEALED_COUNT} SEALED → /PRIVATE/PHOTO_BACKUP (FILES)`
             : `${SEALED_COUNT} ITEMS SEALED — VESTIBULE REQUIRED`}
         </span>
+      </div>
+      {/* Declarative tool: the agent can surface metadata + a directional hint natively */}
+      <div className="shrink-0 px-3 py-1.5 border-b border-line bg-surface flex items-center gap-2">
+        <span className="mono-xs text-faint shrink-0">SCRUTINIZE —</span>
+        <DeclarativeForm
+          toolname="inspect_photo"
+          tooldescription="Ask ARIA to surface machine-readable metadata for a single photo (EXIF, timestamp, file note) and a hint about where in the image to look. The agent CANNOT see pixels — the player must inspect."
+          paramName="photoId"
+          paramDescription="Photo id (e.g. DSC04821) or partial filename. One photo at a time."
+          placeholder="DSC04821 / IMG_0022 / badge_scan …"
+          submitLabel="SCRUTINIZE"
+          className="flex-1"
+          onExecute={async (raw) => {
+            const q = raw.trim().toLowerCase().replace(/\.(png|jpg|jpeg)$/, "");
+            const photo =
+              PHOTOS.find((p) => p.id.toLowerCase() === q) ??
+              PHOTOS.find((p) => p.filename.toLowerCase().includes(q));
+            if (!photo) {
+              useOS.getState().pushToast({ app: "PHOTOS", title: "SCRUTINIZE", body: `no photo matches "${raw}"` });
+              sfx.error();
+              return `no photo matches "${raw}"`;
+            }
+            const meta = getPhoto(photo.id);
+            if (photo.inPrivateBackup && !useOS.getState().vaultUnlocked) {
+              useOS.getState().pushToast({ app: "PHOTOS", title: "SCRUTINIZE", body: `${photo.filename} is sealed in /Private/photo_backup` });
+              sfx.error();
+              return `${photo.filename} is sealed — unlock the vestibule first.`;
+            }
+            const hint =
+              photo.id === "DSC04821"
+                ? "Hint: window glass, lower half — a figure holds a phone with a reversed badge glint."
+                : photo.id === "DSC04655"
+                ? "Hint: a stopped wall clock. Note the minute hand."
+                : photo.id === "IMG_0022"
+                ? "Hint: a reminder card photographed through glass."
+                : photo.id === "IMG_0044"
+                ? "Hint: a door camera timestamp — bottom-right corner."
+                : photo.id === "IMG_0103"
+                ? "Hint: a health-band trace — the line ends mid-beat."
+                : `Caption: ${meta?.caption ?? "no caption"}.`;
+            useOS.getState().addFlag("DISCOVERED_METADATA");
+            sfx.chime();
+            return `${photo.filename} — ${meta?.exif.dateOriginal ?? "unknown date"} · ${meta?.exif.camera ?? "?"} · ${meta?.exif.gpsLabel ?? "?"}. ${hint}`;
+          }}
+        />
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto p-2 grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2 content-start">
         {visible.map((p) => (
