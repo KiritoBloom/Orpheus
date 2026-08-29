@@ -267,22 +267,31 @@ export default function GameRoot() {
     return () => window.removeEventListener("keydown", h);
   }, []);
 
-  /* ---------- declarative tool lifecycle ---------- */
+  /* ---------- declarative tool lifecycle — agent fills a form ---------- */
+  // Chrome's Declarative API fires `toolactivated` on the form element when
+  // the host agent starts filling it, and `toolcancel` if the user aborts.
+  // We forward those to toasts so the player sees the desk respond.
   useEffect(() => {
     const onActivated = (e: Event) => {
-      const name = (e as unknown as { toolName?: string }).toolName ?? "record_evidence";
-      // Visible feedback when agent fills the declarative form (Chrome guide: :tool-form-active)
-      useOS.getState().pushToast({ app: "WEBMCP", title: "TOOL ACTIVATED", body: `${name} — agent is filling the form` });
+      const ce = e as CustomEvent<{ toolName?: string }>;
+      const name = ce.detail?.toolName ?? "record_evidence";
+      useOS.getState().pushToast({
+        app: "WEBMCP",
+        title: "TOOL ACTIVATED",
+        body: `${name} — agent is filling the form`,
+      });
     };
     const onCancel = (e: Event) => {
-      const name = (e as unknown as { toolName?: string }).toolName ?? "record_evidence";
+      const ce = e as CustomEvent<{ toolName?: string }>;
+      const name = ce.detail?.toolName ?? "record_evidence";
       useOS.getState().pushToast({ app: "WEBMCP", title: "TOOL CANCELLED", body: name });
     };
-    window.addEventListener("toolactivated" as never, onActivated as never);
-    window.addEventListener("toolcancel" as never, onCancel as never);
+    // capture phase catches events dispatched on form elements before they bubble
+    window.addEventListener("toolactivated" as never, onActivated as never, true);
+    window.addEventListener("toolcancel" as never, onCancel as never, true);
     return () => {
-      window.removeEventListener("toolactivated" as never, onActivated as never);
-      window.removeEventListener("toolcancel" as never, onCancel as never);
+      window.removeEventListener("toolactivated" as never, onActivated as never, true);
+      window.removeEventListener("toolcancel" as never, onCancel as never, true);
     };
   }, []);
 

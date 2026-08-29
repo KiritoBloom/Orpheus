@@ -17,7 +17,7 @@ Orpheus is verifiable without any AI host. The `LINK` console *is* the agent int
 4. Pick `get_timeline` — prefilled window `01:45-02:40` → **EXECUTE** → see merged `01:45–02:40` chronology (logs + photos + messages) that would take a human 5 apps
 5. Pick `open_file` — prefilled with `/Research/ORPHEUS/anomaly_notes.txt` → **EXECUTE** → watch document open on YOUR screen
 6. Pick `scroll_document_to_line` — prefilled `{"path":"...anomaly_notes.txt","line":184}` → **EXECUTE** → watch line 184 scroll into view with `line-flash` + `nav-sweep` — the visible actuation proof
-7. Or press **RUN EVALS** — 9 deterministic checks (budgets, security, search, briefing) pass/fail in one click, per `src/webmcp/evals.md` — state-safe: investigation state is snapshotted and restored, no checkpoints advanced
+7. Or press **RUN EVALS** — 9 deterministic checks (budgets, security, search, briefing) pass/fail in one click, per `src/webmcp/evals.md` — state-safe: investigation state is snapshotted and restored, no checkpoints advanced. For an even faster pass, press **⚡ QUICK VERIFY** (the accent button) which runs the same 9 evals + 3 headline tool calls in one click and prints `✅ WEBMCP VERIFIED`. The CI companion `pnpm test:webmcp` runs 7/7 static budget + schema + security + declarative-API checks against `register.ts` without a browser.
 
 You just verified: read-only search at scale + visible navigation that moves the human's screen + budgets + security — all without a host.
 
@@ -39,7 +39,8 @@ This is the new era loop: `human sees → describes → agent searches & opens �
 - `src/webmcp/register.ts` — 26 `TOOL_DEFS`, single registry, budgets `MAX_QUERY_LEN=200` / `MAX_OUTPUT_CHARS=1500`, `readOnlyHint` + `untrustedContentHint` per secure-tools guide, `AbortSignal`, `toolchange` lifecycle
 - `src/game/services.ts` —single source-of-truth capability layer both UI and tools call (remove WebMCP and agent loses every capability)
 - `src/components/GameRoot.tsx` — hydration + `registerWebMCPTools()` poll 800ms + 1.2s re-attach for Atlas + declarative `<form toolname="record_evidence">` (Declarative API)
-- `src/webmcp/evals.md` — 7 evals per https://developer.chrome.com/docs/ai/webmcp/evals
+- `src/webmcp/evals.md` — 9 evals per https://developer.chrome.com/docs/ai/webmcp/evals (the in-browser RUN EVALS / ⚡ QUICK VERIFY panel)
+- `src/components/DeclarativeForm.tsx` + `EvidenceApp.tsx` / `FilesApp.tsx` / `PhotosApp.tsx` — 3 visible declarative forms (request_correlation, unlock_vault, inspect_photo) + 1 hidden record_evidence fallback, per the Declarative API spec
 
 ## 3) Why this is the new era (not just a game)
 

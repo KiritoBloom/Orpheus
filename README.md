@@ -115,7 +115,7 @@ No backend, no database, no authentication. Persistence is IndexedDB (`orpheus-s
 
 1. Enable the host: in Chrome Canary, `chrome://flags/#enable-webmcp-testing → Enabled`; or use ChatGPT's Atlas browser / any W3C WebMCP origin trial build. Open https://orpheus-mcduff.vercel.app/ in ChatGPT's in-app browser for the native experience (verified on Vercel + HSTS).
 
-**Fastest verification (30 sec, no agent):** tray **LINK** (or `Ctrl+``) → pick `get_system_logs` → `{"filter":"02:13"}` → **EXECUTE** → watch the 02:13 login block appear. Then `get_timeline` → `scroll_document_to_line` with line 184 → watch the document scroll and flash on screen. Or press **RUN EVALS** for the 9-check deterministic pass.
+**Fastest verification (30 sec, no agent):** tray **LINK** (or `Ctrl+``) → pick `get_system_logs` → `{"filter":"02:13"}` → **EXECUTE** → watch the 02:13 login block appear. Then `get_timeline` → `scroll_document_to_line` with line 184 → watch the document scroll and flash on screen. Or press **⚡ QUICK VERIFY** for the one-click 9 evals + 3 headline tool calls (`✅ WEBMCP VERIFIED`).
 
 2. On the desktop, click the tray **LINK** button (also Ctrl+\`) to open the **Agent Link** panel — a judge/dev console listing all 26 registered tools with live execute. Filter by ◇ readOnly / ◆ nav / ⚑ untrusted. Pick any tool — headline tools arrive with example inputs prefilled — press EXECUTE, and watch the computer respond.
 
@@ -127,7 +127,7 @@ No backend, no database, no authentication. Persistence is IndexedDB (`orpheus-s
 
 3. For a full loop: open **Photos** → double-click `DSC04821.JPG` → tell the agent (ChatGPT) "something is reflected in the window" → watch it pull metadata, search messages, open the notebook, and scroll to line ≈184 (`"02:13 is not a time..."`) for you to read.
 
-The registration code lives in `src/webmcp/register.ts` and feature-detects `document.modelContext ?? navigator.modelContext` defensively. Rejection on duplicate name or bad schema is handled; `toolchange` events are observed with 800 ms poll + 1.2 s re-attach for late Atlas injection. Budgets enforced: 500 char desc / 150 param / 30 name / 1.5k output. `terminal_command` allowlists `ls|cd|cat|open|search|unlock|help|clear|history` and caps at 200 chars per secure-tools guide. Declarative fallback form for `record_evidence` lives hidden in `GameRoot.tsx`.
+The registration code lives in `src/webmcp/register.ts` and feature-detects `document.modelContext ?? navigator.modelContext` defensively. Rejection on duplicate name or bad schema is handled; `toolchange` events are observed with 800 ms poll + 1.2 s re-attach for late Atlas injection. Budgets enforced: 500 char desc / 150 param / 30 name / 1.5k output. `terminal_command` allowlists `ls|cd|cat|open|search|unlock|help|clear|history` and caps at 200 chars per secure-tools guide. **Both APIs** per best practice: 26 imperative tools + 4 declarative forms — `request_correlation` in Evidence, `unlock_vault` in Files, `inspect_photo` in Photos (visible), and the `record_evidence` fallback (hidden in `GameRoot.tsx`). Reusable component at `src/components/DeclarativeForm.tsx`.
 
 ---
 
@@ -156,7 +156,7 @@ src/
     services.ts                 # single source-of-truth capability layer
   webmcp/
     register.ts                 # 26 tools, registration, host detection
-    evals.md                    # 7 evals per Chrome guide
+    evals.md                    # 7 model evals per Chrome guide + 9 deterministic in-browser checks (RUN EVALS / ⚡ QUICK VERIFY)
   components/
     title/IrisTitle             # diegetic circular opening (not an eyeball; see below)
     boot/                       # POST + mission briefing

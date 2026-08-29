@@ -134,16 +134,7 @@ export function runStaticChecks(tools: ToolLike[]): StaticCheck[] {
     `name:${MAX_NAME} desc:${MAX_DESC} param:${MAX_PARAM_DESC} input:${MAX_QUERY_INPUT} output:${MAX_OUTPUT_CHARS}`,
   );
 
-  // 6 — Declarative API forms present (in addition to imperative registerTool)
-  // We can't see forms from this module — but we can require the form helper to exist.
-  // (Form coverage is checked via grep in the repo by the agent; this asserts the surface area.)
-  add(
-    "declarative API: form helper imported in components (best-practice both APIs)",
-    true,
-    "see src/components/DeclarativeForm.tsx + 3 wired apps (Evidence, Files, Photos)",
-  );
-
-  // 7 — every tool is a real function with a unique name
+  // 6 — every tool is a real function with a unique name
   const names = new Set<string>();
   let dup = "";
   for (const t of tools) {
@@ -160,19 +151,9 @@ export function runStaticChecks(tools: ToolLike[]): StaticCheck[] {
   return out;
 }
 
-/** CLI entry — `node --import tsx src/webmcp/static-checks.ts` after wiring.
- *  For the simplest "judge can read it" path, the in-browser QUICK VERIFY
- *  remains the primary verification surface. */
-// The actual node-side runner lives in scripts/run-webmcp-tests.mjs because
-// static-checks.ts is bundled into the browser app and `require` is forbidden
-// under @typescript-eslint/no-require-imports. The CLI entry below is therefore
-// only meaningful in a node-with-require environment; otherwise import the
-// runStaticChecks function directly.
-
-export const STATIC_BUDGETS = {
-  MAX_NAME,
-  MAX_DESC,
-  MAX_PARAM_DESC,
-  MAX_QUERY_INPUT,
-  MAX_OUTPUT_CHARS,
-} as const;
+/* The actual node-side runner lives in scripts/run-webmcp-tests.mjs because
+   static-checks.ts is bundled into the browser app and cannot read the
+   filesystem at runtime. The mjs script parses register.ts and runs an
+   expanded set of checks including the declarative-form surface area
+   (3 apps wired + 1 hidden fallback). Import `runStaticChecks` here to
+   run the in-process subset against any ToolLike[] in the browser. */
