@@ -12,11 +12,11 @@
 Orpheus is verifiable without any AI host. The `LINK` console *is* the agent interface, exposed to you.
 
 1. Open live URL → wait for iris → **NEW INVESTIGATION** → skip boot (click) → desktop
-2. Tray → **LINK** (or `Ctrl+``) — judge console for all 26 tools; headline tools come with ready-made example inputs prefilled
+2. Tray → **LINK** (or `Ctrl+``) — judge console for all 25 tools; headline tools come with ready-made example inputs prefilled
 3. Pick `get_system_logs` — input prefilled `{"filter":"02:13"}` → **EXECUTE** → see `log_035 LOGIN user S.OKAFOR ... gait mismatch` returned (1.5k cap, `untrustedContentHint`)
 4. Pick `get_timeline` — prefilled window `01:45-02:40` → **EXECUTE** → see merged `01:45–02:40` chronology (logs + photos + messages) that would take a human 5 apps
 5. Pick `open_file` — prefilled with `/Research/ORPHEUS/anomaly_notes.txt` → **EXECUTE** → watch document open on YOUR screen
-6. Pick `scroll_document_to_line` — prefilled `{"path":"...anomaly_notes.txt","line":145}` → **EXECUTE** → watch line 145 scroll into view with `line-flash` + `nav-sweep` — the visible actuation proof (line 145 is the "02:13 is not a time" passage)
+6. Pick `show_in_document` — prefilled `{"path":"/Research/ORPHEUS/anomaly_notes.txt","query":"02:13 is not a time"}` → **EXECUTE** → the document opens, scrolls to line 145, briefly flashes, then **pins a persistent highlight** on the passage. Click anywhere in the document, scroll, or press the `◆ DISMISS` button in the toolbar to clear it.
 7. Or press **RUN EVALS** — 9 deterministic checks (budgets, security, search, briefing) pass/fail in one click, per `src/webmcp/evals.md` — state-safe: investigation state is snapshotted and restored, no checkpoints advanced. For an even faster pass, press **⚡ QUICK VERIFY** (the accent button) which runs the same 9 evals + 3 headline tool calls in one click and prints `✅ WEBMCP VERIFIED`. The CI companion `pnpm test:webmcp` runs 7/7 static budget + schema + security + declarative-API checks against `register.ts` without a browser.
 
 You just verified: read-only search at scale + visible navigation that moves the human's screen + budgets + security — all without a host.
@@ -28,7 +28,7 @@ You just verified: read-only search at scale + visible navigation that moves the
 3. Then say: *“Something is reflected in the window of DSC04821. What is it?”* → agent must call `get_image_metadata` + `open_image`. What the agent *says* is ChatGPT's own — it cannot be scripted and is not a pass condition. What matters: it does NOT claim to see pixels and does not dump the photo into chat. The zoom guidance comes from the game itself (viewer shows "SCROLL TO ZOOM · inspect closely; ARIA cannot see this").
 4. Reply: *“A figure holding a phone, badge turned backwards.”* → agent must call `search_messages({"query":"badge"})` (hits `t_sarah` 16:11) + `search_browser_history({"query":"kestrel"})`
 5. Say: *“What happened at 02:13?”* → agent must call `get_system_logs({"filter":"02:13"})` → count = 6, includes `log_035` gait-mismatch reveal
-6. Say: *“Show me where Daniel says 02:13 is not a time.”* → agent must call `find_text_in_document` → `open_file` → `scroll_document_to_line({"line":145})` → document scrolls *on your screen*, not dumped in chat
+6. Say: *“Show me where Daniel says 02:13 is not a time.”* → agent must call `show_in_document({"path":"/Research/ORPHEUS/anomaly_notes.txt","query":"02:13 is not a time"})` → document opens, scrolls to line 145, pins a persistent highlight, chat does **not** contain the passage (you read it on screen)
 
 **Bonus set piece — the 02:13 Window (the Keep-Talking moment):** after the vault, the machine opens a 90-second observability window every ~2.5 min (amber pulse + `02:13 WINDOW` taskbar badge). Inside it, zoom `DSC04655` past 2.5× **while** the agent calls `get_system_logs` — synchronized, `/Private/window_echo.txt` appears. Neither side counts alone; the clock is real.
 
@@ -55,9 +55,9 @@ Self-hosted, no backend, no env keys, `idb-keyval` persistence, headers `Origin-
 
 ## 4) Expected results checklist
 
-- [ ] `LINK` lists 26 tools with ◇ readOnly / ◆ nav / ⚑ untrusted, `title`/`description`/`inputSchema` visible, budgets enforced
+- [ ] `LINK` lists 25 tools with ◇ readOnly / ◆ nav / ⚑ untrusted, `title`/`description`/`inputSchema` visible, budgets enforced
 - [ ] `get_system_logs filter 02:13` returns `log_035` with `gait mismatch` note
-- [ ] `scroll_document_to_line` visibly moves document, does NOT dump paragraph in chat
+- [ ] `show_in_document` visibly opens + scrolls + pins a persistent highlight, does NOT dump paragraph in chat, and the pin clears on first click/scroll/type/close
 - [ ] Evidence Board `CASE RECONSTRUCTION` lights only after collaboration (≥4 milestones + `COLLABORATED_WITH_ARIA`)
 - [ ] `terminal_command "rm -rf /"` returns `{ok:false, error:"unsupported command"}` (allowlist check)
 - [ ] Live URL is `https://orpheus-mcduff.vercel.app/` on Vercel + HSTS, 7117 bytes static shell, headers verified in `next.config.ts`

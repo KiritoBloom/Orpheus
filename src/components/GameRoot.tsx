@@ -203,7 +203,7 @@ export default function GameRoot() {
           useOS.getState().pushToast({
             app: "ARIA",
             title: "JUDGE? 30-SEC PATH",
-            body: "Tray → LINK → ⚡ QUICK VERIFY — 9 evals + 3 tool calls, no host needed.",
+            body: "Tray → LINK → ⚡ QUICK VERIFY — 9 evals + 3 tool calls (incl. show_in_document, which pins a persistent highlight). No host needed.",
           });
         }, 3000);
       }

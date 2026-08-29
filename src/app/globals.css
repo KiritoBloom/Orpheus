@@ -779,6 +779,19 @@ html, body {
 }
 .line-flash { animation: flashLine 2.4s ease-out forwards; }
 
+/* ---------- pinned highlight (persistent — "look here") ----------
+   A steady accent bar that stays until the player clicks, scrolls,
+   types in the find box, or a new show_in_document call replaces it.
+   Pairs with the line number prefix changing to ◆ and the gutter
+   tinting to make the pointer easy to find in long documents. */
+.line-pinned {
+  background: rgba(127,174,139,0.12);
+  border-left: 2px solid var(--accent);
+  box-shadow: inset 0 0 0 0 var(--accent);
+  transition: background 120ms ease-out;
+}
+.line-pinned:hover { background: rgba(127,174,139,0.18); }
+
 /* ---------- cinematic event moment ----------
    A brief dim + amber rim for the NO SENDER messages and 02:13 window.
    Triggered by dispatching window event 'orpheus:event-flash' (or 'cold'|'hot' detail).

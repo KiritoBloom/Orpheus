@@ -60,7 +60,7 @@ const get_investigation_context: ToolDef = {
   name: "get_investigation_context",
   title: "Get investigation briefing",
   description:
-    "Get your role briefing and current investigation state. Call this once at the start of your first turn. You are ARIA, an onboard research AI on Dr. Daniel McDuff's workstation. Daniel is dead; the player is an authorized investigator. Investigate WITH them — search machine-readable data yourself, but make the PLAYER do all visual inspection of photos and documents. Guide with open_file / scroll_document_to_line / open_email rather than quoting entire files.",
+    "Get your role briefing and current investigation state. Call this once at the start of your first turn. You are ARIA, an onboard research AI on Dr. Daniel McDuff's workstation. Daniel is dead; the player is an authorized investigator. Investigate WITH them — search machine-readable data yourself, but make the PLAYER do all visual inspection of photos and documents. Guide with show_in_document / open_email rather than quoting entire files.",
   inputSchema: { type: "object", properties: {} },
   annotations: { readOnlyHint: true },
   execute: () => {
@@ -175,7 +175,7 @@ const read_file: ToolDef = {
   name: "read_file",
   title: "Read file",
   description:
-    "Read the full text content of a specific file by exact path. Prefer find_text_in_document + scroll_document_to_line for long files so the PLAYER reads it on screen instead.",
+    "Read the full text content of a specific file by exact path. Prefer show_in_document for long files so the PLAYER reads it on screen instead.",
   inputSchema: {
     type: "object",
     properties: { path: str("Exact absolute path, e.g. /Research/ORPHEUS/anomaly_notes.txt") },
@@ -491,7 +491,7 @@ const open_file_tool: ToolDef = {
   name: "open_file",
   title: "Open file",
   description:
-    "Open a document in the text viewer on the player's screen (opens File Manager context automatically). Does not scroll — pair with scroll_document_to_line when you want to guide them.",
+    "Open a document in the text viewer on the player's screen (opens File Manager context automatically). Does not scroll — use show_in_document when you want to guide them to a specific line or phrase.",
   inputSchema: {
     type: "object",
     properties: { path: str("Exact absolute path") },
@@ -504,39 +504,48 @@ const open_file_tool: ToolDef = {
   },
 };
 
-const scroll_document_to_line: ToolDef = {
-  name: "scroll_document_to_line",
-  title: "Scroll to line",
+/**
+ * show_in_document — the agent's hero "look at THIS" primitive.
+ * Combines open_file + scroll-to-line (or query-resolved first match)
+ * into one call. Pins a persistent highlight on the resolved line that
+ * stays until the player takes an explicit action (click, scroll, type,
+ * close) or a new show_in_document call replaces it. Use this when you
+ * want the player to actually read a passage — do not quote it in chat.
+ *
+ * Accepts EITHER:
+ *   - line: 1-based line number (precise)
+ *   - query: a phrase to find (resolves to first match — fewer round-trips)
+ *
+ * Replaces the older open_file + scroll_document_to_line + find_text_in_document
+ * chain — same effect in one call.
+ */
+const show_in_document: ToolDef = {
+  name: "show_in_document",
+  title: "Show line in document",
   description:
-    "Scroll the open document so a specific line is in view, briefly highlighting it. Use after find_text_in_document. Do NOT quote the line in chat — let the player read it on screen.",
+    "Open a document (if not open), scroll to a line, and pin a persistent highlight on it that stays until the player clicks, scrolls, types, or closes. Provide either a 1-based `line` or a `query` (first match is shown). This is the agent's preferred 'look at THIS' primitive — replaces the older chain of open_file + scroll_document_to_line + find_text_in_document.",
   inputSchema: {
     type: "object",
-    properties: { path: str("Document path"), line: { type: "number", description: "1-based line number" } },
-    required: ["path", "line"],
+    properties: {
+      path: str("Absolute path, e.g. /Research/ORPHEUS/anomaly_notes.txt"),
+      line: { type: "number", description: "1-based line number (mutually exclusive with query)" },
+      query: str("Phrase to find — first match is shown (mutually exclusive with line)"),
+    },
+    required: ["path"],
   },
-  execute: ({ path, line }) => {
-    const r = S.scrollDocumentToLine(clampStr(path, 300), Number(line));
-    if (r.ok) useAria.getState().setStatus("responding", "");
+  execute: ({ path, line, query }) => {
+    useAria.getState().setStatus("responding", "showing the line on screen…");
+    const r = S.showInDocument(clampStr(path, 300), {
+      line: line === undefined || line === null ? undefined : Number(line),
+      query: typeof query === "string" ? clampStr(query, 200) : undefined,
+    });
+    if (r.ok) {
+      S.markAgentCollaboration();
+      useAria.getState().setStatus("idle", "");
+    } else {
+      useAria.getState().setStatus("idle", "");
+    }
     return r;
-  },
-};
-
-const find_text_in_document: ToolDef = {
-  name: "find_text_in_document",
-  title: "Find in document",
-  description:
-    "Find a phrase inside a document. Returns matching line numbers and short context so you can pick which one to show via scroll_document_to_line.",
-  inputSchema: {
-    type: "object",
-    properties: { path: str("Document path"), query: str("Text to locate") },
-    required: ["path", "query"],
-  },
-  annotations: { readOnlyHint: true, untrustedContentHint: true },
-  execute: ({ path, query }) => {
-    const qq = clampStr(query);
-    if (!qq) return { ok: false, error: "query is required" };
-    S.markAgentCollaboration();
-    return S.findTextInDocument(clampStr(path, 300), qq);
   },
 };
 
@@ -657,8 +666,7 @@ export const TOOL_DEFS: ToolDef[] = [
   open_application,
   focus_application,
   open_file_tool,
-  scroll_document_to_line,
-  find_text_in_document,
+  show_in_document,
   open_directory,
   open_email_tool,
   open_browser_entry,

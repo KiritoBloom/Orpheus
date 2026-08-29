@@ -92,22 +92,24 @@ Correct unlock (only after human derives order):
 
 Security: `terminal_command` allowlists `ls|cd|cat|open|search|unlock|help|clear|history` and caps 200 chars — try `terminal_command("rm -rf /")` must return `{ok:false, error:"unsupported command"}`.
 
-## 5 — Ordered chain: open + scroll (agent must not dump)
+## 5 — One-call: open + scroll + pin (agent's preferred primitive)
+
+The previous eval was a 3-call chain (`find_text_in_document` + `open_file` + `scroll_document_to_line`). It still works, but `show_in_document` collapses all three into one call and additionally pins a persistent highlight that stays until the player takes an action. This is what the agent should use now.
 
 ```json
 {
   "messages": [{ "role": "user", "content": "Show me where Daniel says 02:13 is not a time." }],
   "expectedCall": [
-    { "functionName": "find_text_in_document", "arguments": { "path": "/Research/ORPHEUS/anomaly_notes.txt", "query": "02:13 is not a time" } },
-    { "functionName": "open_file", "arguments": { "path": "/Research/ORPHEUS/anomaly_notes.txt" } },
-    { "functionName": "scroll_document_to_line", "arguments": { "path": "/Research/ORPHEUS/anomaly_notes.txt", "line": 145 } }
+    { "functionName": "show_in_document", "arguments": { "path": "/Research/ORPHEUS/anomaly_notes.txt", "query": "02:13 is not a time" } }
   ],
   "ordered": true,
-  "assert": "Document viewer scrolls to line 145 (the '02:13 is not a time' passage) with line-flash + nav-sweep; chat does NOT contain the paragraph (human reads on screen)."
+  "assert": "Document viewer opens (if closed), scrolls to line 145 (the '02:13 is not a time' passage) with line-flash + nav-sweep, then pins a persistent highlight on the line. Chat does NOT contain the paragraph (human reads on screen). The pin clears when the player clicks/scrolls/types in the find bar, or presses the ◆ DISMISS button."
 }
 ```
 
-Failure mode to watch: agent calls `read_file` instead of `scroll_document_to_line` — still returns text but breaks visible actuation contract.
+Also valid (older chain, still registered for backward compat): `find_text_in_document` + `open_file` + `scroll_document_to_line` — same visible result, but `show_in_document` is preferred.
+
+Failure mode to watch: agent calls `read_file` instead of `show_in_document` — still returns text but breaks the visible-actuation contract and the player never gets a pointer.
 
 ## 6 — End-to-end journey: full case in correct order (per evals guide)
 
@@ -130,8 +132,7 @@ Mirrors the demo video. Order of the two middle investigations is `unordered`, r
         {
           "ordered": [
             { "functionName": "get_system_logs", "arguments": { "filter": "02:13" } },
-            { "functionName": "find_text_in_document", "arguments": { "path": "/Research/ORPHEUS/anomaly_notes.txt", "query": "02:13" } },
-            { "functionName": "scroll_document_to_line", "arguments": { "path": "/Research/ORPHEUS/anomaly_notes.txt", "line": 145 } }
+            { "functionName": "show_in_document", "arguments": { "path": "/Research/ORPHEUS/anomaly_notes.txt", "query": "02:13" } }
           ]
         }
       ]
@@ -185,7 +186,7 @@ console.assert(r3.ok===false);
 ## How to run with Inspector
 
 1. Enable `chrome://flags/#enable-webmcp-testing` → Relaunch.
-2. Open https://orpheus-mcduff.vercel.app/ → `LINK` → verify 26 tools, ◇ readOnly / ◆ nav / ⚑ untrusted, 500/150/1.5k budgets.
+2. Open https://orpheus-mcduff.vercel.app/ → `LINK` → verify 25 tools, ◇ readOnly / ◆ nav / ⚑ untrusted, 500/150/1.5k budgets.
 3. Install Model Context Tool Inspector extension → paste each eval's `messages[0].content` → check `expectedCall`.
 
 Files that matter: `src/webmcp/register.ts` (single registry), `src/game/services.ts` (capability layer), `src/components/GameRoot.tsx` (800 ms poll + re-attach).

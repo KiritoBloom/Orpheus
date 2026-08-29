@@ -84,29 +84,84 @@ export function openFile(path: string): { ok: boolean; error?: string } {
 }
 
 /** extra transient state kept outside zustand typing via module singleton */
-let docListener: ((state: { path: string; scrollLine?: number; flashLine?: number }) => void) | null = null;
+let docListener: ((state: { path: string; scrollLine?: number; flashLine?: number; pinnedLine?: number }) => void) | null = null;
 export function setDocListener(fn: typeof docListener) {
   docListener = fn;
   return () => {
     if (docListener === fn) docListener = null;
   };
 }
-function emitDoc(state: { path: string; scrollLine?: number; flashLine?: number }) {
+function emitDoc(state: { path: string; scrollLine?: number; flashLine?: number; pinnedLine?: number }) {
   docListener?.(state);
 }
 
-export function scrollDocumentToLine(path: string, line: number): { ok: boolean; error?: string; line?: number } {
+/**
+ * showInDocument — the agent's "look at THIS" primitive.
+ * Opens the document (if not already open), scrolls to a line, and *pins*
+ * a persistent highlight on that line that stays until the player takes
+ * an explicit action (click/scroll/type/close).
+ *
+ * Accepts either an explicit `line` OR a `query` (resolved to the first
+ * match via findTextInDocument). When `query` is used, the tool's return
+ * value includes the resolved line so the agent can chain further work.
+ */
+export function showInDocument(
+  path: string,
+  opts: { line?: number; query?: string }
+): { ok: boolean; error?: string; line?: number; query?: string; resolvedFrom?: "line" | "query"; matches?: number } {
   const node = fsGet(path);
   const os = useOS.getState();
   if (!node || !node.content) return { ok: false, error: `not a readable document: ${path}` };
   const lines = node.content.split("\n");
-  if (line < 1 || line > lines.length)
-    return { ok: false, error: `line ${line} out of range (document has ${lines.length} lines)` };
-  if (!os.windows.textviewer.open) openFile(path);
-  else os.focusWindow("textviewer");
-  // give the viewer a tick to mount before scrolling
-  setTimeout(() => emitDoc({ path, scrollLine: line, flashLine: line }), 60);
-  return { ok: true, line };
+
+  // resolve target line
+  let line: number;
+  let resolvedFrom: "line" | "query";
+  let matchCount: number | undefined;
+  if (typeof opts.line === "number" && Number.isFinite(opts.line)) {
+    line = Math.trunc(opts.line);
+    resolvedFrom = "line";
+    if (line < 1 || line > lines.length)
+      return { ok: false, error: `line ${line} out of range (document has ${lines.length} lines)` };
+  } else if (typeof opts.query === "string" && opts.query.trim().length > 0) {
+    const found = findTextInDocument(path, opts.query);
+    if (!found.matches.length) {
+      return { ok: false, error: `no match for "${opts.query}" in ${path}`, query: opts.query };
+    }
+    line = found.matches[0].line;
+    matchCount = found.matches.length;
+    resolvedFrom = "query";
+  } else {
+    return { ok: false, error: "provide either `line` (1-based) or `query` (text to find)" };
+  }
+
+  // open or focus the viewer
+  if (!os.windows.textviewer.open) {
+    const opened = openFile(path);
+    if (!opened.ok) return { ok: false, error: opened.error ?? "could not open document" };
+  } else {
+    os.focusWindow("textviewer");
+  }
+
+  // emit with a pinnedLine so the highlight persists
+  setTimeout(
+    () => emitDoc({ path, scrollLine: line, flashLine: line, pinnedLine: line }),
+    60,
+  );
+  return { ok: true, line, query: opts.query, resolvedFrom, matches: matchCount };
+}
+
+/** Called by the viewer when the player takes an action that should
+ *  clear the pinned highlight (click, scroll, type, close). */
+let docDismissListener: ((p: { path: string; reason: "user-action" | "new-pin" | "close" }) => void) | null = null;
+export function setDocDismissListener(fn: typeof docDismissListener) {
+  docDismissListener = fn;
+  return () => {
+    if (docDismissListener === fn) docDismissListener = null;
+  };
+}
+export function dismissPinnedHighlight(reason: "user-action" | "new-pin" | "close"): void {
+  docDismissListener?.({ path: currentDocPath, reason });
 }
 
 export function findTextInDocument(path: string, query: string): { matches: { line: number; context: string }[]; error?: string } {

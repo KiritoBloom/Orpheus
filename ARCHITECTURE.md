@@ -52,7 +52,7 @@ src/
     applications/{ Files, Mail, Messages, Photos+ImageViewer, Browser, Terminal,
                     SystemLog, Evidence, TextViewer}.tsx
     art/photos.tsx       procedural SVG photographs (every clue is vector & zoomable)
-    AgentLinkPanel.tsx   judge console for all 26 tools (LINK)
+    AgentLinkPanel.tsx   judge console for all 25 tools (LINK)
     GameRoot.tsx         lifecycle: title→boot→briefing→desktop→ending + hydration +
                          WebMCP polling + hum/focus wiring
     EndingSequence.tsx   staggered closes → iris → black
@@ -94,7 +94,7 @@ Both the React UI and the WebMCP tools import and call this module. If you remov
 
 **Reusable pattern for the new era:** Replace `src/game/data/*` with your corpus (leak docs, incident logs, medical images, archive scans), keep the `services.ts` + `register.ts` split, and you have an accompanied desk for newsrooms, SOCs, oversight boards, or classrooms in an afternoon. No backend, no env keys, `idb-keyval` persistence — self-hostable in one static site.
 
-Event wiring `UI ↔ services` uses five tiny single-channel buses (`SimpleBus` — `on(fn) → unsubscribe, emit(payload)`) for: File Manager navigation, photo focus, Mail selection, Messages thread selection, Browser history navigation, plus a `TermBus` for the terminal. The text viewer listens via `setDocListener` for `scroll_document_to_line`.
+Event wiring `UI ↔ services` uses five tiny single-channel buses (`SimpleBus` — `on(fn) → unsubscribe, emit(payload)`) for: File Manager navigation, photo focus, Mail selection, Messages thread selection, Browser history navigation, plus a `TermBus` for the terminal. The text viewer listens via `setDocListener` for `show_in_document` (which scrolls + pins) and also via `setDocDismissListener` for user-initiated dismiss events.
 
 ---
 
@@ -102,8 +102,8 @@ Event wiring `UI ↔ services` uses five tiny single-channel buses (`SimpleBus` 
 
 - `GameRoot` hydrates from IndexedDB, then calls `registerWebMCPTools()` once and polls every 800 ms for late `modelContext` (+ 1.2 s re-attach for late Atlas injection); it observes `toolchange`.
 - On success the 26 `TOOL_DEFS` are registered; input schemas are pure JSON Schema (`type: object` + `properties`/`required`/`enum`), `title`/`description`/`annotations` per W3C, `execute` handlers delegate to `services.ts` and return MCP-shaped objects (`{ ok, error? }` or typed results). Budgets enforced: 500 desc / 150 param / 30 name / 1.5k output.
-- No fallback assistant — WebMCP *is* the agent interface. During development the game remains playable without a host, but investigation is intentionally slower without an agent that can bulk-search and correlate. 26 tools: 14 read-only + 9 visible nav + 3 evidence (guarded). See `JUDGE_QUICKSTART.md` for 90-second verification (no host needed via `LINK`).
-- Both APIs per best practice: 26 imperative tools registered via `document.modelContext.registerTool` + 4 declarative forms. The reusable `src/components/DeclarativeForm.tsx` renders `<form toolname="…" tooldescription="…" toolparamdescription="…">` with `agentInvoked` + `respondWith(Promise)` + `toolactivated` window listener and `:tool-form-active` styling. 3 visible forms wired into the apps: `request_correlation` in Evidence (search files + messages from a player-noticed term), `unlock_vault` in Files (three-word passphrase), `inspect_photo` in Photos (metadata + directional hint per photo id). 1 hidden `record_evidence` fallback in `GameRoot.tsx`. See `JUDGE_QUICKSTART.md` for the 30-second verification path; the CI companion `pnpm test:webmcp` runs 7/7 static budget + schema + security + declarative-API checks against `register.ts` without a browser.
+- No fallback assistant — WebMCP *is* the agent interface. During development the game remains playable without a host, but investigation is intentionally slower without an agent that can bulk-search and correlate. 25 tools: 14 read-only + 8 visible nav + 3 evidence (guarded). The nav set centres on the hero `show_in_document` primitive — opens the file, scrolls, and pins a persistent highlight on the resolved line. See `JUDGE_QUICKSTART.md` for 90-second verification (no host needed via `LINK`).
+- Both APIs per best practice: 25 imperative tools registered via `document.modelContext.registerTool` + 4 declarative forms. The reusable `src/components/DeclarativeForm.tsx` renders `<form toolname="…" tooldescription="…" toolparamdescription="…">` with `agentInvoked` + `respondWith(Promise)` + `toolactivated` window listener and `:tool-form-active` styling. 3 visible forms wired into the apps: `request_correlation` in Evidence (search files + messages from a player-noticed term), `unlock_vault` in Files (three-word passphrase), `inspect_photo` in Photos (metadata + directional hint per photo id). 1 hidden `record_evidence` fallback in `GameRoot.tsx`. See `JUDGE_QUICKSTART.md` for the 30-second verification path; the CI companion `pnpm test:webmcp` runs 7/7 static budget + schema + security + declarative-API checks against `register.ts` without a browser.
 
 ---
 

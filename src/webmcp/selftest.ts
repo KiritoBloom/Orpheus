@@ -101,8 +101,8 @@ function runChecks(): SelfTestResult[] {
   const badName = TOOL_DEFS.find((t) => t.name.length > 30);
   const badDesc = TOOL_DEFS.find((t) => t.description.length > 500);
   check(
-    "registry: 26 tools · names ≤30 · descriptions ≤500",
-    TOOL_DEFS.length === 26 && !badName && !badDesc,
+    "registry: 25 tools · names ≤30 · descriptions ≤500",
+    TOOL_DEFS.length === 25 && !badName && !badDesc,
     `${TOOL_DEFS.length} tools${badName ? ` — ${badName.name} name too long` : ""}${badDesc ? ` — ${badDesc.name} desc ${badDesc.description.length} chars` : ""}`,
   );
 
@@ -150,23 +150,25 @@ function runChecks(): SelfTestResult[] {
     `count: ${gl.count} · log_035 ${gl.logs.some((l) => l.id === "log_035") ? "present" : "MISSING"}`,
   );
 
-  // 7 — document search anchor
-  const ft = tool("find_text_in_document").execute({ path: "/Research/ORPHEUS/anomaly_notes.txt", query: "02:13 is not a time" }) as {
-    matches: { line: number }[];
+  // 7 — show_in_document with a query: first match resolved and visible
+  const sd = tool("show_in_document").execute({ path: "/Research/ORPHEUS/anomaly_notes.txt", query: "02:13 is not a time" }) as {
+    ok: boolean;
+    line?: number;
+    resolvedFrom?: "line" | "query";
   };
   check(
-    "find_text_in_document '02:13 is not a time' → line match",
-    ft.matches.length >= 1,
-    `first match: line ${ft.matches[0]?.line ?? "—"}`,
+    "show_in_document {query:'02:13 is not a time'} → resolves to first match (line 145)",
+    sd.ok && sd.line === 145 && sd.resolvedFrom === "query",
+    `line: ${sd.line ?? "—"} · resolvedFrom: ${sd.resolvedFrom ?? "—"}`,
   );
 
   // 8 — graceful failure on out-of-range navigation
-  const sc = tool("scroll_document_to_line").execute({ path: "/Research/ORPHEUS/anomaly_notes.txt", line: 99999 }) as {
+  const sc = tool("show_in_document").execute({ path: "/Research/ORPHEUS/anomaly_notes.txt", line: 99999 }) as {
     ok: boolean;
     error?: string;
   };
   check(
-    "scroll_document_to_line out-of-range → graceful {ok:false}, no crash",
+    "show_in_document out-of-range line → graceful {ok:false}, no crash",
     sc.ok === false && !!sc.error,
     sc.error ?? "",
   );
@@ -253,20 +255,23 @@ export async function runQuickVerify(): Promise<QuickVerifyResult> {
       });
     }
 
-    // 3) scroll-to-line — proves the visible-actuation contract
+    // 3) show_in_document — proves the visible-actuation + query-resolve contract
     //    The line is chosen so the player visibly sees the document move
     //    AND the line content is meaningful (the "02:13 is not a time" passage).
-    //    LINE_0213_PASSAGE in filesystem.ts = 145.
+    //    LINE_0213_PASSAGE in filesystem.ts = 145. We use the query form so the
+    //    check exercises the full search-and-pin path in one call.
     {
-      const r = tool("scroll_document_to_line").execute({
+      const r = tool("show_in_document").execute({
         path: "/Research/ORPHEUS/anomaly_notes.txt",
-        line: 145,
-      }) as { ok: boolean; error?: string; line?: number };
-      const ok = r.ok === true && r.line === 145;
+        query: "02:13 is not a time",
+      }) as { ok: boolean; error?: string; line?: number; resolvedFrom?: "line" | "query" };
+      const ok = r.ok === true && r.line === 145 && r.resolvedFrom === "query";
       toolCalls.push({
-        name: "scroll_document_to_line (anomaly_notes.txt:145) → document moves on screen",
+        name: "show_in_document {query:'02:13 is not a time'} → document moves + pin on line 145",
         pass: ok,
-        detail: r.ok ? `scrolled to line ${r.line}` : r.error ?? "ok=false",
+        detail: r.ok
+          ? `resolved via ${r.resolvedFrom} → line ${r.line}`
+          : r.error ?? "ok=false",
       });
     }
   } finally {

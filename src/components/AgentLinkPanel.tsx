@@ -55,13 +55,15 @@ export default function AgentLinkPanel({ onClose }: { onClose: () => void }) {
   }
 
   /** One-click judge verification — runs the 9 deterministic evals + 3
-   *  visible-actuation tool calls (system logs → timeline → scroll-to-line
-   *  145 on the "02:13 is not a time" passage). State-safe: investigation
-   *  state is snapshotted and restored, so this advances no checkpoints.
+   *  visible-actuation tool calls (system logs → timeline → show_in_document
+   *  to pin line 145 on the "02:13 is not a time" passage). State-safe:
+   *  investigation state is snapshotted and restored, so this advances
+   *  no checkpoints.
    *
    *  Differs from RUN EVALS: RUN EVALS only inspects return values; QUICK
-   *  VERIFY also ACTUATES the desk (the document viewer scrolls visibly
-   *  during the run), proving the visible-actuation contract.
+   *  VERIFY also ACTUATES the desk (the document viewer opens, scrolls,
+   *  and pins a persistent highlight during the run), proving the
+   *  visible-actuation contract.
    */
   async function quickVerify() {
     setBusy(true);
@@ -162,7 +164,7 @@ export default function AgentLinkPanel({ onClose }: { onClose: () => void }) {
                 className="btn-bevel text-[11px] px-3 !bg-accent/20 !border-accent !text-accent"
                 disabled={busy}
                 onClick={quickVerify}
-                title="One-click judge verification: 9 evals + 3 visible-actuation tool calls. Differs from RUN EVALS — actually moves the desk (scroll-to-line)."
+                title="One-click judge verification: 9 evals + 3 visible-actuation tool calls. Differs from RUN EVALS — actually moves the desk (show_in_document opens + scrolls + pins a persistent highlight)."
               >
                 ⚡ QUICK VERIFY
               </button>
@@ -187,8 +189,7 @@ const EXAMPLE_ARGS: Record<string, string> = {
   search_browser_history: JSON.stringify({ query: "kestrel" }),
   read_file: JSON.stringify({ path: "/Research/ORPHEUS/anomaly_notes.txt" }),
   open_file: JSON.stringify({ path: "/Research/ORPHEUS/anomaly_notes.txt" }),
-  find_text_in_document: JSON.stringify({ path: "/Research/ORPHEUS/anomaly_notes.txt", query: "02:13" }),
-  scroll_document_to_line: JSON.stringify({ path: "/Research/ORPHEUS/anomaly_notes.txt", line: 145 }),
+  show_in_document: JSON.stringify({ path: "/Research/ORPHEUS/anomaly_notes.txt", query: "02:13 is not a time" }),
   open_directory: JSON.stringify({ path: "/Research/ORPHEUS" }),
   get_message_thread: JSON.stringify({ threadId: "t_sarah" }),
   open_messages_thread: JSON.stringify({ threadId: "t_sarah" }),

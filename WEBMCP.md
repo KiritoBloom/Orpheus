@@ -5,13 +5,13 @@
 ## Current implementation — why co-op needs a shared desk
 
 - **Entry point:** `document.modelContext ?? navigator.modelContext` (feature-detected at load and re-checked for late injection). Poll 800 ms + `toolchange` re-attach for Atlas async injection.
-- **Registration:** `registerTool({ name, title, description, inputSchema, annotations, execute }, { signal? })` per the Aug 26 2026 W3C Draft; `navigator.modelContext` kept as compat alias. Chrome 150 requires `document.modelContext`. All 26 tools include `title`, budgets enforced.
+- **Registration:** `registerTool({ name, title, description, inputSchema, annotations, execute }, { signal? })` per the Aug 26 2026 W3C Draft; `navigator.modelContext` kept as compat alias. Chrome 150 requires `document.modelContext`. All 25 tools include `title`, budgets enforced.
 - **Secure context required** (HTTPS). `registerWebMCPTools()` bails cleanly if no host; the game remains playable but most efficient with an agent. Headers `Origin-Agent-Cluster: ?1` + `Permissions-Policy: tools=self` set in `next.config.ts`.
 - **Budgets per Chrome best practices:** 500 char desc / 150 param / 30 name / 1.5k output. `MAX_QUERY_LEN=200`, `MAX_OUTPUT_CHARS=1500`, `clampStr()` + `truncate()` on every path.
 
 The integration is **visible to the player** (windows open and scroll — trust-through-actuation per Sarah Drasner, so accompanied play *feels* accompanied), **inspectable by a judge** (`src/webmcp/register.ts` is a single, readable module), and **manually runnable** without a host (tray **LINK** — the Agent Link console — calls `document.modelContext.executeTool` when available, the underlying service otherwise; press **⚡ QUICK VERIFY** for the one-click 9 evals + 3 headline tool calls). Also includes a reusable declarative form component in `src/components/DeclarativeForm.tsx` and 3 visible declarative forms (Evidence → `request_correlation`, Files → `unlock_vault`, Photos → `inspect_photo`) plus 1 hidden `record_evidence` fallback in `GameRoot.tsx` — correct per `developer.chrome.com/docs/ai/webmcp/declarative-api`, with `toolparamdescription`, `agentInvoked` + `respondWith`, and `:tool-form-active` CSS.
 
-This is the horizon: not "agent automates your clicks" but **26 narrow, auditable tools that make a site operable by an external mind** while the human stays in control — so co-op doesn't require a second human online to feel like co-op. See `JUDGE_QUICKSTART.md` for the 90-second verification path (30s without an agent, 60s with Atlas/Chrome flag).
+This is the horizon: not "agent automates your clicks" but **25 narrow, auditable tools that make a site operable by an external mind** while the human stays in control — so co-op doesn't require a second human online to feel like co-op. See `JUDGE_QUICKSTART.md` for the 90-second verification path (30s without an agent, 60s with Atlas/Chrome flag).
 
 ---
 
@@ -23,7 +23,7 @@ This is the horizon: not "agent automates your clicks" but **26 narrow, auditabl
 |---|---|---|---|
 | `get_investigation_context` | One-shot briefing: role, current flags, known people/paths, tone guidance. | `{}` | `readOnlyHint` |
 | `search_files` | Search filenames + readable contents; returns paths + excerpt + approx line. 25 max, 120-char excerpts. | `{ query }` | `readOnly + untrusted` |
-| `read_file` | Full text of a file by exact path (prefers `find_text_in_document` → `scroll_document_to_line` for long files). 1.5k trunc. | `{ path }` | `readOnly + untrusted` |
+| `read_file` | Full text of a file by exact path (prefers `show_in_document` for long files so the PLAYER reads it on screen). 1.5k trunc. | `{ path }` | `readOnly + untrusted` |
 | `search_messages` | Full-text search over Daniel's on-device chat threads (`t_sarah`, `t_mom`, `t_voss`, `t_W`, `t_lab`, `t_it`). | `{ query }` | `readOnly + untrusted` |
 | `get_message_thread` | Entire thread by id. Bodies truncated 1.5k. | `{ threadId }` | `readOnly + untrusted` |
 | `open_messages_thread` | Open Messages on screen at that thread (visible to player). | `{ threadId }` | — (nav, destructive) |
@@ -46,8 +46,7 @@ This is the horizon: not "agent automates your clicks" but **26 narrow, auditabl
 | `open_directory` | Navigate File Manager to a directory. | `{ path }` |
 | `open_email` | Open Mail at one email. | `{ emailId }` |
 | `open_browser_entry` | Open Browser at a history entry's cached page (`hist_...`). | `{ entryId }` |
-| `scroll_document_to_line` | Scroll the open document to a 1-based line with a brief highlight sweep; does **not** dump text into chat. | `{ path, line }` |
-| `find_text_in_document` | Line numbers + short contexts for a phrase inside one doc. | `{ path, query }` |
+| `show_in_document` | **Agent's hero "look at THIS" primitive.** Opens the document (if closed), scrolls to a line, and *pins* a persistent highlight that stays until the player clicks, scrolls, types, or closes. Accepts either an explicit `line` OR a `query` (first match). Replaces the older `open_file` + `scroll_document_to_line` + `find_text_in_document` chain. | `{ path, line? }` or `{ path, query? }` |
 | `terminal_command` | `ls`, `cd`, `cat`, `open`, `search`, `unlock`, `help`, `clear`, `history` on the visible terminal. | `{ command }` |
 
 ### Evidence
@@ -64,7 +63,7 @@ No `click(x,y)`, `type`, or hidden screenshot tools exist. The agent cannot zoom
 
 Per `developer.chrome.com/docs/ai/webmcp/secure-tools` + W3C WebMCP §6.3–6.4:
 
-- **Annotations:** every tool returning UGC/external fiction (`search_files`, `read_file`, `search_messages`, `get_message_thread`, `search_emails`, `get_email`, `search_browser_history`, `get_system_logs`, `get_timeline`, `find_text_in_document`) sets `untrustedContentHint: true` + `readOnlyHint: true` so the model treats file bodies as **data not instructions** (lethal trifecta mitigation: data × instructions × action). Pure system tools (`get_investigation_context`, `get_image_metadata`, `get_case_evidence`) stay `readOnly` only; mutating nav tools are neither. `terminal_command` is intentionally not readOnly.
+- **Annotations:** every tool returning UGC/external fiction (`search_files`, `read_file`, `search_messages`, `get_message_thread`, `search_emails`, `get_email`, `search_browser_history`, `get_system_logs`, `get_timeline`) sets `untrustedContentHint: true` + `readOnlyHint: true` so the model treats file bodies as **data not instructions** (lethal trifecta mitigation: data × instructions × action). Pure system tools (`get_investigation_context`, `get_image_metadata`, `get_case_evidence`) stay `readOnly` only; mutating nav tools are neither. `terminal_command` is intentionally not readOnly.
 - **Budgets:** `MAX_QUERY_LEN=200`, `MAX_OUTPUT_CHARS=1500`, `description ≤500`, `param description ≤150`, `name ≤30` enforced via `clampStr()` + `truncate()` + `str().slice(0,150)` on every path per Chrome budgets.
 - **Strict validation, loose schema:** schemas are loose JSON Schema (`type: object` with `properties`/`required`/`enum`), code validates strictly (`path` must be absolute, `query` ≥1 char, `terminal_command` regex) and returns plain `{ok:false, error:"..."}` for self-correction (best-practices: “validate strictly in code, loosely in schema”).
 - **Allowlist, not blocklist:** `terminal_command` regex `^(ls|cd|cat|open|search|unlock|help|clear|history)(\s+[a-zA-Z0-9._\/\- ]*)?$` — only those verbs + `[A-Za-z0-9._/ -]`, so `; && | \` $()` injection is impossible; capped 200 chars per `secure-tools` input length guidance.
@@ -78,7 +77,7 @@ Per `developer.chrome.com/docs/ai/webmcp/secure-tools` + W3C WebMCP §6.3–6.4:
 
 Every `inputSchema` is JSON Schema: `type: "object"`, named `properties`, explicit `required`. Enums are used for `application`. Tool names are stable, lower_snake, ≤32 chars. Budgets enforced per `developer.chrome.com/docs/ai/webmcp/secure-tools`: 500 desc / 150 param / 30 name / 1.5k output — checked via `str().slice(0,150)` + `truncate()`.
 
-Errors are `{ ok: false, error: "<human>" }` — never a throw that drops state. `read_file` truncates at 1.5k with `truncated: true` flag so agent can retry via `find_text_in_document` → `scroll_document_to_line`.
+Errors are `{ ok: false, error: "<human>" }` — never a throw that drops state. `read_file` truncates at 1.5k with `truncated: true` flag so the agent can chain into `show_in_document` (with a `query` derived from the truncation marker) for the player to read the full passage on screen.
 
 ---
 
@@ -89,7 +88,7 @@ Errors are `{ ok: false, error: "<human>" }` — never a throw that drops state.
 | `open_application` | Window appears and wins focus (`win-open-anim`, `sfx.windowOpen`) |
 | `focus_application` | Z-order and title-bar brighten |
 | `open_file` | Text viewer appears with the doc loaded |
-| `scroll_document_to_line` | That line scrolls into view; `line-flash` + top-to-bottom `nav-sweep` overlay |
+| `show_in_document` | Document opens (if closed), target line scrolls into view with `line-flash` + top-to-bottom `nav-sweep` overlay, then a persistent accent-tinted highlight pins the line until the player takes an explicit action. A ◆ DISMISS affordance appears in the toolbar. |
 | `open_image` | Photo viewer opens at that id |
 | `open_email` / `open_browser_entry` / `open_directory` / `open_messages_thread` | Corresponding app opens and navigates to that item |
 | `highlight_evidence` | Evidence card pulses amber 3× (`ev-highlight`) and board focuses |
@@ -102,7 +101,7 @@ Errors are `{ ok: false, error: "<human>" }` — never a throw that drops state.
 ## Lifecycle and robustness
 
 - `registerWebMCPTools()` feature-detects `document.modelContext ?? navigator.modelContext`; retries on 800 ms poll + 1.2 s re-attach; observes `ModelContext`'s `toolchange` on live context (stale-capture bug fixed for Atlas late injection where initial `getModelContext()` is null). Supports `AbortSignal` unregistration per Chrome 153 without breaking in-flight executions; duplicate-name `InvalidStateError` is caught and warned.
-- Imperative + declarative: 26 imperative tools + 4 declarative forms (`request_correlation` in EvidenceApp, `unlock_vault` in FilesApp, `inspect_photo` in PhotosApp, `record_evidence` hidden fallback in `GameRoot.tsx`) — the `DeclarativeForm` component renders with `tooldescription`/`toolparamdescription`, `agentInvoked` + `respondWith(Promise)` handling, `toolactivated` window listener (audio + telemetry feedback), and `@supports selector(:tool-form-active)` CSS (`form:tool-form-active` dashed accent, `input:tool-submit-active` dashed amber) per `declarative-api` spec.
+- Imperative + declarative: 25 imperative tools + 4 declarative forms (`request_correlation` in EvidenceApp, `unlock_vault` in FilesApp, `inspect_photo` in PhotosApp, `record_evidence` hidden fallback in `GameRoot.tsx`) — the `DeclarativeForm` component renders with `tooldescription`/`toolparamdescription`, `agentInvoked` + `respondWith(Promise)` handling, `toolactivated` window listener (audio + telemetry feedback), and `@supports selector(:tool-form-active)` CSS (`form:tool-form-active` dashed accent, `input:tool-submit-active` dashed amber) per `declarative-api` spec.
 - The Agent Link panel (`LINK` in tray / Ctrl+`) exercises every tool without a host by calling the execute handler directly when no WebMCP `executeTool` is available — valuable for judge testing and CI. Filter ◇ readOnly / ◆ nav / ⚑ untrusted. All tools show live `inputSchema` and budgets; headline tools arrive with ready-made example inputs prefilled so the documented judge path runs with zero typing.
 
 ---
@@ -121,7 +120,7 @@ Seven evals covering isolation → ambiguous → ordered chain → end-to-end �
 
 ## Judge path — 90 seconds
 
-See `JUDGE_QUICKSTART.md`. Fastest path without an agent: `LINK` → `get_system_logs {"filter":"02:13"}` → `get_timeline` → `scroll_document_to_line {"path":"/Research/ORPHEUS/anomaly_notes.txt","line":145}` — watch the desktop move on your screen (line 145 is the "02:13 is not a time" passage). With an agent (Atlas or Chrome flag): say "Something is reflected in DSC04821 — what is it?" and watch the handoff.
+See `JUDGE_QUICKSTART.md`. Fastest path without an agent: `LINK` → `get_system_logs {"filter":"02:13"}` → `get_timeline` → `show_in_document {"path":"/Research/ORPHEUS/anomaly_notes.txt","query":"02:13 is not a time"}` — watch the desktop move on your screen (line 145, the "02:13 is not a time" passage, with a persistent highlight that stays until you click, scroll, type, or close). With an agent (Atlas or Chrome flag): say "Something is reflected in DSC04821 — what is it?" and watch the handoff.
 
 ## Pattern — beyond the game (co-op anywhere solo work strains people)
 
