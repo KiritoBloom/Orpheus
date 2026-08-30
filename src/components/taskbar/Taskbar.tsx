@@ -8,8 +8,7 @@ import { useAria } from "@/game/state/ariaStore";
 import { sfx } from "@/audio/engine";
 import AgentLinkPanel from "@/components/AgentLinkPanel";
 import { TOOL_DEFS } from "@/webmcp/register";
-import { EMAILS } from "@/game/data/emails";
-import { THREADS } from "@/game/data/chatMessages";
+import { activeCorpus } from "@/game/data/corpus";
 import { APP_ICONS, IconCrt, IconLink, IconSoundOff, IconSoundOn } from "@/components/icons/WorkstationIcons";
 
 /* short taskbar labels — full names stay in APP_LABELS (tooltips + aria) */
@@ -39,13 +38,14 @@ export default function Taskbar() {
   const hasLinkHint = !os.flags.has("COLLABORATED_WITH_ARIA") && !os.flags.has("DISCOVERED_ORPHEUS") && !linkOpen;
 
   // unread badges — reactive via osStore so marking read clears the dot
+  const chrome = activeCorpus().chrome;
   const readMailIds = useOS((s) => s.readMailIds);
   const readThreadIds = useOS((s) => s.readThreadIds);
-  const unreadMail = useMemo(() => EMAILS.filter((e) => e.unread && !readMailIds.has(e.id)).length, [readMailIds]);
+  const unreadMail = useMemo(() => activeCorpus().emails.filter((e) => e.unread && !readMailIds.has(e.id)).length, [readMailIds]);
   // count only threads currently visible — the hidden unexplained thread is not unread until it arrives
   const unreadThreads = useMemo(
     () =>
-      THREADS.filter(
+      activeCorpus().threads.filter(
         (t) => !(t.hiddenUntilFlag && !os.flags.has(t.hiddenUntilFlag)) && !readThreadIds.has(t.id)
       ).length,
     [readThreadIds, os.flags]
@@ -90,7 +90,7 @@ export default function Taskbar() {
         <button
           onClick={() => { os.openApp("files"); sfx.click(); }}
           className="task-start-90s flex items-center gap-1.5 px-2.5 h-[26px] shrink-0 select-none"
-          title="MCDUFF WORKSTATION"
+          title={chrome.watermark}
         >
           <span className="w-[8px] h-[8px] bg-accent border border-black/40" style={{ boxShadow: "inset 1px 1px 0 rgba(255,255,255,0.3)" }} />
           <span className="text-[11px] tracking-[0.18em] font-bold text-txt">ORPHEUS</span>
@@ -149,7 +149,7 @@ export default function Taskbar() {
               className="hidden lg:inline text-[9px] tracking-[0.14em] text-amber mr-1 border border-amber/40 px-1.5 bg-amber/10"
               style={{ animation: "evHighlight 1.6s ease-in-out infinite" }}
             >
-              02:13 WINDOW
+              {chrome.watermarkBadge} WINDOW
             </span>
           )}
           {os.flags.has("CASE_RECONSTRUCTION_AVAILABLE") && !os.flags.has("CASE_COMPLETE") && (

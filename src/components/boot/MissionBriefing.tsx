@@ -3,124 +3,31 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { sfx } from "@/audio/engine";
 import { useOS } from "@/game/state/osStore";
+import { activeCorpus, type BriefingSection } from "@/game/data/corpus";
 import { Aperture, usePhaseExit } from "@/components/Aperture";
 
 /* ============================================================
-   CASE FILE 001 — the authorization.
+   THE AUTHORIZATION — the case jacket.
 
    A case jacket, at desk scale: the spine on the left carries the
    case number, the classification stamp, the subject card and the
-   02:13 dial the whole case turns on; the file on the right lands
+   one dial time the whole case turns on; the file on the right lands
    section by section. Sections use the desk's own idioms — record
    fields, a conflict table, a capability pair — not paragraphs of
    teletype.
+
+   Every string is the corpus's. This component knows the shape of a
+   case jacket and nothing about which case it is holding.
    ============================================================ */
 
-type Field = { label: string; value: string; sub?: string; tone?: "alert" };
-type Conflict = { src: string; time: string; text: string; tone?: "amber" | "alert" };
-type Column = { head: string; dim?: boolean; items: string[] };
-
-type Section =
-  | { no: string; legend: string; kind: "fields"; fields: Field[] }
-  | { no: string; legend: string; kind: "conflict"; rows: Conflict[]; verdict: string }
-  | { no: string; legend: string; kind: "objectives"; items: string[] }
-  | { no: string; legend: string; kind: "partner"; intro: string; columns: Column[]; note: string }
-  | { no: string; legend: string; kind: "notes"; notes: string[] };
-
-const SECTIONS: Section[] = [
-  {
-    no: "I",
-    legend: "SUBJECT",
-    kind: "fields",
-    fields: [
-      { label: "NAME", value: "Dr. Daniel McDuff" },
-      {
-        label: "POSITION",
-        value: "Professor of Physics and Astronomy — University of Pennsylvania",
-        sub: "PREVIOUS POST: CERN — PRECISION MEASUREMENT",
-      },
-      { label: "STATUS", value: "Deceased — 2026-03-10, at home", tone: "alert" },
-      { label: "RULING", value: "Accidental fall.", sub: "FILED WITHOUT AN EXAMINATION OF THIS MACHINE" },
-      { label: "THIS UNIT", value: "His personal workstation. Air-gapped. Seized intact." },
-    ],
-  },
-  {
-    no: "II",
-    legend: "ONE MINUTE, THREE RECORDS",
-    kind: "conflict",
-    rows: [
-      {
-        src: "ACCESS LOG",
-        time: "02:13:07",
-        text: "A login under Sarah Okafor's credentials. The gait signature on file is not hers.",
-        tone: "amber",
-      },
-      {
-        src: "WALL CLOCK",
-        time: "02:13",
-        text: "Stopped. Two photographs taken hours apart both show that same minute.",
-        tone: "amber",
-      },
-      {
-        src: "POWER LOG",
-        time: "02:00–03:00",
-        text: "Nothing. No interruption, no restart, no gap that would explain a stopped clock.",
-      },
-    ],
-    verdict: "At most one of these describes what actually happened that minute.",
-  },
-  {
-    no: "III",
-    legend: "OBJECTIVE",
-    kind: "objectives",
-    items: [
-      "Establish what happened to Dr. McDuff on the night of 2026-03-10.",
-      "Recover his research. He scattered it across this disk under one name: ORPHEUS.",
-      "File every source you rely on to the evidence board. A conclusion without a source will not hold.",
-    ],
-  },
-  {
-    no: "IV",
-    legend: "YOUR PARTNER",
-    kind: "partner",
-    intro:
-      "Daniel built an assistant into this workstation. ARIA resumed 74 hours after his last login and is still running. She can read every byte on this disk. She cannot see your screen.",
-    columns: [
-      {
-        head: "ARIA READS",
-        items: [
-          "searches thousands of lines across files, mail, logs and messages",
-          "cross-references names, dates and figures in seconds",
-          "opens a document on your screen at the exact line",
-        ],
-      },
-      {
-        head: "YOU SEE",
-        dim: true,
-        items: [
-          "reflections, handwriting, clock faces, a figure in a window",
-          "photographs at 1× to 9× — zoom and pan",
-          "tone, intent, and what is missing from a record",
-        ],
-      },
-    ],
-    note: "Work in that order. You describe what you see, ARIA finds what matches it, you decide what it means. Neither half closes this case alone.",
-  },
-  {
-    no: "V",
-    legend: "ON ARRIVAL",
-    kind: "notes",
-    notes: [
-      "A field guide opens on the desktop. It explains the machine, not the answer.",
-      "Daniel left three requests in /System/readme_first.txt. Start there — it takes a minute.",
-      "Nothing here is timed and nothing advances on its own. The session is archived as you work.",
-    ],
-  },
-];
+type Section = BriefingSection;
 
 const REVEAL_MS = 430;
 
 export default function MissionBriefing({ onDone }: { onDone: () => void }) {
+  const corpus = activeCorpus();
+  const spine = corpus.briefingSpine;
+  const SECTIONS: Section[] = corpus.briefing;
   const [shown, setShown] = useState(0);
   const fileRef = useRef<HTMLDivElement>(null);
   const os = useOS();
@@ -179,7 +86,7 @@ export default function MissionBriefing({ onDone }: { onDone: () => void }) {
   }, [advance]);
 
   return (
-    <div className="brief-shell" onClick={advance} role="document" aria-label="case file 001 — authorization">
+    <div className="brief-shell" onClick={advance} role="document" aria-label="case file — authorization">
       {leaving && <Aperture dir="out" />}
 
       <div className="boot-titlebar">
@@ -197,10 +104,10 @@ export default function MissionBriefing({ onDone }: { onDone: () => void }) {
         <aside className="brief-spine">
           <div className="brief-caseno">
             <div className="brief-caseno-k">CASE</div>
-            <div className="brief-caseno-v">001</div>
+            <div className="brief-caseno-v">{spine.caseNo}</div>
           </div>
 
-          <div className="brief-stampmark">RESTRICTED</div>
+          <div className="brief-stampmark">{spine.stamp}</div>
 
           <div className="brief-dial">
             <div className="brief-dial-face" aria-hidden>
@@ -209,52 +116,46 @@ export default function MissionBriefing({ onDone }: { onDone: () => void }) {
               <span className="brief-dial-pin" />
             </div>
             <div>
-              <div className="brief-dial-t">02:13</div>
+              <div className="brief-dial-t">{spine.dialTime}</div>
               <div className="brief-dial-s">
-                THE MINUTE
-                <br />
-                EVERYTHING TOUCHES
+                {spine.dialCaption.map((line, i) => (
+                  <span key={line}>
+                    {i > 0 && <br />}
+                    {line}
+                  </span>
+                ))}
               </div>
             </div>
           </div>
 
           <div className="brief-card">
-            <div className="brief-card-k">SUBJECT OF RECORD</div>
-            <div className="brief-card-name">D. MCDUFF</div>
+            <div className="brief-card-k">{spine.cardKicker}</div>
+            <div className="brief-card-name">{spine.cardName}</div>
             <dl>
-              <div className="brief-card-row">
-                <dt>STATUS</dt>
-                <dd className="is-alert">DECEASED</dd>
-              </div>
-              <div className="brief-card-row">
-                <dt>FOUND</dt>
-                <dd>2026-03-10</dd>
-              </div>
-              <div className="brief-card-row">
-                <dt>RULING</dt>
-                <dd>ACCIDENTAL</dd>
-              </div>
-              <div className="brief-card-row">
-                <dt>REOPENED</dt>
-                <dd>BY YOU</dd>
-              </div>
+              {spine.cardRows.map((r) => (
+                <div className="brief-card-row" key={r.k}>
+                  <dt>{r.k}</dt>
+                  <dd className={r.alert ? "is-alert" : undefined}>{r.v}</dd>
+                </div>
+              ))}
             </dl>
           </div>
 
           <div className="brief-spine-foot">
-            OPENED 2026-03-10 09:12
-            <br />
-            ASSIGNED — YOU + ARIA
-            <br />
-            EVIDENCE ARCHIVED CONTINUOUSLY
+            {spine.footLines.map((line, i) => (
+              <span key={line}>
+                {i > 0 && <br />}
+                {line}
+              </span>
+            ))}
           </div>
         </aside>
 
         {/* ---------- the file ---------- */}
         <div className="brief-file" ref={fileRef} onClick={advance}>
           <div className="brief-file-head">
-            <span className="brief-file-title">INVESTIGATION AUTHORIZATION</span>
-            <span className="brief-file-meta">MCDUFF WORKSTATION · AIR-GAPPED</span>
+            <span className="brief-file-title">{spine.fileTitle}</span>
+            <span className="brief-file-meta">{spine.fileMeta}</span>
           </div>
 
           {SECTIONS.slice(0, shown).map((s) => (
@@ -347,7 +248,7 @@ export default function MissionBriefing({ onDone }: { onDone: () => void }) {
         <span className="brief-rail-left">
           <span className="boot-status-dot" aria-hidden />
           <span className="truncate">
-            {done ? "AUTHORIZATION GRANTED — CASE 001 IS YOURS" : "ASSEMBLING CASE FILE…"}
+            {done ? spine.railDone : spine.railOpen}
           </span>
         </span>
         <span className="flex items-center gap-3">

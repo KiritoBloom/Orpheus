@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Image from "next/image";
 import type { PhotoMeta } from "@/types/game";
-import { PHOTOS, getPhoto } from "@/game/data/photos";
+import { activeCorpus } from "@/game/data/corpus";
 import {
   getCurrentPhotoId,
   inspectPhoto,
@@ -22,23 +22,18 @@ import DeclarativeForm from "@/components/DeclarativeForm";
    never zoom (enforced by design: no zoom service exists).
    ============================================================ */
 
-const PHOTO_SOURCES: Record<string, string> = {
-  DSC04821: "/Images/PhotoDSC04821.png",
-  DSC04655: "/Images/PhotoDSC04655.png",
-  DSC04788: "/Images/PhotoDSC04788.png",
-  DSC04903: "/Images/PhotoDSC04903.png",
-  IMG_0022: "/Images/PhotoIMG0022.png",
-  IMG_0044: "/Images/PhotoIMG0044.png",
-  IMG_0103: "/Images/PhotoIMG0103.png",
-  old_cern_group_2003: "/Images/PhotoOldCern.png",
-  sarah_defense_day: "/Images/PhotoSarahDefense.png",
-  badge_scan: "/Images/PhotoBadgeScan.png",
-  brass_plate: "/Images/PhotoBrassPlate.png",
-  campus_map: "/Images/PhotoCampusMap.png",
-};
+function photoSource(id: string) {
+  return activeCorpus().photoSources[id];
+}
 
-/* Private-backup photos live ONLY in /Private/photo_backup (Files app) — never in the camera roll. */
-const SEALED_COUNT = PHOTOS.filter((p) => p.inPrivateBackup).length;
+function getPhoto(id: string) {
+  return activeCorpus().photos.find((p) => p.id === id);
+}
+
+/* Sealed photos live ONLY in the private backup directory (Files app) — never in the camera roll. */
+function sealedCount() {
+  return activeCorpus().photos.filter((p) => p.inPrivateBackup).length;
+}
 
 function PhotoAsset({
   id,
@@ -47,7 +42,7 @@ function PhotoAsset({
   id: string;
   sizes?: string;
 }) {
-  const source = PHOTO_SOURCES[id];
+  const source = photoSource(id);
   const meta = getPhoto(id);
   if (!source || !meta) return <div className="w-full h-full bg-surface" />;
   // Grid thumbnail: optimized via next/image → WebP/AVIF. Low-res is fine for 120px tiles.
@@ -68,7 +63,7 @@ function PhotoAsset({
 }
 
 function PhotoViewerImage({ id }: { id: string }) {
-  const source = PHOTO_SOURCES[id];
+  const source = photoSource(id);
   const meta = getPhoto(id);
   if (!source || !meta) return <div className="w-full h-full bg-surface" />;
   // Forensic viewer: full-resolution PNG (unoptimized) so CSS scale(9×) stays crisp
@@ -95,18 +90,20 @@ function PhotoViewerImage({ id }: { id: string }) {
 
 export function PhotosApp() {
   const os = useOS();
-  const visible = PHOTOS.filter((p) => !p.inPrivateBackup);
+  const vaultUi = activeCorpus().vaultUi;
+  const photoExamples = activeCorpus().photoIds.slice(0, 3);
+  const visible = activeCorpus().photos.filter((p) => !p.inPrivateBackup);
   if (visible.length === 0) {
     return (
       <div className="flex flex-col h-full">
         <div className="shrink-0 h-[28px] px-2 flex items-center justify-between border-b border-line bg-surface text-[10px] text-faint tracking-[0.14em]">
           <span>CAMERA ROLL — 0 ITEM(S)</span>
-          <span>PRIVATE BACKUP SEALED</span>
+          <span>{vaultUi.sealedTitle}</span>
         </div>
         <div className="flex-1 grid place-items-center p-8 text-center">
           <div>
-            <div className="text-[11px] tracking-[0.22em] text-faint">PRIVATE BACKUP SEALED</div>
-            <div className="text-[10px] tracking-[0.14em] text-dim mt-1 leading-relaxed">unlock via terminal: <span className="text-accent">unlock lantern orpheus echo</span><br />order is light → name → echo</div>
+            <div className="text-[11px] tracking-[0.22em] text-faint">{vaultUi.sealedTitle}</div>
+            <div className="text-[10px] tracking-[0.14em] text-dim mt-1 leading-relaxed">{vaultUi.sealedBody}</div>
           </div>
         </div>
       </div>
@@ -118,8 +115,8 @@ export function PhotosApp() {
         <span>CAMERA ROLL — {visible.length} ITEM(S)</span>
         <span>
           {os.vaultUnlocked
-            ? `${SEALED_COUNT} SEALED → /PRIVATE/PHOTO_BACKUP (FILES)`
-            : `${SEALED_COUNT} ITEMS SEALED — VESTIBULE REQUIRED`}
+            ? `${sealedCount()} SEALED → ${vaultUi.revealedPath} (FILES)`
+            : `${sealedCount()} ITEMS SEALED — DECRYPTION REQUIRED`}
         </span>
       </div>
       {/* Declarative tool: the agent can surface metadata + a directional hint natively */}
@@ -128,8 +125,8 @@ export function PhotosApp() {
           toolname="inspect_photo"
           tooldescription="Surface machine-readable metadata for a single photo (EXIF, timestamp, file note) plus a hint about where in the image to look. You cannot see pixels — the player must inspect."
           paramName="photoId"
-          paramDescription="Photo id (e.g. DSC04821) or partial filename. One photo at a time."
-          placeholder="DSC04821 / IMG_0022 / badge_scan …"
+          paramDescription={`Photo id (e.g. ${photoExamples[0] ?? ""}) or partial filename. One photo at a time.`}
+          placeholder={photoExamples.join(" / ") + " …"}
           submitLabel="SCRUTINIZE"
           label="SCRUTINIZE —"
           className="flex-1"
@@ -234,7 +231,7 @@ export function ImageViewerApp() {
   const meta: PhotoMeta | undefined = getPhoto(photoId);
   if (!meta) return <div className="p-4 text-faint">no image</div>;
 
-  const list = PHOTOS.filter((p) => !p.inPrivateBackup || os.vaultUnlocked);
+  const list = activeCorpus().photos.filter((p) => !p.inPrivateBackup || os.vaultUnlocked);
   const idx = list.findIndex((p) => p.id === photoId);
 
   const step = (d: number) => {

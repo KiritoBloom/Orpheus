@@ -1,0 +1,442 @@
+"use client";
+
+/**
+ * APOLLO 13 — air-to-ground voice (corpus instance two).
+ *
+ * The same `Thread[]` / `ChatMsg[]` shape instance one uses for a chat client.
+ * Here a thread is an extract from the air-to-ground loop and a message is one
+ * transmission, stamped with ground elapsed time.
+ *
+ * Convention: `outgoing` is TRUE for transmissions from the ground — CAPCOM and
+ * the internal Mission Control loops — because this workstation is a ground-side
+ * archive. Spacecraft transmissions are incoming.
+ *
+ * Every line is verbatim. Lines carrying a ★ in SOURCES.md also appear on the
+ * NASA History Office chronology page and are public domain; the remainder come
+ * from the Apollo Flight Journal's corrected transcript over public-domain
+ * audio. Nothing is paraphrased. Where no verbatim line could be obtained for an
+ * event, the event appears in the mission event log with no quote rather than a
+ * reconstruction.
+ */
+
+import type { ChatMsg, Thread } from "@/types/game";
+
+export const THREADS: Thread[] = [
+  { id: "voice_a", name: "A · THE FAILURE", handle: "GET 055:52 – 055:57 · Lousma / Lovell / Swigert / Haise" },
+  { id: "voice_b", name: "B · VENTING", handle: "GET 056:09 – 056:10 · Lovell / Lousma / FLIGHT Kranz" },
+  { id: "voice_c", name: "C · THE LIFEBOAT", handle: "GET 057:23 – 057:34 · Swigert / Lousma / EECOM Burton" },
+  { id: "voice_d", name: "D · THE ADAPTER", handle: "GET 089:07 – 093:23 · Kerwin / Lousma / crew" },
+  { id: "voice_e", name: "E · SEPARATION AND HOME", handle: "GET 138:04 – 142:54 · Kerwin / crew / recovery" },
+];
+
+export const MESSAGES: ChatMsg[] = [
+  /* ---------------- A — "Houston, we've had a problem" ---------------- */
+  {
+    id: "va_01",
+    threadId: "voice_a",
+    threadName: "A · THE FAILURE",
+    outgoing: true,
+    time: "055:52:58",
+    body: "LOUSMA (CAPCOM): 13, we've got one more item for you, when you get a chance. We'd like you to stir up your cryo tanks. In addition, I have shaft and trunnion…",
+  },
+  {
+    id: "va_02",
+    threadId: "voice_a",
+    threadName: "A · THE FAILURE",
+    outgoing: false,
+    time: "055:53:06",
+    body: "SWIGERT: Okay.",
+  },
+  {
+    id: "va_03",
+    threadId: "voice_a",
+    threadName: "A · THE FAILURE",
+    outgoing: true,
+    time: "055:53:07",
+    body: "LOUSMA (CAPCOM): …for looking at Comet Bennett, if you need it.",
+  },
+  {
+    id: "va_04",
+    threadId: "voice_a",
+    threadName: "A · THE FAILURE",
+    outgoing: false,
+    time: "055:53:12",
+    body: "SWIGERT: Okay. Stand by.",
+  },
+  {
+    id: "va_05",
+    threadId: "voice_a",
+    threadName: "A · THE FAILURE",
+    outgoing: false,
+    time: "055:55:20",
+    body: "SWIGERT: Okay, Houston, we've had a problem here.",
+  },
+  {
+    id: "va_06",
+    threadId: "voice_a",
+    threadName: "A · THE FAILURE",
+    outgoing: true,
+    time: "055:55:28",
+    body: "LOUSMA (CAPCOM): This is Houston. Say again please.",
+  },
+  {
+    id: "va_07",
+    threadId: "voice_a",
+    threadName: "A · THE FAILURE",
+    outgoing: false,
+    time: "055:55:35",
+    body: "LOVELL: Houston, we've had a problem. We've had a main B bus undervolt.",
+  },
+  {
+    id: "va_08",
+    threadId: "voice_a",
+    threadName: "A · THE FAILURE",
+    outgoing: true,
+    time: "055:55:42",
+    body: "LOUSMA (CAPCOM): Roger. Main B undervolt.",
+  },
+  {
+    id: "va_09",
+    threadId: "voice_a",
+    threadName: "A · THE FAILURE",
+    outgoing: false,
+    time: "055:56:10",
+    body: "HAISE: Okay. Right now, Houston, the voltage is—is looking good. And we had a pretty large bang associated with the caution and warning there. And as I recall, main B was the one that had an amp spike on it once before.",
+  },
+  {
+    id: "va_10",
+    threadId: "voice_a",
+    threadName: "A · THE FAILURE",
+    outgoing: false,
+    time: "055:57:04",
+    body: "HAISE: That jolt must have rocked the sensor on — see now — oxygen quantity 2. It was oscillating down around 20 to 60 percent. Now it's full-scale high.",
+  },
+
+  /* ---------------- B — venting ---------------- */
+  {
+    id: "vb_01",
+    threadId: "voice_b",
+    threadName: "B · VENTING",
+    outgoing: false,
+    time: "056:09:07",
+    body: "LOVELL: That's AC, okay. Yeah, that's — that's a — good with AC and it looks to me, looking out the hatch, that we are venting something. We are — We are venting something out into the — into space.",
+  },
+  {
+    id: "vb_02",
+    threadId: "voice_b",
+    threadName: "B · VENTING",
+    outgoing: true,
+    time: "056:09:16",
+    body: "KRANZ (FLIGHT, internal loop): Crew thinks they are venting something!",
+  },
+  {
+    id: "vb_03",
+    threadId: "voice_b",
+    threadName: "B · VENTING",
+    outgoing: true,
+    time: "056:09:22",
+    body: "LOUSMA (CAPCOM): Roger. We copy your venting.",
+  },
+  {
+    id: "vb_04",
+    threadId: "voice_b",
+    threadName: "B · VENTING",
+    outgoing: false,
+    time: "056:09:29",
+    body: "LOVELL: It's a gas of some sort.",
+  },
+  {
+    id: "vb_05",
+    threadId: "voice_b",
+    threadName: "B · VENTING",
+    outgoing: true,
+    time: "056:10:46",
+    body: "KRANZ (FLIGHT, internal loop): Okay now, let's everybody keep cool, we got the LM still attached, the LM spacecraft's good so if we need, uh, to get back home we've got a LM to do a good portion of it with. Okay, let's make sure that we don't do anything that's going to blow our CSM electrical power with the batteries or that will cause us to lose the main or the fuel cell number 2. Okay, we want to keep the O2 and that kind of stuff working. We'd like to have RCS, but we got the Command Module system, so we're in good shape if we need to get home. Let's solve the problem but let's not make it any worse by guessing.",
+  },
+
+  /* ---------------- C — the lifeboat ---------------- */
+  {
+    id: "vc_01",
+    threadId: "voice_c",
+    threadName: "C · THE LIFEBOAT",
+    outgoing: false,
+    time: "057:23:54",
+    body: "SWIGERT: Okay, Jack. It looks like O2 tank 1 pressure is just a hair over 200.",
+  },
+  {
+    id: "vc_02",
+    threadId: "voice_c",
+    threadName: "C · THE LIFEBOAT",
+    outgoing: false,
+    time: "057:24:09",
+    body: "SWIGERT: Okay. Does it look like it's still going down?",
+  },
+  {
+    id: "vc_03",
+    threadId: "voice_c",
+    threadName: "C · THE LIFEBOAT",
+    outgoing: true,
+    time: "057:24:12",
+    body: "LOUSMA (CAPCOM): It's slowly going to zero, and we're starting to think about the LM lifeboat.",
+  },
+  {
+    id: "vc_04",
+    threadId: "voice_c",
+    threadName: "C · THE LIFEBOAT",
+    outgoing: false,
+    time: "057:24:20",
+    body: "SWIGERT: Yes. That's what we're thinking about, too. You want me to do a quick P52? … it kind of looks like we'd probably align our plats — LM platform with our platform and then power down the CM, and keep the LM powered up doing a DPS — whatever DPS burns you give us?",
+  },
+  {
+    id: "vc_05",
+    threadId: "voice_c",
+    threadName: "C · THE LIFEBOAT",
+    outgoing: true,
+    time: "057:24:54",
+    body: "LOUSMA (CAPCOM): 13, we're not going to concern ourselves at the moment with a DPS burn. It's going to be some time before we'd get to that; but we're working on other procedures to give you, which will allow us to use the LM systems. Over.",
+  },
+  {
+    id: "vc_06",
+    threadId: "voice_c",
+    threadName: "C · THE LIFEBOAT",
+    outgoing: true,
+    time: "057:28:59",
+    body: "BURTON (EECOM, internal loop): Okay, we've got an update on the time. Looks like we've got about 18 minutes until we get down to 100 psi, and that's the cutoff point.",
+  },
+  {
+    id: "vc_07",
+    threadId: "voice_c",
+    threadName: "C · THE LIFEBOAT",
+    outgoing: true,
+    time: "057:29:07",
+    body: "BURTON (EECOM, internal loop): Well, that doesn't mean much in 18 minutes, though. But we're doing all we can do.",
+  },
+  {
+    id: "vc_08",
+    threadId: "voice_c",
+    threadName: "C · THE LIFEBOAT",
+    outgoing: true,
+    time: "057:34:47",
+    body: "LOUSMA (CAPCOM): 13, Houston. It won't do any good to try to power the propellant valves on A and C, so we want you to disable the Auto on RCS Charlie. And we have a procedure for getting power from the LM we'd like you to copy down.",
+  },
+
+  /* ---------------- D — the adapter ---------------- */
+  {
+    id: "vd_01",
+    threadId: "voice_d",
+    threadName: "D · THE ADAPTER",
+    outgoing: true,
+    time: "089:07:54",
+    body: "LOUSMA (CAPCOM): Okay. Your choice on that. As soon as Jack gets up, I'd suggest we go ahead and break up these lithium hydroxide canisters and make a couple of them. Jack could work on that. It's going to take four sets of hands, I think.",
+  },
+  {
+    id: "vd_02",
+    threadId: "voice_d",
+    threadName: "D · THE ADAPTER",
+    outgoing: false,
+    time: "089:08:15",
+    body: "LOVELL: Okay. We'll make that the project, getting the lithium hydroxide canister squared away.",
+  },
+  {
+    id: "vd_03",
+    threadId: "voice_d",
+    threadName: "D · THE ADAPTER",
+    outgoing: true,
+    time: "090:09:17",
+    body: "KERWIN (CAPCOM, equipment list): two Command Module lithium hydroxide canisters, a roll of the gray tape, the two LCGs, because we're going to use the bags from the LCGs, and one — one LM cue card — one of those cardboard cue cards which you will cut off about an inch and a half out from the rings.",
+  },
+  {
+    id: "vd_04",
+    threadId: "voice_d",
+    threadName: "D · THE ADAPTER",
+    outgoing: true,
+    time: "090:10:53",
+    body: "KERWIN (CAPCOM): …about an inch and a half from the rings… you'll have a card about 11 inches long and probably 6 inches wide.",
+  },
+  {
+    id: "vd_05",
+    threadId: "voice_d",
+    threadName: "D · THE ADAPTER",
+    outgoing: true,
+    time: "090:22:33",
+    body: "KERWIN (CAPCOM): Okay, Jack. Did anybody ever tell you that you got a 60-day extension on your income tax. Over.",
+  },
+  {
+    id: "vd_06",
+    threadId: "voice_d",
+    threadName: "D · THE ADAPTER",
+    outgoing: false,
+    time: "090:22:42",
+    body: "SWIGERT: Yes. I think — I think somebody said that when you are out of your country, you get a 60-day extension.",
+  },
+  {
+    id: "vd_07",
+    threadId: "voice_d",
+    threadName: "D · THE ADAPTER",
+    outgoing: true,
+    time: "090:22:50",
+    body: "KERWIN (CAPCOM): …take one of the LCGs and cut off the outer bag. By cutting along one the heat seals; do it carefully and close to the heat seal, because we may have to use the outer bag if we damage the inner bag.",
+  },
+  {
+    id: "vd_08",
+    threadId: "voice_d",
+    threadName: "D · THE ADAPTER",
+    outgoing: false,
+    time: "090:23:37",
+    body: "SWIGERT (readback): Okay. Take an LCG, cut the outer bag by the heat seal. Be careful not to damage the inner bag. Right?",
+  },
+  {
+    id: "vd_09",
+    threadId: "voice_d",
+    threadName: "D · THE ADAPTER",
+    outgoing: true,
+    time: "090:23:46",
+    body: "KERWIN (CAPCOM): Right. Just cut along one side.",
+  },
+  {
+    id: "vd_10",
+    threadId: "voice_d",
+    threadName: "D · THE ADAPTER",
+    outgoing: false,
+    time: "090:24:50",
+    body: "SWIGERT: Hey, Houston, Odyssey — or Aquarius. We've done that.",
+  },
+  {
+    id: "vd_11",
+    threadId: "voice_d",
+    threadName: "D · THE ADAPTER",
+    outgoing: true,
+    time: "091:01:00",
+    body: "KERWIN (CAPCOM): Okay. Real fine. Now the next step is to cut a diagonal hole in one ear of the — of the plastic bag near the arch. You can pick either one and cut about, a 1½- or 2-inch diagonal hole, big enough to slip the red hose through… and then tape the bag to the hose where it goes in so that it's nice and snug. Over.",
+  },
+  {
+    id: "vd_12",
+    threadId: "voice_d",
+    threadName: "D · THE ADAPTER",
+    outgoing: false,
+    time: "091:01:40",
+    body: "SWIGERT (readback): Okay. Copy that. We want a 1½-inch hole right here at this ear, and put the hose in here, end down and toward the canister and then we tape the seal around here.",
+  },
+  {
+    id: "vd_13",
+    threadId: "voice_d",
+    threadName: "D · THE ADAPTER",
+    outgoing: false,
+    time: "093:23:24",
+    body: "HAISE: What do you read down there for partial pressure CO2?",
+  },
+  {
+    id: "vd_14",
+    threadId: "voice_d",
+    threadName: "D · THE ADAPTER",
+    outgoing: true,
+    time: "093:23:29",
+    body: "KERWIN (CAPCOM): Oh, let's see. We're reading 6.6 right now, Fred. What do you read?",
+  },
+  {
+    id: "vd_15",
+    threadId: "voice_d",
+    threadName: "D · THE ADAPTER",
+    outgoing: false,
+    time: "093:23:38",
+    body: "HAISE: I'm reading about 12.5. I guess we've got a gage problem… I did just get a Master Alarm and no caution light; we kind of figured that's what it was, with CO2 approaching its limit.",
+  },
+
+  /* ---------------- E — separation and home ---------------- */
+  {
+    id: "ve_01",
+    threadId: "voice_e",
+    threadName: "E · SEPARATION AND HOME",
+    outgoing: false,
+    time: "138:04:46",
+    body: "LOVELL: And there's one whole side of that spacecraft missing.",
+  },
+  {
+    id: "ve_02",
+    threadId: "voice_e",
+    threadName: "E · SEPARATION AND HOME",
+    outgoing: true,
+    time: "138:04:50",
+    body: "KERWIN (CAPCOM): Is that right?",
+  },
+  {
+    id: "ve_03",
+    threadId: "voice_e",
+    threadName: "E · SEPARATION AND HOME",
+    outgoing: false,
+    time: "138:04:57",
+    body: "LOVELL: Right by the — Look out there, will you? Right by the high gain antenna, the whole panel is blown out, almost from the base to the engine.",
+  },
+  {
+    id: "ve_04",
+    threadId: "voice_e",
+    threadName: "E · SEPARATION AND HOME",
+    outgoing: false,
+    time: "138:05:22",
+    body: "HAISE: Yes, it looks like it got to the SPS bell, too, Houston.",
+  },
+  {
+    id: "ve_05",
+    threadId: "voice_e",
+    threadName: "E · SEPARATION AND HOME",
+    outgoing: false,
+    time: "138:05:31",
+    body: "HAISE: That's the way it looks; unless that's just a dark brown streak. It's really a mess.",
+  },
+  {
+    id: "ve_06",
+    threadId: "voice_e",
+    threadName: "E · SEPARATION AND HOME",
+    outgoing: true,
+    time: "141:48:23",
+    body: "KERWIN (CAPCOM, final entry PAD, excerpt): Mid-PAC, 000,152, 000; 142:38:19, 178; … Noun 61, minus 21.66, minus 165.37; 05.2; 36211, 6.20; 11197, 36291; 142:40:46; 00:30; … You are lift vector up at the very bottom.",
+  },
+  {
+    id: "ve_07",
+    threadId: "voice_e",
+    threadName: "E · SEPARATION AND HOME",
+    outgoing: false,
+    time: "142:18:40",
+    body: "SWIGERT: Its been initialized and setting on Entry.",
+  },
+  {
+    id: "ve_08",
+    threadId: "voice_e",
+    threadName: "E · SEPARATION AND HOME",
+    outgoing: false,
+    time: "142:22:28",
+    body: "SWIGERT: I know all of us here want to thank all you guys down there for the very fine job you did.",
+  },
+  {
+    id: "ve_09",
+    threadId: "voice_e",
+    threadName: "E · SEPARATION AND HOME",
+    outgoing: false,
+    time: "142:51:55",
+    body: "SWIGERT (to Recovery): …see you loud and clear going through 5,000.",
+  },
+  {
+    id: "ve_10",
+    threadId: "voice_e",
+    threadName: "E · SEPARATION AND HOME",
+    outgoing: true,
+    time: "142:51:59",
+    body: "RECOVERY HELICOPTERS: Roger, Apollo 13. This is Recovery and your chutes look good.",
+  },
+  {
+    id: "ve_11",
+    threadId: "voice_e",
+    threadName: "E · SEPARATION AND HOME",
+    outgoing: true,
+    time: "142:54:44",
+    body: "PHOTOGRAPHIC HELICOPTERS: Photo 1's on station. Photo 1 observes splashdown at this time.",
+  },
+  {
+    id: "ve_12",
+    threadId: "voice_e",
+    threadName: "E · SEPARATION AND HOME",
+    outgoing: true,
+    time: "142:54:56",
+    body: "PHOTOGRAPHIC HELICOPTERS: Photo-1. Splashdown at this time. The three chutes are displaced. They're in the water.",
+  },
+];

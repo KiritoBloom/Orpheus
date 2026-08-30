@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { browserNavBus } from "@/game/services";
-import { CACHED_PAGES, HISTORY } from "@/game/data/browserHistory";
+import { activeCorpus } from "@/game/data/corpus";
 import { sfx } from "@/audio/engine";
 
 /* ============================================================
@@ -15,23 +15,25 @@ export default function BrowserApp() {
   const [pageId, setPageId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [view, setView] = useState<"history" | "page">("history");
+  const { history, cachedPages } = activeCorpus();
 
   useEffect(() => {
     return browserNavBus.on((payload) => {
       const id = String(payload);
-      const entry = HISTORY.find((h) => h.id === id);
-      setPageId(entry?.pageId ?? (CACHED_PAGES[id] ? id : null));
-      setView(entry?.pageId || CACHED_PAGES[id] ? "page" : "history");
+      const corpus = activeCorpus();
+      const entry = corpus.history.find((h) => h.id === id);
+      setPageId(entry?.pageId ?? (corpus.cachedPages[id] ? id : null));
+      setView(entry?.pageId || corpus.cachedPages[id] ? "page" : "history");
     });
   }, []);
 
-  const filtered = HISTORY.filter(
+  const filtered = history.filter(
     (h) =>
       !query ||
       h.title.toLowerCase().includes(query.toLowerCase()) ||
       h.url.toLowerCase().includes(query.toLowerCase())
   );
-  const page = pageId ? CACHED_PAGES[pageId] : undefined;
+  const page = pageId ? cachedPages[pageId] : undefined;
 
   return (
     <div className="flex flex-col h-full text-[13px]">
@@ -59,7 +61,7 @@ export default function BrowserApp() {
           <div className="px-3 pb-1.5 pt-1 text-[10px] text-faint truncate border-t border-line flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-accent shrink-0" />
             <span className="truncate">{page.siteTitle}</span>
-            <span className="text-faint/60 hidden sm:inline ml-auto">retrieved {HISTORY.find((h) => h.pageId === page.id)?.visitedAt ?? ""}</span>
+            <span className="text-faint/60 hidden sm:inline ml-auto">retrieved {history.find((h) => h.pageId === page.id)?.visitedAt ?? ""}</span>
           </div>
         )}
       </div>
@@ -73,11 +75,11 @@ export default function BrowserApp() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-            <span className="text-faint text-[10px] tracking-wide">{filtered.length} / {HISTORY.length} entries</span>
+            <span className="text-faint text-[10px] tracking-wide">{filtered.length} / {history.length} entries</span>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">
             {filtered.map((h) => {
-              const hasPage = !!(h.pageId && CACHED_PAGES[h.pageId]);
+              const hasPage = !!(h.pageId && cachedPages[h.pageId]);
               const domain = (() => {
                 try { return new URL(h.url).hostname; } catch { return h.url.slice(0, 32); }
               })();
@@ -121,7 +123,7 @@ export default function BrowserApp() {
       )}
 
       <div className="shrink-0 h-[20px] px-3 flex items-center justify-between border-t border-line bg-surface text-[10px] text-faint tracking-wide">
-        <span>KESTREL PAGES RENDER FROM LOCAL CACHE — air-gapped 2025-11-30</span>
+        <span>{activeCorpus().id === "apollo13" ? "APOLLO PAGES RENDER FROM LOCAL CACHE — public domain · air-gapped" : "KESTREL PAGES RENDER FROM LOCAL CACHE — air-gapped 2025-11-30"}</span>
         <span>cached renderer v1</span>
       </div>
     </div>
@@ -673,6 +675,311 @@ function CachedPageView({
             <p key={i} className="text-[13px] leading-[1.7] text-[#a0b8a8]">{p}</p>
           ))}
           <div className="text-[10px] text-[#4a5f52] font-mono pt-3 border-t border-[#1d2e24] flex justify-between"><span>file:///Research/ORPHEUS/anomaly_notes.txt · 23:47 Mar 9</span><span>LOCAL</span></div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── APOLLO 13 — four purpose-built archive renderers ───────────────
+
+  if (kind === "apollo-history") {
+    const domain = (() => { try { return new URL(url).hostname; } catch { return "nasa.gov"; } })();
+    const isKranz = title.includes("We've Had a Problem");
+    return (
+      <div className="min-h-full bg-[#f8f9fb] text-[#1a2633] flex flex-col">
+        {/* NASA header */}
+        <div className="bg-[#0b3d91] text-white px-5 py-3 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-white grid place-items-center shrink-0">
+            <span className="text-[#0b3d91] font-black text-[11px] tracking-[0.12em] leading-none">NASA</span>
+          </div>
+          <div className="leading-none">
+            <div className="text-[11px] tracking-[0.28em] font-bold">NATIONAL AERONAUTICS AND SPACE ADMINISTRATION</div>
+            <div className="text-[10px] tracking-[0.14em] text-[#a8c0e8] mt-0.5">HISTORY OFFICE · PUBLIC DOMAIN · WASHINGTON, D.C.</div>
+          </div>
+          <span className="ml-auto hidden sm:block text-[9px] tracking-[0.16em] bg-white/10 border border-white/20 px-2 py-1">history.nasa.gov</span>
+        </div>
+        {/* breadcrumb + search mock */}
+        <div className="bg-white border-b border-[#d0dbea] px-5 py-2 flex items-center gap-2 text-[10px]">
+          <span className="text-[#6a8aaa]">nasa.gov</span><span className="text-[#c0cddc]">/</span><span className="text-[#6a8aaa]">history</span><span className="text-[#c0cddc]">/</span>
+          <span className="text-[#0b3d91] font-semibold truncate">apollo-13-accident</span>
+          <span className="ml-auto hidden sm:inline text-[#6a8aaa] font-mono">retrieved 1970-04-20 · cached · air-gapped</span>
+        </div>
+        {/* article hero */}
+        <div className="bg-white border-b border-[#d0dbea]">
+          <div className="max-w-[740px] mx-auto px-6 py-6">
+            <div className="inline-flex items-center gap-1.5 text-[9px] tracking-[0.18em] text-[#0b3d91] border border-[#c0ddea] bg-[#eef3fb] px-2 py-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#fc3d21]" aria-hidden /> APOLLO 13 · CHRONOLOGY
+            </div>
+            <h1 className="text-[20px] font-bold leading-tight text-[#0b1e3a] mt-3">{title.replace("NASA History — ", "")}</h1>
+            <div className="text-[11px] text-[#6a8aaa] mt-1.5 flex flex-wrap items-center gap-2">
+              <span className="font-mono">nasa.gov/history</span><span className="text-[#c0cddc]">·</span><span>By NASA History Office</span>
+              <span className="hidden sm:inline bg-[#0b3d91] text-white px-1.5 py-0.5 text-[9px] tracking-[0.14em]">PUBLIC DOMAIN</span>
+            </div>
+            {/* timeline strip — the clock that matters on this machine */}
+            <div className="mt-4 flex items-center gap-2 bg-[#0b1e3a] text-white px-3 py-2.5 rounded-sm">
+              <span className="text-[10px] tracking-[0.16em] text-[#8fb0d0]">RANGE ZERO</span>
+              <span className="text-[11px] font-mono font-bold">1970-04-11 19:13:00 G.m.t.</span>
+              <span className="text-[#4a6a9e]">→</span>
+              <span className="text-[10px] tracking-[0.14em] text-[#8fb0d0]">GET 55:54:53</span>
+              <span className="text-[11px] font-mono font-bold text-amber">03:07 UTC</span>
+              <span className="ml-auto hidden sm:inline text-[9px] tracking-[0.16em] text-[#6a8aaa] border border-white/15 px-1.5 py-0.5">UTC = ZERO + GET</span>
+            </div>
+          </div>
+        </div>
+        {/* hero image strip — Apollo silhouette */}
+        <div className="h-[110px] relative overflow-hidden border-b border-[#d0dbea] bg-gradient-to-r from-[#0b1e3a] via-[#142e5c] to-[#1a3a6e] flex items-center">
+          <div className="absolute inset-0 opacity-20" style={{ background: "repeating-linear-gradient(90deg, transparent 0 60px, rgba(255,255,255,0.04) 61px 62px)" }} />
+          <div className="max-w-[740px] mx-auto w-full px-6 relative flex items-center justify-between">
+            <div className="text-white/90">
+              <div className="text-[10px] tracking-[0.2em] text-[#8fb0d0]">AS-508 · APOLLO 13</div>
+              <div className="text-[13px] font-mono mt-0.5">200,000 mi from Earth · one tank · 1.8 s of silence</div>
+            </div>
+            <div className="hidden sm:flex items-center gap-1.5 text-[10px] font-mono text-[#c8d6ea] border border-white/15 bg-white/5 px-3 py-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#fc3d21] animate-pulse" /> LIVE TELEMETRY · RECOVERED
+            </div>
+          </div>
+        </div>
+        {/* body */}
+        <div className="max-w-[740px] mx-auto px-6 py-6 space-y-4 flex-1 w-full">
+          {paragraphs.map((p, i) => {
+            const isQuote = p.startsWith("Verbatim") || p.includes('"');
+            const isCross = p.startsWith("Cross-check") || p.startsWith("Also here");
+            if (isQuote) {
+              return (
+                <div key={i} className="border-l-[3px] border-[#fc3d21] bg-white border border-[#e0e6ea] border-l-[#fc3d21] p-4">
+                  <div className="text-[9px] tracking-[0.18em] text-[#8a7a6a] mb-1.5">VERBATIM — AIR-TO-GROUND LOOP</div>
+                  <p className="text-[13px] leading-[1.65] text-[#1a2633] font-mono text-[12.5px]">{p}</p>
+                </div>
+              );
+            }
+            if (isCross) {
+              return (
+                <div key={i} className="bg-[#eef3fb] border border-[#c0ddea] p-3 flex gap-3">
+                  <span className="text-[#0b3d91] text-[14px] leading-none mt-0.5">◈</span>
+                  <p className="text-[12.5px] leading-[1.65] text-[#243a5a]">{p}</p>
+                </div>
+              );
+            }
+            return <p key={i} className={i === 0 ? "text-[13.5px] leading-[1.7] text-[#1a2633] font-medium border-b border-[#e8eef4] pb-4" : "text-[13px] leading-[1.7] text-[#344a5e]"}>{p}</p>;
+          })}
+          <div className="flex items-center gap-2 pt-4 border-t border-[#d0dbea] text-[10px] font-mono text-[#6a8aaa]">
+            <span className="w-2 h-2 rounded-full bg-[#0b3d91]" /> {domain} · cached · air-gapped · public domain
+            <span className="ml-auto">retrieved 1970-04-20</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (kind === "apollo-report") {
+    const docId = url.includes("19700076776") ? "NASA-TM-X-65270" : url.includes("20110015690") ? "NTRS 20110015690" : url.includes("msc02680") || url.includes("02680") ? "MSC-02680" : "NASA-TM-X-65270";
+    const docDate = docId === "MSC-02680" ? "September 1970" : docId === "NTRS 20110015690" ? "2011" : "June 15, 1970";
+    return (
+      <div className="min-h-full bg-[#fafaf8] text-[#1e1e1e] flex flex-col">
+        {/* NTRS / report header */}
+        <div className="bg-white border-b border-[#d6d0c4] px-5 py-3 flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="w-7 h-7 bg-[#0b3d91] text-white grid place-items-center text-[10px] font-black tracking-wide">NASA</span>
+            <div className="leading-none">
+              <div className="text-[10px] tracking-[0.18em] font-bold text-[#0b3d91]">NTRS · NASA TECHNICAL REPORTS SERVER</div>
+              <div className="text-[9px] text-[#8a7a6a] font-mono mt-0.5">{docId} · {docDate}</div>
+            </div>
+          </div>
+          <span className="ml-auto hidden sm:inline-flex items-center gap-1.5 text-[9px] tracking-[0.14em] bg-[#0b3d91] text-white px-2 py-1"><span className="w-2 h-2 bg-white rounded-full" /> PUBLIC DOMAIN</span>
+          <span className="hidden sm:inline text-[9px] font-mono text-[#8a7a6a] border border-[#d6d0c4] px-2 py-1">PDF · machine-readable</span>
+        </div>
+        {/* cover card */}
+        <div className="bg-[#0b1e3a] text-white px-6 py-5">
+          <div className="max-w-[720px] mx-auto">
+            <div className="text-[9px] tracking-[0.22em] text-[#8fb0d0]">REPORT OF APOLLO 13 REVIEW BOARD · CHAPTER EXCERPT ON THIS WORKSTATION</div>
+            <div className="text-[17px] font-bold leading-tight mt-1">{title}</div>
+            <div className="flex flex-wrap gap-2 mt-3 text-[10px]">
+              <span className="bg-white/10 border border-white/15 px-2 py-1 font-mono">{docId}</span>
+              <span className="bg-white/10 border border-white/15 px-2 py-1">Chairman · Edgar M. Cortright</span>
+              <span className="bg-[#fc3d21] px-2 py-1 font-bold tracking-[0.12em]">ON THIS DISK: /Board/</span>
+            </div>
+          </div>
+        </div>
+        {/* meta strip */}
+        <div className="bg-[#eef3fb] border-b border-[#c0ddea] px-6 py-3">
+          <div className="max-w-[720px] mx-auto grid grid-cols-3 gap-3 text-center">
+            {[
+              { k: "ESTABLISHED", v: "Apr 17, 1970" },
+              { k: "TRANSMITTED", v: "Jun 15, 1970" },
+              { k: "PAGES ON DISK", v: "/Board/ · 9 files" },
+            ].map((s) => (
+              <div key={s.k} className="bg-white border border-[#d0dbea] py-2">
+                <div className="text-[8px] tracking-[0.16em] text-[#6a8aaa]">{s.k}</div>
+                <div className="text-[11px] font-mono font-bold text-[#0b1e3a] mt-0.5">{s.v}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* body */}
+        <div className="max-w-[720px] mx-auto px-6 py-6 space-y-4 flex-1 w-full">
+          {paragraphs.map((p, i) => {
+            const isFinding = p.includes("were welded permanently closed") || p.includes("finding this corpus");
+            const isMachineReadable = p.includes("machine-readable") || p.includes("OCR transcription");
+            if (isFinding) {
+              return (
+                <div key={i} className="bg-[#fff8f0] border border-[#e8ddd0] border-l-[3px] border-l-[#0b3d91] p-4">
+                  <div className="text-[9px] tracking-[0.18em] text-[#8a6a3a] mb-1.5">● BOARD FINDING — VERBATIM</div>
+                  <p className="text-[13px] leading-[1.65] text-[#2b241e] italic">&ldquo;{p}&rdquo;</p>
+                </div>
+              );
+            }
+            if (isMachineReadable) {
+              return (
+                <div key={i} className="bg-white border border-[#d0dbea] p-3 flex gap-3">
+                  <span className="text-[#0b3d91] mt-0.5">▣</span>
+                  <p className="text-[12.5px] leading-[1.6] text-[#344a5e]">{p}</p>
+                </div>
+              );
+            }
+            return <p key={i} className={i === 0 ? "text-[13.5px] leading-[1.65] text-[#1a2633] font-medium" : "text-[13px] leading-[1.65] text-[#2b2b2b]"}>{p}</p>;
+          })}
+          <div className="text-[10px] font-mono text-[#8a7a6a] pt-4 border-t border-[#e8ddd0] flex justify-between">
+            <span className="truncate">{url}</span><span className="ml-2 shrink-0 hidden sm:inline">PDF · CACHED</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (kind === "apollo-image") {
+    const imageMap: Record<string, { src: string; id: string; cap: string }> = {
+      image_8500: { src: "/Images/apollo13/as13-59-8500.jpg", id: "AS13-59-8500", cap: "Damaged Service Module · Sector 4" },
+      image_35013: { src: "/Images/apollo13/s70-35013.jpg", id: "S70-35013", cap: "CO2 Adapter Prototype · Mission Control" },
+      image_35638: { src: "/Images/apollo13/s70-35638.jpg", id: "S70-35638", cap: "Splashdown · South Pacific" },
+      image_41984: { src: "/Images/apollo13/s70-41984.jpg", id: "S70-41984", cap: "Ground Test · Tank Failure Reproduction" },
+      image_8929: { src: "/Images/apollo13/as13-62-8929.jpg", id: "AS13-62-8929", cap: "CO₂ Adapter Installed · Lunar Module" },
+      image_9004: { src: "/Images/apollo13/as13-62-9004.jpg", id: "AS13-62-9004", cap: "LM Interior · Return Coast" },
+      image_8484: { src: "/Images/apollo13/as13-59-8484.jpg", id: "AS13-59-8484", cap: "Lovell in LM · Before Jettison" },
+      image_8562: { src: "/Images/apollo13/as13-59-8562.jpg", id: "AS13-59-8562", cap: "Aquarius After Jettison" },
+      image_35145: { src: "/Images/apollo13/s70-35145.jpg", id: "S70-35145", cap: "Mission Control at Splashdown" },
+    };
+    // resolve by page id from title/url
+    let resolved: { src: string; id: string; cap: string } | null = null;
+    for (const [k, v] of Object.entries(imageMap)) {
+      if (title.includes(v.id) || url.includes(v.id.toLowerCase()) || url.includes(k)) { resolved = v; break; }
+    }
+    // also try by direct image asset check
+    if (!resolved) {
+      if (title.includes("AS13-59-8500") || url.includes("as13-59-8500")) resolved = imageMap.image_8500;
+      else if (title.includes("S70-35013") || url.includes("35013")) resolved = imageMap.image_35013;
+      else if (title.includes("S70-35638") || url.includes("35638")) resolved = imageMap.image_35638;
+      else if (title.includes("S70-41984") || url.includes("41984")) resolved = imageMap.image_41984;
+    }
+    return (
+      <div className="min-h-full bg-[#0f1419] text-[#d6e4e0] flex flex-col">
+        <div className="bg-black text-[#8fb0d0] px-4 py-2.5 flex items-center gap-3 border-b border-[#1e2e36]">
+          <span className="text-[10px] tracking-[0.22em] font-bold text-white">NASA</span>
+          <span className="text-[11px] tracking-wide text-[#c8d6ea]">IMAGE AND VIDEO LIBRARY</span>
+          <span className="text-[9px] text-[#5a7a9a] hidden sm:inline">images.nasa.gov</span>
+          <span className="ml-auto text-[9px] tracking-[0.16em] bg-white/10 border border-white/10 px-2 py-1 text-[#c8d6ea]">PUBLIC DOMAIN</span>
+        </div>
+        {resolved && (
+          <div className="bg-[#0a0e12] border-b border-[#1e2e36] p-3">
+            <div className="max-w-[720px] mx-auto">
+              <div className="relative bg-black rounded-sm overflow-hidden border border-[#1e2e36]">
+                <img src={resolved.src} alt={resolved.cap} className="w-full h-auto max-h-[320px] object-contain mx-auto" loading="lazy" />
+                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent px-3 py-2 flex items-center justify-between">
+                  <span className="text-[11px] font-mono text-white">{resolved.id}</span>
+                  <span className="text-[9px] tracking-[0.14em] text-white/70 border border-white/20 px-1.5 py-0.5">ON THIS DISK · /Photos/</span>
+                </div>
+              </div>
+              <div className="text-[11px] text-[#8fb0d0] mt-2 text-center font-mono">{resolved.cap}</div>
+            </div>
+          </div>
+        )}
+        <div className="max-w-[720px] mx-auto px-6 py-5 space-y-4 flex-1 w-full">
+          <div>
+            <div className="inline-flex items-center gap-2 text-[9px] tracking-[0.16em] text-[#0b3d91] bg-[#eef3fb] border border-[#c0ddea] px-2 py-1">
+              <span className="w-1.5 h-1.5 bg-[#0b3d91] rounded-full" /> CATALOG RECORD · {resolved?.id ?? "NASA IMAGE"}
+            </div>
+            <div className="text-[16px] font-bold leading-tight text-[#e0ece8] mt-2">{title.replace("NASA Image and Video Library — ", "")}</div>
+            <div className="text-[11px] text-[#6a8a9a] font-mono mt-1 truncate">{url}</div>
+          </div>
+          {paragraphs.map((p, i) => {
+            const isConflict = p.includes("conflict") || p.includes("contradicts") || p.includes("disagree");
+            const isCaption = p.startsWith("NASA caption");
+            if (isCaption) {
+              return (
+                <div key={i} className="bg-[#1a2420] border border-[#2a3d32] border-l-[3px] border-l-[#fc3d21] p-3">
+                  <div className="text-[9px] tracking-[0.16em] text-[#c9a58a] mb-1">NASA CAPTION — VERBATIM</div>
+                  <p className="text-[12.5px] leading-[1.6] text-[#d6c9a8] italic">{p}</p>
+                </div>
+              );
+            }
+            if (isConflict) {
+              return (
+                <div key={i} className="bg-amber/[0.06] border border-amber/20 p-3">
+                  <div className="text-[9px] tracking-[0.16em] text-amber mb-1">⚠ PRESERVED CONFLICT</div>
+                  <p className="text-[12.5px] leading-[1.6] text-[#d6c9a8]">{p}</p>
+                </div>
+              );
+            }
+            return <p key={i} className={i === 0 ? "text-[13px] leading-[1.65] text-[#b8c9c2] bg-[#111d18] border border-[#1e2e36] p-3" : "text-[13px] leading-[1.65] text-[#a0b8b0]"}>{p}</p>;
+          })}
+          <div className="text-[10px] font-mono text-[#4a6a7a] pt-3 border-t border-[#1e2e36] flex justify-between">
+            <span>images.nasa.gov/details/{resolved?.id?.toLowerCase() ?? "—"} · cached</span><span className="hidden sm:inline">IMAGE · PUBLIC DOMAIN</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (kind === "apollo-archive") {
+    const isSenate = url.includes("govinfo") || title.includes("Senate");
+    const isAFJ = url.includes("apollojournals") || title.includes("Flight Journal");
+    const accent = isSenate ? "#1a3a5a" : isAFJ ? "#1a2620" : "#2a241e";
+    return (
+      <div className="min-h-full bg-[#fafaf8] text-[#1e1e1e] flex flex-col">
+        <div className="px-5 py-3 flex items-center gap-3 border-b" style={{ background: accent, color: isAFJ ? "#c8d6ca" : "white", borderColor: "rgba(0,0,0,0.12)" }}>
+          <span className="w-8 h-8 rounded-sm bg-white/15 border border-white/20 grid place-items-center text-[10px] font-bold">{isSenate ? "◈" : isAFJ ? "AFJ" : "◈"}</span>
+          <div className="leading-none">
+            <div className="text-[11px] tracking-[0.16em] font-bold">{isSenate ? "U.S. GOVERNMENT PUBLISHING OFFICE" : isAFJ ? "APOLLO FLIGHT JOURNAL" : "NASA STATIC ARCHIVE"}</div>
+            <div className="text-[10px] opacity-70 mt-0.5 font-mono truncate max-w-[420px]">{title}</div>
+          </div>
+          <span className="ml-auto hidden sm:inline text-[9px] tracking-[0.14em] bg-white/10 border border-white/20 px-2 py-1">{isSenate ? "GPO · govinfo.gov" : isAFJ ? "apollojournals.org" : "nasa.gov"}</span>
+        </div>
+        {/* status bar for AFJ/senate context */}
+        <div className="bg-white border-b border-[#d6d0c4] px-5 py-2.5 flex items-center gap-2 text-[10px]">
+          <span className={`px-2 py-0.5 text-[9px] tracking-[0.14em] font-bold border ${isAFJ ? "bg-[#1a2620] text-[#8fcaa0] border-[#2a3d32]" : "bg-[#1a3a5a] text-white border-[#1a3a5a]"}`}>{isAFJ ? "CORRECTED TRANSCRIPT" : isSenate ? "CONGRESSIONAL RECORD" : "ARCHIVE PDF"}</span>
+          <span className="text-[#8a7a6a] font-mono hidden sm:inline">public domain · {isAFJ ? "audio is government work; transcript © Woods et al." : "U.S. Government work"}</span>
+          <span className="ml-auto text-[#8a7a6a] font-mono">cached · air-gapped</span>
+        </div>
+        <div className="max-w-[720px] mx-auto px-6 py-6 space-y-4 flex-1 w-full">
+          {isAFJ && (
+            <div className="bg-[#0f1e18] border border-[#1e3a2e] p-4 flex items-start gap-3">
+              <div className="w-10 h-10 rounded-sm bg-[#1a3028] border border-[#2a4a3a] grid place-items-center text-[#8fcaa0] text-[11px] font-mono shrink-0">AFJ</div>
+              <div>
+                <div className="text-[12px] font-bold text-[#c8e6cc]">W. David Woods · Johannes Kemppanen · Alexander Turhanov · Lennox J. Waugh</div>
+                <div className="text-[11px] text-[#7fbea0] mt-0.5">Corrected transcript prepared against public-domain mission audio. The audio is the source; the transcript is the scholarship.</div>
+              </div>
+            </div>
+          )}
+          {isSenate && (
+            <div className="bg-[#eef3fb] border border-[#c0ddea] p-3">
+              <div className="text-[10px] tracking-[0.16em] text-[#1a3a5a] font-bold">HEARING — COMMITTEE ON AERONAUTICAL AND SPACE SCIENCES · JUNE 1970</div>
+              <div className="text-[11px] text-[#344a5e] mt-1">Testimony under oath. The technical account given to the Senate is the same account the Review Board printed — which is not something a reader should have to assume.</div>
+            </div>
+          )}
+          {paragraphs.map((p, i) => {
+            const isProvenance = p.startsWith("A working note") || p.startsWith("Nothing in /Board");
+            if (isProvenance) {
+              return (
+                <div key={i} className="bg-[#faf6ef] border border-[#e8ddd0] p-3">
+                  <div className="text-[9px] tracking-[0.16em] text-[#8a7a6a] mb-1">ARCHIVIST'S NOTE</div>
+                  <p className="text-[12.5px] leading-[1.6] text-[#3d352a]">{p}</p>
+                </div>
+              );
+            }
+            return <p key={i} className={i === 0 ? "text-[13.5px] leading-[1.65] text-[#1a2633] font-medium" : "text-[13px] leading-[1.65] text-[#2b2b2b]"}>{p}</p>;
+          })}
+          <div className="text-[10px] font-mono text-[#8a7a6a] pt-3 border-t border-[#e8ddd0] flex justify-between gap-3">
+            <span className="truncate">{url}</span><span className="shrink-0 hidden sm:inline">CACHED</span>
+          </div>
         </div>
       </div>
     );

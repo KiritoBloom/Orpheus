@@ -169,7 +169,7 @@ export function runStaticChecks(tools: ToolLike[], expectedCount?: number): Stat
   const term = tools.find((t) => t.name === "terminal_command");
   if (term) {
     const allowed = new RegExp(`^(${TERMINAL_VERB_LIST.join("|")})(\\s+[a-zA-Z0-9._/\\- ]*)?$`);
-    const positives = ["help", "ls", "ls /", "cat /System/FIELD_GUIDE.txt", "unlock lantern orpheus echo", "clear"];
+    const positives = ["help", "ls", "ls /", "cat /System/FIELD_GUIDE.txt", "cat /System/ORIENTATION.txt", "unlock lantern orpheus echo", "unlock heater thermostat arc", "clear"];
     const negatives = [
       "rm -rf /",
       "ls; cat /etc/passwd",

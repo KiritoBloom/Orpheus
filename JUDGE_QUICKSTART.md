@@ -1,6 +1,7 @@
 # JUDGE QUICKSTART — verify Orpheus in 30 seconds, or 90 with an agent
 
 **Live:** https://orpheus-mcduff.vercel.app/
+**Second instance:** https://orpheus-mcduff.vercel.app/apollo13 — the same 25 tools over the real Apollo 13 accident record
 **Repo:** MIT, `document.modelContext.registerTool` visible at the top of the README
 
 > Orpheus is a game that proves a pattern: **human eyes plus machine recall at one desk, with the browser as arbiter.** You do not need an agent to verify it. The tool console *is* the agent interface, exposed to you.
@@ -91,16 +92,34 @@ A banner names the shortcut on arrival. Preloaded flags are the flags real play 
 
 ---
 
-## 4) Beyond the case
+## 4) Beyond the case — instance two exists, and it is real
 
-The McDuff investigation is instance one. The pattern — 20–30 semantic tools over filesystem, messages, logs, and images, with visible actuation and asymmetric perception — transfers to any corpus where some evidence is visual and some is machine-readable:
+The McDuff investigation is fiction. **[`/apollo13`](https://orpheus-mcduff.vercel.app/apollo13) is not.** It is the same engine, the same 25 tools and the same set piece over the primary record of the Apollo 13 accident: the Review Board report (June 1970), the MSC-02680 Mission Report, five voice-loop threads, and nine photographs served from `public/Images/apollo13/` with real byte sizes and real SHA-256 prefixes you can check with `certutil -hashfile`.
+
+Nothing in that corpus is invented. Where the record contradicts itself, the contradiction is preserved rather than smoothed:
+
+- service-module jettison at GET 138:01:48 in the Mission Report vs 138:02:06 on the voice loop — 18 seconds apart
+- splashdown at 12:07:41 p.m. CST derived from the report vs 12:07:44 in the press caption — 3 seconds apart
+- press photo S70-35013 captions the CO2 adapter as the command module's; the frame shows the lunar module's
+
+The clock is the other half of the exercise: everything on that disk is Ground Elapsed Time, and UTC is range zero `1970-04-11 19:13:00` plus GET. The accident is GET 55:54:53 — **03:07 UTC**. Ask the agent for `get_system_logs {"filter":"03:07"}` and it lands on the failure; the same tool call on instance one lands on 02:13.
+
+**How it works:** every player-visible string, rule and document lives behind one `Corpus` interface (`src/game/data/corpus.ts`) — filesystem, mail, threads, logs, photos, evidence, flag rules, vault sequence, checklist, boot chrome, case jacket. `services.ts` reads it through `activeCorpus()`; `register.ts` never imports a data module (enforced by check 16 of `pnpm test:webmcp`). Adding an instance is a data file and a route, not a fork:
+
+```ts
+// src/components/Apollo13Root.tsx
+registerCorpus("apollo13", () => APOLLO13_CORPUS);
+setActiveCorpus("apollo13");
+```
+
+The pattern transfers to any corpus where some evidence is visual and some is machine-readable:
 
 - newsroom leak review, where a photograph matters and 50,000 documents also matter
 - SOC or air-gapped host forensics on a night shift with nobody else awake
 - research-integrity and e-discovery review
 - classroom archive digs where students describe and the agent contextualises
 
-Replace `src/game/data/*`, keep the `services.ts` + `register.ts` split, deploy one static site. No backend, no database, no environment variables, IndexedDB persistence.
+One static site either way. No backend, no database, no environment variables, IndexedDB persistence scoped per corpus.
 
 ---
 
@@ -116,6 +135,7 @@ Replace `src/game/data/*`, keep the `services.ts` + `register.ts` split, deploy 
 - [ ] Evidence board `CASE RECONSTRUCTION` lights only after `COLLABORATED_WITH_ARIA` plus 4 of 6 milestones
 - [ ] Sealed private-backup photos (`badge_scan`, `brass_plate`, `campus_map`) are unreachable by tool until the vestibule is decrypted
 - [ ] After the vault: the `02:13 WINDOW` badge appears within ~2.5 min; human zoom + agent log query inside 90 s → `WINDOW_SYNCHRONIZED` and `/Private/window_echo.txt`
+- [ ] **[`/apollo13`](https://orpheus-mcduff.vercel.app/apollo13)** boots the same 25 tools over real NASA material: `get_system_logs {"filter":"03:07"}` finds the accident, `search_files {"query":"welded permanently closed"}` finds the Board's switch finding, and no McDuff string appears anywhere in the instance
 
 If you are short on time, the 30-second LINK path alone covers WebMCP Leverage and Execution.
 

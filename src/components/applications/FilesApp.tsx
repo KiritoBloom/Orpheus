@@ -6,22 +6,22 @@ import type { FsNode } from "@/types/game";
 import * as S from "@/game/services";
 import { useOS } from "@/game/state/osStore";
 import { sfx } from "@/audio/engine";
+import { activeCorpus } from "@/game/data/corpus";
 import DeclarativeForm from "@/components/DeclarativeForm";
 
 /* ============================================================
    FILE MANAGER — dense two-pane browser with STATUS column
+
+   The sidebar shortcuts, banners, volume line and vault copy all
+   come from the corpus; the pane behaviour is the machine's.
    ============================================================ */
 
-const QUICK: { label: string; path: string }[] = [
-  { label: "ROOT", path: "/" },
-  { label: "RESEARCH", path: "/Research" },
-  { label: "PERSONAL", path: "/Personal" },
-  { label: "PROJECTS", path: "/Projects" },
-  { label: "PHOTOS", path: "/Photos" },
-  { label: "SYSTEM", path: "/System" },
-];
-
 export default function FilesApp() {
+  const corpus = activeCorpus();
+  const chrome = corpus.chrome;
+  const guidance = corpus.guidance;
+  const vaultUi = corpus.vaultUi;
+  const QUICK = guidance.quickPaths;
   const [cwd, setCwd] = useState("/");
   const [sel, setSel] = useState<string | null>(null);
   const [seeking, setSeeking] = useState(false);
@@ -99,14 +99,14 @@ export default function FilesApp() {
           <>
             <div className="mono-xs text-faint px-2 pt-2 pb-1">DISCOVERED</div>
             <button
-              className={`block w-full text-left px-2.5 py-[3px] text-[11px] cursor-pointer ${cwd.startsWith("/Private") ? "bg-sel text-accent" : "text-amber hover:text-txt"}`}
-              onClick={() => { seekTo("/Private"); sfx.click(); }}
+              className={`block w-full text-left px-2.5 py-[3px] text-[11px] cursor-pointer ${cwd.startsWith(vaultUi.revealedPath) ? "bg-sel text-accent" : "text-amber hover:text-txt"}`}
+              onClick={() => { seekTo(vaultUi.revealedPath); sfx.click(); }}
             >
-              ▨ PRIVATE
+              {vaultUi.revealedLabel}
             </button>
             {os.flags.has("VAULT_DECOY") && (
               <button className="block w-full text-left px-2.5 py-[3px] text-[10px] text-dim hover:text-txt cursor-pointer"
-                onClick={() => { seekTo("/Private/_fragments_recovered"); sfx.click(); }}>
+                onClick={() => { seekTo(vaultUi.decoyPath); sfx.click(); }}>
                 └ _fragments…
               </button>
             )}
@@ -129,12 +129,12 @@ export default function FilesApp() {
           <div className="shrink-0 px-3 py-1.5 border-b border-line bg-surface2">
             <DeclarativeForm
               toolname="unlock_vault"
-              tooldescription="Submit the three-word passphrase Daniel photographed on his desk. Three words, in the correct order. Wrong attempts reveal a fragment archive instead of destroying anything."
+              tooldescription={vaultUi.formDescription}
               paramName="passphrase"
-              paramDescription="Three words separated by single spaces — e.g. 'lantern orpheus echo'. The order matters."
-              placeholder="lantern orpheus echo"
+              paramDescription={vaultUi.paramDescription}
+              placeholder={vaultUi.placeholder}
               submitLabel="UNLOCK"
-              label="UNLOCK VESTIBULE —"
+              label={vaultUi.formLabel}
               className="flex-1"
               onExecute={async (passphrase) => {
                 const words = passphrase.split(/\s+/).filter(Boolean);
@@ -143,12 +143,12 @@ export default function FilesApp() {
                   sfx.chime();
                   useOS.getState().pushToast({
                     app: "FILES",
-                    title: "VESTIBULE DECRYPTED",
-                    body: "/Private is now accessible.",
+                    title: vaultUi.successToast.title,
+                    body: vaultUi.successToast.body,
                   });
                   S.openApplication("files");
-                  setTimeout(() => S.filesNavigateBus.emit("/Private"), 80);
-                  return "Vault unlocked. /Private is now accessible.";
+                  setTimeout(() => S.filesNavigateBus.emit(vaultUi.revealedPath), 80);
+                  return `Vault unlocked. ${vaultUi.revealedPath} is now accessible.`;
                 }
                 sfx.error();
                 useOS.getState().pushToast({ app: "FILES", title: "VAULT", body: r.message });
@@ -167,12 +167,12 @@ export default function FilesApp() {
         <div className="flex-1 min-h-0 overflow-y-auto">
           {cwd === "/" && !os.flags.has("FOUND_GUIDE") && (
             <div className="mx-2 mt-2 mb-1 px-2 py-1.5 text-[10px] leading-relaxed text-amber border border-amber/30 bg-amber/10">
-              ★ START HERE: open <span className="text-txt">SYSTEM / FIELD_GUIDE.txt</span> — how to play &amp; how to work with ARIA. Then read <span className="text-txt">readme_first.txt</span>.
+              {guidance.startBanner}
             </div>
           )}
           {cwd === "/" && os.flags.has("FOUND_GUIDE") && (
             <div className="mx-2 mt-2 mb-1 px-2 py-1.5 text-[10px] leading-relaxed text-accentdim border border-line bg-surface2">
-              TIP: Files → System → FIELD_GUIDE.txt is your handbook. Select an item, then press OPEN; double-click also works.
+              {guidance.tipBanner}
             </div>
           )}
           {items.map((n) => (
@@ -209,7 +209,7 @@ export default function FilesApp() {
         {/* status bar */}
         <div className="shrink-0 h-[20px] px-2 flex items-center justify-between border-t border-line bg-surface text-[9.5px] text-faint">
           <span>{items.length} OBJECT(S)</span>
-          <span>MCDUFF-WKS01 · VOLUME 0 · NTFS-LIKE · AIR-GAPPED</span>
+          <span>{chrome.volumeLine}</span>
         </div>
       </div>
     </div>

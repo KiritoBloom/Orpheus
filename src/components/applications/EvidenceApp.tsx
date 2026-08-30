@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { EvidenceSection } from "@/types/game";
 import { useInvestigation } from "@/game/state/investigationStore";
 import { useOS } from "@/game/state/osStore";
-import { EVIDENCE } from "@/game/data/evidence";
+import { activeCorpus } from "@/game/data/corpus";
 import { reconstructionProgress } from "@/game/services";
 import { sfx } from "@/audio/engine";
 import DeclarativeForm from "@/components/DeclarativeForm";
@@ -25,10 +25,11 @@ const SECTIONS: { id: EvidenceSection; label: string }[] = [
 export default function EvidenceApp() {
   const inv = useInvestigation();
   const os = useOS();
+  const guidance = activeCorpus().guidance;
   const [tab, setTab] = useState<EvidenceSection>("people");
   const [recon, setRecon] = useState(false);
   const items = inv.getVisibleEvidence().filter((e) => e.section === tab);
-  const totalEvidence = EVIDENCE.length;
+  const totalEvidence = activeCorpus().evidence.length;
   const collected = inv.getVisibleEvidence().length;
   const progress = Math.round((collected / totalEvidence) * 100);
   const progressGate = reconstructionProgress();
@@ -53,7 +54,7 @@ export default function EvidenceApp() {
           tooldescription="Search the whole workstation for a term the player noticed. Returns how many files, messages, and emails mention it, so you know where to look next."
           paramName="query"
           paramDescription="A term the player saw — a name, place, object, or number to correlate across files, messages, and mail."
-          placeholder="e.g. badge, kestrel, 02:13…"
+          placeholder={guidance.correlatePlaceholder}
           submitLabel="CORRELATE"
           label="CORRELATE —"
           onExecute={async (query) => {
@@ -72,8 +73,8 @@ export default function EvidenceApp() {
           toolname="record_evidence_form"
           tooldescription="Record one already-discovered item on the shared Evidence board by its id. Ids come from get_case_evidence; invented ids are rejected."
           paramName="evidenceId"
-          paramDescription="Evidence id from get_case_evidence, e.g. ev_0213_login. One id per submission."
-          placeholder="e.g. ev_0213_login"
+          paramDescription={`Evidence id from get_case_evidence, ${guidance.recordPlaceholder}. One id per submission.`}
+          placeholder={guidance.recordPlaceholder}
           submitLabel="RECORD"
           label="RECORD —"
           onExecute={async (id) => {
@@ -162,11 +163,7 @@ export default function EvidenceApp() {
           <div className="col-span-full panel-inset p-4 text-center">
             <div className="text-[11px] tracking-[0.14em] text-faint">NOTHING RECORDED HERE YET</div>
             <div className="text-[10.5px] text-dim mt-1 leading-relaxed">
-              {tab === "people" && "Talk to ARIA: “search messages for Haldane” — people emerge when you connect logs + messages."}
-              {tab === "events" && "Open System Log → FINAL NIGHT. Scroll. Watch the 02:13 block appear."}
-              {tab === "locations" && "Visit Private/photo_backup after the vault — maps and badges live there."}
-              {tab === "documents" && "Research → ORPHEUS holds every stack. Open anomaly_notes.txt."}
-              {tab === "hypotheses" && "Hypotheses unlock when you link visuals + logs. Try the checklist HUD → HINT."}
+              {guidance.evidenceEmptyHints[tab]}
             </div>
           </div>
         )}

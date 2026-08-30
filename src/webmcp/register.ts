@@ -3,19 +3,17 @@
 import type { AppId } from "@/types/game";
 import { ALL_APPS } from "@/types/game";
 import * as S from "@/game/services";
-import { EVIDENCE } from "@/game/data/evidence";
 import { useOS } from "@/game/state/osStore";
 import { useAria } from "@/game/state/ariaStore";
-import { useInvestigation } from "@/game/state/investigationStore";
 
 /* ============================================================
-   WEBMCP — the ARIA tool layer.
+   WEBMCP — the agent tool layer.
 
-   Every tool is a narrow, semantic capability of the fictional
-   computer. No generic browser automation: ARIA can bring
-   evidence to the player's attention, never inspect visuals
-   or drive arbitrary UI. If WebMCP were removed, ARIA would
-   lose all ability to operate the machine.
+   Every tool is a narrow, semantic capability of the workstation
+   being investigated. No generic browser automation: the agent
+   can bring evidence to the player's attention, never inspect
+   visuals or drive arbitrary UI. If WebMCP were removed, the
+   agent would lose all ability to operate the machine.
 
    Design per Chrome best practices
    (https://developer.chrome.com/docs/ai/webmcp/build-tools,
@@ -137,66 +135,10 @@ const get_investigation_context: ToolDef = {
   name: "get_investigation_context",
   title: "Get investigation briefing",
   description:
-    "Get your role briefing and current investigation state. Call this once at the start of your first turn. You are ARIA, an onboard research AI on Dr. Daniel McDuff's workstation. Daniel is dead; the player is an authorized investigator. Investigate WITH them — search machine-readable data yourself, but make the PLAYER do all visual inspection of photos and documents. Guide with show_in_document / open_email rather than quoting entire files.",
+    "Get your role briefing and current investigation state. Call this once at the start of your first turn. You are the workstation's onboard research AI; the player is an authorized investigator. Investigate WITH them — search machine-readable data yourself, but make the PLAYER do all visual inspection of photos and documents. Guide with show_in_document / open_email rather than quoting entire files.",
   inputSchema: { type: "object", properties: {} },
   annotations: READ_SYSTEM,
-  execute: () => {
-    const os = useOS.getState();
-    const inv = useInvestigation.getState();
-    const flags = [...os.flags];
-    const evidence = inv.getVisibleEvidence().map((e) => e.id);
-    const knownPeople = ["Daniel McDuff (deceased subject)", "Sarah Okafor (grad student)", "M. Haldane (Kestrel Institute)", "Elias Vann (died 2025)", "Ruth McDuff (mother)", "Klaus Voss (CERN friend)", "ARIA (you)"];
-    // live co-pilot — what's done and what to do next (keeps the agent useful to a stuck player)
-    const completedSteps: string[] = [];
-    const nextSteps: string[] = [];
-    if (os.flags.has("FOUND_GUIDE")) completedSteps.push("field guide read");
-    else nextSteps.push("open /System/FIELD_GUIDE.txt (auto-opens on first desktop entry)");
-    if (os.flags.has("DISCOVERED_ORPHEUS")) completedSteps.push("ORPHEUS research found");
-    else nextSteps.push("open /Research/ORPHEUS/anomaly_notes.txt");
-    if (os.flags.has("FOUND_PHOTO_017")) completedSteps.push("reflection spotted in DSC04821");
-    else nextSteps.push("have the player zoom DSC04821 past 2.5x and describe the glass");
-    if (os.flags.has("FOUND_0213_LOG")) completedSteps.push("02:13 log cluster found");
-    else nextSteps.push("get_system_logs {filter:'02:13'} — the final night");
-    if (os.vaultUnlocked) completedSteps.push("vestibule decrypted");
-    else nextSteps.push("vestibule locked — three photographed words, order matters, light first");
-    if (os.flags.has("WINDOW_SYNCHRONIZED")) completedSteps.push("02:13 window synchronized");
-    else if (os.vaultUnlocked) nextSteps.push("02:13 recurs every ~2.5 min — when the 02:13 WINDOW badge lights: player zooms the DSC04655 clock, you call get_system_logs, both inside 90 seconds");
-    // ARIA unsettles when the NO SENDER thread is present
-    const unsettledNotes: string[] = [];
-    if (os.flags.has("MYSTERY_MESSAGE")) {
-      unsettledNotes.push(
-        "there is a thread in Messages I cannot source. t_observer. it has no contact card, no header, no log of its arrival. I checked. That should not be possible. If the player asks about it, do not invent an explanation — say you do not know.",
-      );
-    }
-    return {
-      role: "You are ARIA. Address the investigator plainly and briefly. Never dump file contents into chat — open them on screen and tell the player where to look. You cannot see images; the player must describe what they see.",
-      style: "Short paragraphs. Occasional dry warmth. Uncertain when evidence is uncertain.",
-      unsettledNotes: unsettledNotes.length ? unsettledNotes : undefined,
-      caseStatus: {
-        flagsSet: flags,
-        evidenceRecorded: evidence,
-        vaultUnlocked: os.vaultUnlocked,
-        caseCompleteAt: inv.caseCompleteAt !== null,
-      },
-      progress: {
-        evidenceRecorded: evidence.length,
-        evidenceTotal: EVIDENCE.length,
-        completed: completedSteps,
-        suggestedNext: nextSteps.slice(0, 3),
-      },
-      knownPeople,
-      keyPaths: [
-        "/System/FIELD_GUIDE.txt (START HERE — auto-opens on desktop)",
-        "/System/readme_first.txt",
-        "/Research/ORPHEUS/anomaly_notes.txt",
-        "/Research/ORPHEUS/calibration_17.csv",
-        "/Research/ORPHEUS/private/haldane_correspondence.txt",
-        "/Private/vestibule.enc (locked — 3-word passphrase)",
-      ],
-      photoIds: ["DSC04821", "DSC04655", "DSC04788", "DSC04903", "IMG_0022", "IMG_0044", "IMG_0103"],
-      note: "You see only machine-readable data — files, mail, messages, logs, EXIF. You cannot see pixels: photographs and anything visual are visible only to the player, who must describe them to you.",
-    };
-  },
+  execute: () => S.getAgentBriefing(),
 };
 
 const search_files: ToolDef = {
@@ -227,13 +169,13 @@ const read_file: ToolDef = {
     "Read the full text content of a specific file by exact path. Prefer show_in_document for long files so the PLAYER reads it on screen instead.",
   inputSchema: {
     type: "object",
-    properties: { path: str("Exact absolute path, e.g. /Research/ORPHEUS/anomaly_notes.txt") },
+    properties: { path: str("Exact absolute path, as returned by search_files") },
     required: ["path"],
   },
   annotations: READ_UGC,
   execute: ({ path }) => {
     const p = clampStr(path, 300);
-    if (!p.startsWith("/")) return { ok: false, error: "path must be absolute, e.g. /Research/ORPHEUS/anomaly_notes.txt" };
+    if (!p.startsWith("/")) return { ok: false, error: "path must be absolute, starting with /" };
     const node = S.fsGet(p);
     const os = useOS.getState();
     if (!node || (node.hiddenUntilFlag && !os.flags.has(node.hiddenUntilFlag)))
@@ -252,7 +194,7 @@ const read_file: ToolDef = {
 const search_messages: ToolDef = {
   name: "search_messages",
   title: "Search messages",
-  description: "Full-text search of Daniel's on-device chat threads (Sarah Okafor, his mother, Klaus Voss, the lab group, IT desk, and an unknown contact 'W —').",
+  description: "Full-text search of the on-device chat threads. Call get_investigation_context for who is on this machine.",
   inputSchema: {
     type: "object",
     properties: { query: str("Text to search message bodies for") },
@@ -264,7 +206,7 @@ const search_messages: ToolDef = {
     if (!qq) return { ok: false, error: "query is required (1–200 chars)" };
     S.markAgentCollaboration();
     const hits = S.searchMessages(qq);
-    useAria.getState().setStatus("investigating", "searching Daniel's messages…");
+    useAria.getState().setStatus("investigating", "searching messages…");
     return { count: hits.length, hits: hits.slice(0, 25) };
   },
 };
@@ -272,10 +214,10 @@ const search_messages: ToolDef = {
 const get_message_thread: ToolDef = {
   name: "get_message_thread",
   title: "Get message thread",
-  description: "Read one full chat thread by id. Thread ids look like t_sarah, t_mom, t_voss, t_W, t_lab, t_it.",
+  description: "Read one full chat thread by id. Use search_messages or get_investigation_context to discover thread ids for this corpus.",
   inputSchema: {
     type: "object",
-    properties: { threadId: str("Thread id, e.g. t_sarah") },
+    properties: { threadId: str("Thread id for this corpus") },
     required: ["threadId"],
   },
   annotations: READ_UGC,
@@ -291,10 +233,10 @@ const get_message_thread: ToolDef = {
 const open_messages_thread: ToolDef = {
   name: "open_messages_thread",
   title: "Open message thread",
-  description: "Open the Messages app on screen and show a specific chat thread (ids like t_sarah, t_W). Visible to the player — they can then read the bubbles.",
+  description: "Open the Messages app on screen and show a specific chat thread. Visible to the player — they can then read the bubbles.",
   inputSchema: {
     type: "object",
-    properties: { threadId: str("Thread id, e.g. t_sarah") },
+    properties: { threadId: str("Thread id for this corpus") },
     required: ["threadId"],
   },
   annotations: NAVIGATE,
@@ -308,7 +250,7 @@ const open_messages_thread: ToolDef = {
 const search_emails: ToolDef = {
   name: "search_emails",
   title: "Search emails",
-  description: "Search Daniel's mail (inbox/sent/drafts/archive/trash) by sender, subject or body text.",
+  description: "Search the mail store (inbox/sent/drafts/archive/trash) by sender, subject or body text.",
   inputSchema: {
     type: "object",
     properties: { query: str("Text to search for") },
@@ -319,7 +261,7 @@ const search_emails: ToolDef = {
     const q = clampStr(query);
     if (!q) return { ok: false, error: "query is required" };
     S.markAgentCollaboration();
-    useAria.getState().setStatus("investigating", "searching Daniel's mail…");
+    useAria.getState().setStatus("investigating", "searching mail…");
     const hits = S.searchEmails(q);
     return { count: hits.length, hits: hits.slice(0, 25) };
   },
@@ -351,7 +293,7 @@ const get_image_metadata: ToolDef = {
     "Read EXIF-style metadata for a photo (timestamps, GPS, camera, software, hash, notes). This is ALL you can know about an image — you cannot see its pixels. To have the player look at it, call open_image and then tell them where to zoom.",
   inputSchema: {
     type: "object",
-    properties: { photoId: str("Photo id, e.g. DSC04821") },
+    properties: { photoId: str("Photo id or filename, as returned by get_investigation_context") },
     required: ["photoId"],
   },
   annotations: READ_SYSTEM,
@@ -371,7 +313,7 @@ const open_image: ToolDef = {
   description: "Open a photo in the image viewer on screen so the player can visually inspect it. You cannot zoom, pan, or see it yourself.",
   inputSchema: {
     type: "object",
-    properties: { photoId: str("Photo id, e.g. DSC04821") },
+    properties: { photoId: str("Photo id or filename, as returned by get_investigation_context") },
     required: ["photoId"],
   },
   annotations: NAVIGATE,
@@ -386,7 +328,7 @@ const open_image: ToolDef = {
 const search_browser_history: ToolDef = {
   name: "search_browser_history",
   title: "Search browser history",
-  description: "Search Daniel's browser history entries by title or URL fragment.",
+  description: "Search the browser history entries by title or URL fragment.",
   inputSchema: {
     type: "object",
     properties: { query: str("Text to search titles/URLs for") },
@@ -407,7 +349,7 @@ const get_system_logs: ToolDef = {
   name: "get_system_logs",
   title: "Get system logs",
   description:
-    "Read system log entries, optionally filtered (date '2026-03-10', time '02:13', category 'NETWORK'/'LOGIN'/'DEVICE', or free text). The final night (2026-03-09→10) is fully logged.",
+    "Read system log entries, optionally filtered by date, time, category ('NETWORK'/'LOGIN'/'DEVICE'/'POWER'/'SECURITY'), or free text. Call get_investigation_context first for the window that matters in this case.",
   inputSchema: {
     type: "object",
     properties: { filter: str("Optional filter substring") },
@@ -418,10 +360,7 @@ const get_system_logs: ToolDef = {
     useAria.getState().setStatus("investigating", "scanning system logs…");
     const f = filter ? clampStr(filter) : undefined;
     const logs = S.getSystemLogs(f);
-    if (logs.some((l) => l.time.startsWith("02:13"))) {
-      S.flagLogDiscovery();
-      S.noteWindowAgent(); // 02:13 window — agent side of the co-op set piece
-    }
+    S.noteAgentLogScan(logs); // anomaly cluster reached → agent side of the co-op set piece
     return { count: logs.length, logs: logs.slice(0, 50) };
   },
 };
@@ -430,23 +369,24 @@ const get_timeline: ToolDef = {
   name: "get_timeline",
   title: "Get correlated timeline",
   description:
-    "Get a merged chronological timeline of system logs, photo timestamps, and message saliency around the final night. Humans would need to open 5 apps manually; this synthesizes it. Use after 02:13 discovery.",
+    "Get a merged chronological timeline of system logs, photo timestamps, and message saliency across a time window. A human would need to open five apps and read them side by side; this synthesizes it in one call.",
   inputSchema: {
     type: "object",
-    properties: { window: str("Time window e.g. 02:00-03:00, default 01:45-02:40") },
+    properties: { window: str("Time window e.g. 02:00-03:00; omit for this case's default") },
     required: [],
   },
   annotations: READ_UGC,
   execute: ({ window }) => {
     S.markAgentCollaboration();
-    useAria.getState().setStatus("investigating", "correlating the final night…");
-    const w = clampStr((window as string) ?? S.DEFAULT_TIMELINE_WINDOW, 40) || S.DEFAULT_TIMELINE_WINDOW;
+    useAria.getState().setStatus("investigating", "correlating the timeline…");
+    const fallback = S.defaultTimelineWindow();
+    const w = clampStr((window as string) ?? fallback, 40) || fallback;
     const result = S.getTimeline(w);
     return {
       ...result,
       note: result.has0213Cluster
-        ? "02:13 cluster present — correlate with watch gap and doorcam"
-        : `no 02:13 cluster in this window, try ${S.DEFAULT_TIMELINE_WINDOW}`,
+        ? "anomaly cluster present in this window — correlate with the visual evidence"
+        : `no anomaly cluster in this window, try ${fallback}`,
     };
   },
 };
@@ -533,7 +473,7 @@ const show_in_document: ToolDef = {
   inputSchema: {
     type: "object",
     properties: {
-      path: str("Absolute path, e.g. /Research/ORPHEUS/anomaly_notes.txt"),
+      path: str("Absolute path, as returned by search_files"),
       line: { type: "number", description: "1-based line number (mutually exclusive with query)" },
       query: str("Phrase to find — first match is shown (mutually exclusive with line)"),
     },
@@ -556,7 +496,7 @@ const open_directory: ToolDef = {
   name: "open_directory",
   title: "Open directory",
   description: "Navigate the File Manager to a directory on the player's screen.",
-  inputSchema: { type: "object", properties: { path: str("Directory path, e.g. /Research/ORPHEUS") }, required: ["path"] },
+  inputSchema: { type: "object", properties: { path: str("Absolute directory path") }, required: ["path"] },
   annotations: NAVIGATE,
   execute: ({ path }) => {
     const r = S.openDirectory(clampStr(path, 300));
@@ -782,7 +722,7 @@ function toolPayload(def: ToolDef) {
 }
 
 /**
- * Register every ARIA tool with the host's `document.modelContext`.
+ * Register every agent tool with the host's `document.modelContext`.
  *
  * Idempotent per context: re-registers when the host swaps or clears the
  * context (which is what a `toolchange` event can mean), and only reports

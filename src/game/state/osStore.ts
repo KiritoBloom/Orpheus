@@ -10,8 +10,7 @@ import type {
   WinState,
 } from "@/types/game";
 import { getSave, updateSave } from "./persistence";
-import { EMAILS } from "@/game/data/emails";
-import { THREADS } from "@/game/data/chatMessages";
+import { activeCorpus } from "@/game/data/corpus";
 
 /* ============================================================
    OS STORE — phase, windows, focus, toasts, settings, flags.
@@ -230,13 +229,13 @@ export const useOS = create<OSState>((set, get) => ({
   },
 
   markAllMailRead: () => {
-    const next = new Set(EMAILS.map((e) => e.id));
+    const next = new Set(activeCorpus().emails.map((e) => e.id));
     updateSave({ readMailIds: [...next] });
     set({ readMailIds: next });
   },
 
   markAllThreadsRead: () => {
-    const next = new Set(THREADS.map((t) => t.id));
+    const next = new Set(activeCorpus().threads.map((t) => t.id));
     updateSave({ readThreadIds: [...next] });
     set({ readThreadIds: next });
   },

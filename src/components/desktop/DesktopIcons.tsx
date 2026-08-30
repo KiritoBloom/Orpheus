@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import type { AppId } from "@/types/game";
 import { APP_LABELS } from "@/types/game";
 import { useOS } from "@/game/state/osStore";
+import { activeCorpus } from "@/game/data/corpus";
 import { sfx } from "@/audio/engine";
 import { APP_ICONS, IconFieldGuide, IconPrivate } from "@/components/icons/WorkstationIcons";
 
@@ -58,7 +59,7 @@ export default function DesktopIcons() {
       {/* field guide — 90s: dotted when selected, amber dot when unread */}
       <button
         onClick={() => {
-          import("@/game/services").then((m) => m.openFile("/System/FIELD_GUIDE.txt"));
+          import("@/game/services").then((m) => m.openFile(activeCorpus().guidePath));
           sfx.windowOpen();
         }}
         className="w-[76px] py-1.5 flex flex-col items-center gap-1 no-select relative"

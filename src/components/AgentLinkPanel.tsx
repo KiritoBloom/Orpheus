@@ -13,6 +13,7 @@ import {
   webmcpAvailable,
 } from "@/webmcp/register";
 import { runDeterministicSelfTests, runQuickVerify } from "@/webmcp/selftest";
+import { activeCorpus } from "@/game/data/corpus";
 
 /* ============================================================
    AGENT LINK PANEL — judge/dev console.
@@ -227,32 +228,10 @@ export default function AgentLinkPanel({ onClose }: { onClose: () => void }) {
 }
 
 /* Ready-made example inputs for the judge path — zero-typing verification.
-   Values mirror JUDGE_QUICKSTART.md so every console run matches the documented flow. */
-const EXAMPLE_ARGS: Record<string, string> = {
-  get_system_logs: JSON.stringify({ filter: "02:13" }),
-  get_timeline: JSON.stringify({ window: "01:45-02:40" }),
-  search_files: JSON.stringify({ query: "02:13" }),
-  search_messages: JSON.stringify({ query: "badge" }),
-  search_emails: JSON.stringify({ query: "kestrel" }),
-  search_browser_history: JSON.stringify({ query: "kestrel" }),
-  read_file: JSON.stringify({ path: "/Research/ORPHEUS/anomaly_notes.txt" }),
-  open_file: JSON.stringify({ path: "/Research/ORPHEUS/anomaly_notes.txt" }),
-  show_in_document: JSON.stringify({ path: "/Research/ORPHEUS/anomaly_notes.txt", query: "02:13 is not a time" }),
-  open_directory: JSON.stringify({ path: "/Research/ORPHEUS" }),
-  get_message_thread: JSON.stringify({ threadId: "t_sarah" }),
-  open_messages_thread: JSON.stringify({ threadId: "t_sarah" }),
-  get_email: JSON.stringify({ emailId: "mail_102" }),
-  open_email: JSON.stringify({ emailId: "mail_102" }),
-  get_image_metadata: JSON.stringify({ photoId: "DSC04821" }),
-  open_image: JSON.stringify({ photoId: "DSC04821" }),
-  open_browser_entry: JSON.stringify({ entryId: "hist_003" }),
-  terminal_command: JSON.stringify({ command: "help" }),
-  record_evidence: JSON.stringify({ evidenceId: "ev_0213_login" }),
-  highlight_evidence: JSON.stringify({ evidenceId: "ev_daniel" }),
-};
-
+   The values are the corpus's (see `guidance.exampleArgs`), so every console
+   run matches the documented flow for whichever investigation is loaded. */
 function defaultArgs(t: (typeof TOOL_DEFS)[number]): string {
-  const canned = EXAMPLE_ARGS[t.name];
+  const canned = activeCorpus().guidance.exampleArgs[t.name];
   if (canned !== undefined) return canned;
   const props = ((t.inputSchema as { properties?: Record<string, unknown> }).properties) ?? {};
   const obj: Record<string, unknown> = {};

@@ -1,4 +1,4 @@
-import type { ChatMsg, StoryFlag } from "@/types/game";
+import type { ChatMsg, Thread } from "@/types/game";
 
 /* ============================================================
    DANIEL'S ON-DEVICE CHAT EXPORT — threads + messages
@@ -6,7 +6,7 @@ import type { ChatMsg, StoryFlag } from "@/types/game";
    t_observer (NO SENDER) arrives during the session — unexplained.
    ============================================================ */
 
-export const THREADS: { id: string; name: string; handle: string; hiddenUntilFlag?: StoryFlag }[] = [
+export const THREADS: Thread[] = [
   { id: "t_observer", name: "NO SENDER", handle: "—", hiddenUntilFlag: "MYSTERY_MESSAGE" },
   { id: "t_sarah", name: "Sarah Okafor", handle: "s.okafor" },
   { id: "t_mom", name: "Ruth McDuff", handle: "mom" },

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { sfx } from "@/audio/engine";
 import { useOS } from "@/game/state/osStore";
+import { activeCorpus } from "@/game/data/corpus";
 import { Aperture, usePhaseExit } from "@/components/Aperture";
 
 /* ============================================================
@@ -24,22 +25,32 @@ type Check = {
   work?: number;
 };
 
-const CHECKS: Check[] = [
-  { label: "PROCESSOR", value: "R4400 / 200MHz", detail: "1 CPU", work: 220 },
-  { label: "MEMORY", value: "65536K", detail: "PARITY OK", work: 1500 },
-  { label: "STORAGE", value: "1 VOLUME", detail: "1 DAMAGED SECTOR", tone: "amber", work: 420 },
-  { label: "SYSTEM CLOCK", value: "OK", detail: "DRIFT CORRECTED", work: 300 },
-  { label: "SECURITY", value: "OK", detail: "SEALED DIRECTIVE STORE PRESENT", work: 360 },
-  { label: "NETWORK", value: "DISABLED", detail: "PHYSICAL — NO INTERFACE", tone: "amber", work: 260 },
-  { label: "USER PROFILE", value: "DANIEL MCDUFF", detail: "LAST LOGIN 2026-03-07", work: 340 },
-  { label: "ARIA SERVICE", value: "RESUMED", detail: "ASSIST MODE — WAKE ON EVENT", tone: "accent", work: 520 },
-];
+/* Everything but the two corpus-specific rows is machine, not story: the same
+   fictional workstation runs both investigations. The profile row and the
+   assistant's name come from the corpus. */
+function buildChecks(profile: { label: string; value: string; detail: string }, assistant: string): Check[] {
+  return [
+    { label: "PROCESSOR", value: "R4400 / 200MHz", detail: "1 CPU", work: 220 },
+    { label: "MEMORY", value: "65536K", detail: "PARITY OK", work: 1500 },
+    { label: "STORAGE", value: "1 VOLUME", detail: "1 DAMAGED SECTOR", tone: "amber", work: 420 },
+    { label: "SYSTEM CLOCK", value: "OK", detail: "DRIFT CORRECTED", work: 300 },
+    { label: "SECURITY", value: "OK", detail: "SEALED DIRECTIVE STORE PRESENT", work: 360 },
+    { label: "NETWORK", value: "DISABLED", detail: "PHYSICAL — NO INTERFACE", tone: "amber", work: 260 },
+    { label: profile.label, value: profile.value, detail: profile.detail, work: 340 },
+    { label: `${assistant} SERVICE`, value: "RESUMED", detail: "ASSIST MODE — WAKE ON EVENT", tone: "accent", work: 520 },
+  ];
+}
 
 const MEM_TOTAL = 65536;
 const MEM_CELLS = 96;
 const SPLASH_MS = 1250;
 
 export default function BootSequence({ onDone }: { onDone: () => void }) {
+  const chrome = activeCorpus().chrome;
+  const CHECKS = useMemo(
+    () => buildChecks(chrome.bootProfile, chrome.assistantName),
+    [chrome.bootProfile, chrome.assistantName]
+  );
   const [phase, setPhase] = useState<"splash" | "post">("splash");
   const [passed, setPassed] = useState(0); // checks resolved
   const [memK, setMemK] = useState(0);
@@ -79,7 +90,7 @@ export default function BootSequence({ onDone }: { onDone: () => void }) {
       if (sound) sfx.bootKeyEnter();
     }, dwell);
     return () => clearTimeout(t);
-  }, [phase, passed, done, reduced, sound]);
+  }, [phase, passed, done, reduced, sound, CHECKS]);
 
   /* ---------- memory walk — drives both the counter and the map ---------- */
   const memIndex = CHECKS.findIndex((c) => c.label === "MEMORY");
@@ -134,6 +145,10 @@ export default function BootSequence({ onDone }: { onDone: () => void }) {
   const litCells = Math.round((memShown / MEM_TOTAL) * MEM_CELLS);
   const cells = useMemo(() => Array.from({ length: MEM_CELLS }, (_, i) => i), []);
   const running = phase === "post" && !done ? CHECKS[passed] : null;
+  // the wordmark's second word is emphasised, as on a period badge plate
+  const brandWords = chrome.systemBrand.split(" ");
+  const brandHead = brandWords[0];
+  const brandTail = brandWords.slice(1).join(" ");
 
   return (
     <div className="boot-shell" onClick={handleSkip} role="status" aria-label="power-on self test">
@@ -142,7 +157,7 @@ export default function BootSequence({ onDone }: { onDone: () => void }) {
         <div className="boot-titlebar">
           <span className="boot-titlebar-label">
             <span className="boot-titlebar-glyph" aria-hidden>▣</span>
-            MCDUFF SYSTEMS — BIOS 4.72
+            {chrome.systemBrand} — BIOS 4.72
           </span>
           <span className="boot-titlebar-status">
             {phase === "splash" ? "POWER ON" : done ? "READY" : `POST ${passed}/${CHECKS.length}`}
@@ -157,10 +172,10 @@ export default function BootSequence({ onDone }: { onDone: () => void }) {
               <div className="boot-splash-main">
                 <div>
                   <div className="boot-wordmark boot-fade">
-                    MCDUFF&nbsp;<span>SYSTEMS</span>
+                    {brandHead}&nbsp;<span>{brandTail}</span>
                   </div>
                   <div className="boot-tagline boot-fade" style={{ animationDelay: "0.14s" }}>
-                    PERSONAL COMPUTING DIVISION
+                    {chrome.brandTagline}
                   </div>
                   <div className="boot-rail" aria-hidden>
                     <div className="boot-rail-fill boot-bar" />
@@ -168,22 +183,12 @@ export default function BootSequence({ onDone }: { onDone: () => void }) {
                 </div>
               </div>
               <div className="boot-plate">
-                <div className="boot-plate-cell">
-                  <div className="boot-plate-k">FIRMWARE</div>
-                  <div className="boot-plate-v">BIOS 4.72 · UNREGISTERED</div>
-                </div>
-                <div className="boot-plate-cell">
-                  <div className="boot-plate-k">LICENSED TO</div>
-                  <div className="boot-plate-v">D. MCDUFF</div>
-                </div>
-                <div className="boot-plate-cell">
-                  <div className="boot-plate-k">CHASSIS</div>
-                  <div className="boot-plate-v">MS-4200 · DESKSIDE</div>
-                </div>
-                <div className="boot-plate-cell">
-                  <div className="boot-plate-k">NETWORK</div>
-                  <div className="boot-plate-v">AIR-GAPPED</div>
-                </div>
+                {chrome.bootPlate.map((cell) => (
+                  <div className="boot-plate-cell" key={cell.k}>
+                    <div className="boot-plate-k">{cell.k}</div>
+                    <div className="boot-plate-v">{cell.v}</div>
+                  </div>
+                ))}
               </div>
             </div>
           ) : (
@@ -191,7 +196,7 @@ export default function BootSequence({ onDone }: { onDone: () => void }) {
               <div className="post-main">
                 <div className="post-head">
                   <span className="post-head-name">
-                    MCDUFF <b>PERSONAL COMPUTING SYSTEM</b>
+                    {brandHead} <b>{brandTail || "SYSTEM"}</b>
                   </span>
                   <span className="post-head-meta">POWER-ON SELF TEST · BIOS 4.72</span>
                 </div>
@@ -224,7 +229,7 @@ export default function BootSequence({ onDone }: { onDone: () => void }) {
                 <div className="post-tail">
                   {done && (
                     <div className={`post-tail-line ${reduced ? "" : "post-in"}`}>
-                      LOADING PERSONAL PROFILE…
+                      LOADING {chrome.bootProfile.label}…
                       <span className="boot-cursor" aria-hidden />
                     </div>
                   )}

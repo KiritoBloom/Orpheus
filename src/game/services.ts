@@ -1,12 +1,7 @@
 "use client";
 
-import type { AppId, ChatMsg, Email, FsNode, LogEntry, PhotoMeta } from "@/types/game";
-import { buildFilesystem } from "@/game/data/filesystem";
-import { EMAILS } from "@/game/data/emails";
-import { CHAT_MESSAGES, THREADS } from "@/game/data/chatMessages";
-import { HISTORY } from "@/game/data/browserHistory";
-import { LOGS } from "@/game/data/systemLogs";
-import { getPhoto, PHOTOS } from "@/game/data/photos";
+import type { AppId, ChatMsg, Email, FsNode, LogEntry, PhotoMeta, StoryFlag } from "@/types/game";
+import { activeCorpus } from "@/game/data/corpus";
 import { useOS } from "@/game/state/osStore";
 import { sfx } from "@/audio/engine";
 
@@ -19,15 +14,23 @@ import { sfx } from "@/audio/engine";
    src/webmcp/register.ts reimplements game logic; no app
    component reimplements a tool. That is what makes WebMCP
    fundamental here rather than bolted on.
+
+   Second rule: no function in this file contains a string that
+   belongs to one investigation. Documents, photos, flags, and
+   the rules connecting them are read from activeCorpus()
+   (src/game/data/corpus.ts). Swapping the corpus swaps the
+   case; the 25 tools do not change.
    ============================================================ */
 
-const FS: FsNode[] = buildFilesystem();
+function fs(): FsNode[] {
+  return activeCorpus().filesystem;
+}
 
 export function fsList(): FsNode[] {
-  return FS;
+  return fs();
 }
 export function fsGet(path: string): FsNode | undefined {
-  return FS.find((n) => n.path === path);
+  return fs().find((n) => n.path === path);
 }
 
 /** Single visibility predicate for filesystem objects — story flags + vault state. */
@@ -39,7 +42,7 @@ export function fsVisible(n: FsNode): boolean {
 }
 
 export function fsChildren(dirPath: string): FsNode[] {
-  return FS.filter((n) => n.parent === dirPath && fsVisible(n));
+  return fs().filter((n) => n.parent === dirPath && fsVisible(n));
 }
 
 /* ---------------- filesystem search — one implementation ---------------- */
@@ -62,7 +65,7 @@ export function searchFiles(query: string, opts: { limit?: number; excerptChars?
   const excerptChars = opts.excerptChars ?? 120;
   const q = query.trim().toLowerCase();
   if (!q) return [];
-  return FS.filter((n) => {
+  return fs().filter((n) => {
     if (!fsVisible(n)) return false;
     // sealed containers match on name only — contents must stay opaque
     if (n.encrypted) return n.name.toLowerCase().includes(q);
@@ -108,7 +111,7 @@ export function openFile(path: string): { ok: boolean; error?: string } {
   if (node.hiddenUntilFlag && !os.flags.has(node.hiddenUntilFlag))
     return { ok: false, error: "access denied — object not present" };
   if (node.requiresUnlock && !os.vaultUnlocked)
-    return { ok: false, error: "file is sealed (vestibule encryption)" };
+    return { ok: false, error: activeCorpus().vaultUi.sealedMessage };
   if (node.encrypted)
     return {
       ok: false,
@@ -258,8 +261,13 @@ export function setCurrentDoc(p: string) {
 
 /* ---------------- photos ---------------- */
 
-let currentPhotoId = "DSC04821";
+function getPhoto(id: string): PhotoMeta | undefined {
+  return activeCorpus().photos.find((p) => p.id === id);
+}
+
+let currentPhotoId: string | null = null;
 export function getCurrentPhotoId() {
+  if (!currentPhotoId) currentPhotoId = activeCorpus().defaultPhotoId;
   return currentPhotoId;
 }
 
@@ -279,7 +287,7 @@ export function isPhotoAccessible(photoId: string): boolean {
   if (!meta) return false;
   const os = useOS.getState();
   if (meta.inPrivateBackup && !os.vaultUnlocked) return false;
-  const node = FS.find((n) => n.photoId === photoId);
+  const node = fs().find((n) => n.photoId === photoId);
   if (node && node.hiddenUntilFlag && !os.flags.has(node.hiddenUntilFlag)) return false;
   return true;
 }
@@ -288,25 +296,15 @@ export function isPhotoAccessible(photoId: string): boolean {
 export function resolvePhoto(raw: string): PhotoMeta | undefined {
   const q = raw.trim().toLowerCase().replace(/\.(png|jpe?g)$/, "");
   if (!q) return undefined;
-  return PHOTOS.find((p) => p.id.toLowerCase() === q) ?? PHOTOS.find((p) => p.filename.toLowerCase().includes(q));
+  const photos = activeCorpus().photos;
+  return photos.find((p) => p.id.toLowerCase() === q) ?? photos.find((p) => p.filename.toLowerCase().includes(q));
 }
 
 /** Where the player should look in a given photo — the agent cannot see pixels, so it points. */
 export function photoInspectionHint(photoId: string): string {
-  switch (photoId) {
-    case "DSC04821":
-      return "Hint: window glass, lower half — a figure holds a phone with a reversed badge glint.";
-    case "DSC04655":
-      return "Hint: a stopped wall clock. Note the minute hand.";
-    case "IMG_0022":
-      return "Hint: a reminder card photographed through glass.";
-    case "IMG_0044":
-      return "Hint: a door camera timestamp — bottom-right corner.";
-    case "IMG_0103":
-      return "Hint: a health-band trace — the line ends mid-beat.";
-    default:
-      return `Caption: ${getPhoto(photoId)?.caption ?? "no caption"}.`;
-  }
+  const hint = activeCorpus().inspectionHints[photoId];
+  if (hint) return hint;
+  return `Caption: ${getPhoto(photoId)?.caption ?? "no caption"}.`;
 }
 
 // cooldown for ARIA's reactive zoom toast — presence, not nagging
@@ -325,12 +323,15 @@ export function notePhotoInspection(photoId: string, zoom: number): void {
   noteHumanAction(); // the human is inspecting — synchrony rhythm
   onPhotoViewed(photoId, zoom);
   const os = useOS.getState();
-  if (photoId === "DSC04821") {
-    os.pushToast({ app: "PHOTOS", title: "DSC04821.JPG", body: "Something is reflected in the glass." });
+  const corpus = activeCorpus();
+
+  const toast = corpus.inspectionToasts[photoId];
+  if (toast) {
+    os.pushToast({ app: "PHOTOS", title: toast.title, body: toast.body });
     return;
   }
-  if (photoId === "DSC04655") {
-    noteWindowHuman(); // 02:13 window — human side (the stopped clock)
+  if (corpus.syncWindow?.photoId === photoId) {
+    noteWindowHuman(); // time-boxed set piece — human side
     return;
   }
   if (Date.now() - lastAriaZoomToastAt > 180_000) {
@@ -352,8 +353,10 @@ export function notePhotoInspection(photoId: string, zoom: number): void {
 export function inspectPhoto(raw: string): { ok: boolean; message: string; photoId?: string } {
   const photo = resolvePhoto(raw);
   if (!photo) return { ok: false, message: `no photo matches "${raw}"` };
-  if (!isPhotoAccessible(photo.id))
-    return { ok: false, message: `${photo.filename} is sealed in /Private/photo_backup — unlock the vestibule first.`, photoId: photo.id };
+  if (!isPhotoAccessible(photo.id)) {
+    const vault = activeCorpus().vaultUi;
+    return { ok: false, message: `${photo.filename} is sealed in ${vault.revealedPath} — ${vault.sealedMessage}.`, photoId: photo.id };
+  }
   const meta = getImageMetadata(photo.id);
   const hint = photoInspectionHint(photo.id);
   return {
@@ -368,27 +371,25 @@ export function setPhotoListener(fn: typeof photoListener) {
   photoListener = fn;
 }
 function checkReconstructed() {
-  const f = useOS.getState().flags;
-  if (f.has("FOUND_0213_LOG") && f.has("SEEN_WATCH_GAP") && f.has("SEEN_DOORCAM")) useOS.getState().addFlag("RECONSTRUCTED_FINAL_HOURS");
+  const os = useOS.getState();
+  for (const rule of activeCorpus().derivedFlags) {
+    if (rule.requires.every((f) => os.flags.has(f))) os.addFlag(rule.flag);
+  }
 }
 
 function onPhotoViewed(photoId: string, zoom = 1) {
   photoListener?.(photoId, zoom);
-  // story hooks
+  // story hooks — declared by the corpus, applied here
   const os = useOS.getState();
-  if (photoId === "DSC04821" && zoom >= ZOOM_INSPECTION_THRESHOLD) {
-    os.addFlag("FOUND_PHOTO_017");
-  }
-  if (photoId === "IMG_0022") os.addFlag("FOUND_PRIVATE_HINT");
-  if (photoId === "IMG_0044") os.addFlag("SEEN_DOORCAM");
-  if (photoId === "IMG_0103") os.addFlag("SEEN_WATCH_GAP");
-  if (photoId === "badge_scan" && os.flags.has("FOUND_PHOTO_017")) {
-    os.addFlag("DISCOVERED_SURVEILLANCE");
-    os.pushToast({
-      app: "PHOTOS",
-      title: "CORRELATED DETAIL",
-      body: "The badge clip matches the reflection and observatory attendee.",
-    });
+  for (const rule of activeCorpus().photoFlags) {
+    if (rule.photoId !== photoId) continue;
+    if (rule.requiresZoom && zoom < ZOOM_INSPECTION_THRESHOLD) continue;
+    if (rule.requiresFlag && !os.flags.has(rule.requiresFlag)) continue;
+    const already = os.flags.has(rule.flag);
+    os.addFlag(rule.flag);
+    if (rule.toast && !already) {
+      os.pushToast({ app: "PHOTOS", title: rule.toast.title, body: rule.toast.body });
+    }
   }
   checkReconstructed();
   checkReconstructionAvailable();
@@ -408,7 +409,7 @@ export type MailIndexItem = Email;
 
 export function listEmails(): Email[] {
   const os = useOS.getState();
-  return EMAILS.filter((e) => !(e.hiddenUntilFlag && !os.flags.has(e.hiddenUntilFlag)));
+  return activeCorpus().emails.filter((e) => !(e.hiddenUntilFlag && !os.flags.has(e.hiddenUntilFlag)));
 }
 
 /** Search mail across every visible folder by sender, subject, or body. */
@@ -432,32 +433,32 @@ export function openEmail(id: string): { ok: boolean; error?: string } {
 }
 export const mailSelectBus = new SimpleBus();
 export function markEmailRead(id: string) {
-  const em = EMAILS.find((e) => e.id === id);
+  const em = activeCorpus().emails.find((e) => e.id === id);
   if (em) em.unread = false;
   useOS.getState().markMailRead(id);
 }
 export function isMailUnread(id: string): boolean {
   const os = useOS.getState();
   if (os.readMailIds.has(id)) return false;
-  const em = EMAILS.find((e) => e.id === id);
+  const em = activeCorpus().emails.find((e) => e.id === id);
   return !!em?.unread;
 }
 
 /* ---------------- messages / chat search ---------------- */
 
 /** Story-flag visibility for a chat message or thread (t_observer stays hidden until it arrives). */
-export function msgVisible(m: { hiddenUntilFlag?: import("@/types/game").StoryFlag }): boolean {
+export function msgVisible(m: { hiddenUntilFlag?: StoryFlag }): boolean {
   return !(m.hiddenUntilFlag && !useOS.getState().flags.has(m.hiddenUntilFlag));
 }
 
 /** Every currently visible chat message. */
 export function listMessages(): ChatMsg[] {
-  return CHAT_MESSAGES.filter(msgVisible);
+  return activeCorpus().messages.filter(msgVisible);
 }
 
 /** Every currently visible thread. */
 export function listThreads() {
-  return THREADS.filter(msgVisible);
+  return activeCorpus().threads.filter(msgVisible);
 }
 
 export function searchMessages(query: string): { threadId: string; threadName: string; time: string; body: string }[] {
@@ -473,14 +474,14 @@ export function searchMessages(query: string): { threadId: string; threadName: s
     }));
 }
 export function getMessageThread(threadId: string): { name: string; messages: ChatMsg[] } {
-  const t = THREADS.find((x) => x.id === threadId);
+  const t = activeCorpus().threads.find((x) => x.id === threadId);
   return {
     name: t?.name ?? threadId,
     messages: listMessages().filter((m) => m.threadId === threadId),
   };
 }
 export function openMessagesThread(threadId: string): { ok: boolean; error?: string } {
-  const t = THREADS.find((x) => x.id === threadId);
+  const t = activeCorpus().threads.find((x) => x.id === threadId);
   if (!t) return { ok: false, error: `no thread: ${threadId}` };
   if (t.hiddenUntilFlag && !useOS.getState().flags.has(t.hiddenUntilFlag)) return { ok: false, error: `no thread: ${threadId}` };
   openApplication("messages");
@@ -500,16 +501,20 @@ export function isThreadUnread(id: string): boolean {
 
 export function searchBrowserHistory(query: string) {
   const q = query.toLowerCase();
-  return HISTORY.filter(
-    (h) => h.title.toLowerCase().includes(q) || h.url.toLowerCase().includes(q)
-  ).map((h) => ({ id: h.id, title: h.title, url: h.url, visitedAt: h.visitedAt }));
+  return activeCorpus()
+    .history.filter((h) => h.title.toLowerCase().includes(q) || h.url.toLowerCase().includes(q))
+    .map((h) => ({ id: h.id, title: h.title, url: h.url, visitedAt: h.visitedAt }));
 }
 export function openBrowserEntry(entryId: string): { ok: boolean; error?: string } {
-  const entry = HISTORY.find((h) => h.id === entryId);
+  const corpus = activeCorpus();
+  const entry = corpus.history.find((h) => h.id === entryId);
   if (!entry) return { ok: false, error: `no history entry: ${entryId}` };
   openApplication("browser");
   setTimeout(() => browserNavBus.emit(entry.pageId ?? entry.id), 60);
-  if (entry.pageId === "arxiv_withdrawn" || entry.pageId === "obituary_vann" || entryId === "hist_003" || entryId === "hist_007") useOS.getState().addFlag("FOUND_CERN_CONNECTION");
+  const os = useOS.getState();
+  for (const rule of corpus.historyFlags) {
+    if (rule.id === entry.id || rule.id === entry.pageId) os.addFlag(rule.flag);
+  }
   return { ok: true };
 }
 export const browserNavBus = new SimpleBus();
@@ -517,9 +522,10 @@ export const browserNavBus = new SimpleBus();
 /* ---------------- system logs ---------------- */
 
 export function getSystemLogs(filter?: string): LogEntry[] {
-  if (!filter) return LOGS;
+  const logs = activeCorpus().logs;
+  if (!filter) return logs;
   const q = filter.toLowerCase();
-  return LOGS.filter(
+  return logs.filter(
     (l) =>
       l.date.includes(q) ||
       l.time.includes(q) ||
@@ -528,14 +534,35 @@ export function getSystemLogs(filter?: string): LogEntry[] {
   );
 }
 export function flagLogDiscovery() {
-  useOS.getState().addFlag("FOUND_0213_LOG");
+  useOS.getState().addFlag(activeCorpus().logDiscoveryFlag);
   checkReconstructed();
   checkReconstructionAvailable();
 }
 
+/**
+ * The agent side of a log scan. Called with whatever `getSystemLogs` returned:
+ * if the result reached the corpus's anomaly cluster, the milestone is granted
+ * and the agent's half of the synchrony window is registered.
+ *
+ * Lives here so the tool layer does not need to know which timestamp matters.
+ */
+export function noteAgentLogScan(logs: LogEntry[]): boolean {
+  const markers = activeCorpus().anomalyMarkers;
+  const reached = logs.some((l) =>
+    markers.some((m) => l.time.startsWith(m) || l.detail.toLowerCase().includes(m.toLowerCase()))
+  );
+  if (!reached) return false;
+  flagLogDiscovery();
+  noteWindowAgent();
+  return true;
+}
+
 /* ---------------- correlated timeline ---------------- */
 
-export const DEFAULT_TIMELINE_WINDOW = "01:45-02:40";
+/** Kept as a named export for callers that want the corpus default. */
+export function defaultTimelineWindow(): string {
+  return activeCorpus().defaultTimelineWindow;
+}
 
 export interface TimelineItem {
   time: string;
@@ -558,19 +585,23 @@ export interface TimelineResult {
  * would need five open applications to assemble by hand — which is exactly
  * why it belongs to the agent side of the desk.
  */
-export function getTimeline(window = DEFAULT_TIMELINE_WINDOW, opts: { limit?: number; detailChars?: number } = {}): TimelineResult {
+export function getTimeline(window?: string, opts: { limit?: number; detailChars?: number } = {}): TimelineResult {
+  const corpus = activeCorpus();
   const limit = opts.limit ?? 30;
   const detailChars = opts.detailChars ?? 120;
-  const w = window.trim() || DEFAULT_TIMELINE_WINDOW;
+  const fallback = corpus.defaultTimelineWindow;
+  const w = (window ?? fallback).trim() || fallback;
 
-  let startMin = 105; // 01:45
-  let endMin = 160; // 02:40
-  const parsed = w.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
-  if (parsed) {
-    startMin = parseInt(parsed[1], 10) * 60 + parseInt(parsed[2], 10);
-    endMin = parseInt(parsed[3], 10) * 60 + parseInt(parsed[4], 10);
-    if (endMin < startMin) endMin += 24 * 60; // window crosses midnight
-  }
+  const parseWindow = (s: string) => {
+    const m = s.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+    if (!m) return null;
+    const a = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+    let b = parseInt(m[3], 10) * 60 + parseInt(m[4], 10);
+    if (b < a) b += 24 * 60;
+    return { startMin: a, endMin: b };
+  };
+  const parsed = parseWindow(w) ?? parseWindow(fallback) ?? { startMin: 105, endMin: 160 } as const;
+  const { startMin, endMin } = parsed;
   const toMin = (t: string) => {
     const p = t.split(":");
     return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
@@ -584,27 +615,37 @@ export function getTimeline(window = DEFAULT_TIMELINE_WINDOW, opts: { limit?: nu
   const clip = (s: string) => s.replace(/\s+/g, " ").slice(0, detailChars);
 
   const items: TimelineItem[] = [];
-  for (const l of LOGS) {
+  for (const l of corpus.logs) {
     if (!inWindow(l.time)) continue;
+    const detail = l.detail.toLowerCase();
     items.push({
       time: `${l.date} ${l.time}`,
       source: "log",
       detail: clip(l.detail),
-      anomaly: l.time.startsWith("02:13") || l.severity === "alert" || l.detail.toLowerCase().includes("gait mismatch"),
+      anomaly:
+        l.severity === "alert" ||
+        corpus.anomalyMarkers.some((m) => l.time.startsWith(m) || detail.includes(m.toLowerCase())),
     });
   }
-  for (const p of PHOTOS) {
+  for (const p of corpus.photos) {
     const t = p.exif.dateOriginal.slice(11, 19); // HH:MM:SS
     if (!t || !inWindow(t)) continue;
     items.push({
       time: p.exif.dateOriginal.replace("T", " "),
       source: "photo",
       detail: clip(`${p.id} ${p.filename} — ${p.caption}`),
-      anomaly: p.id === "IMG_0044" || p.id === "IMG_0103",
+      anomaly: corpus.anomalyPhotoIds.includes(p.id),
     });
   }
   for (const m of listMessages()) {
-    const timePart = m.time.includes(" ") ? m.time.split(" ")[1] : m.time;
+    let timePart = m.time.includes(" ") ? m.time.split(" ")[1] : m.time;
+    // Apollo messages use GET HH:MM:SS (e.g. "055:52:58") — convert to UTC HH:MM via range zero 19:13
+    if (/^\d{3}:\d{2}:\d{2}/.test(timePart)) {
+      const [gh, gm] = timePart.split(":").map(Number);
+      const baseMin = 19 * 60 + 13;
+      const utcMin = (baseMin + gh * 60 + gm) % (24 * 60);
+      timePart = `${String(Math.floor(utcMin / 60)).padStart(2, "0")}:${String(utcMin % 60).padStart(2, "0")}:00`;
+    }
     if (!inWindow(timePart)) continue;
     items.push({ time: m.time, source: "message", detail: clip(`${m.threadName}: ${m.body}`), anomaly: false });
   }
@@ -615,7 +656,7 @@ export function getTimeline(window = DEFAULT_TIMELINE_WINDOW, opts: { limit?: nu
     window: w,
     count: timeline.length,
     totalInWindow: items.length,
-    has0213Cluster: timeline.some((x) => x.time.includes("02:13")),
+    has0213Cluster: timeline.some((x) => corpus.anomalyMarkers.some((m) => x.time.includes(m) || x.detail.toLowerCase().includes(m.toLowerCase()))),
     timeline,
   };
 }
@@ -643,50 +684,42 @@ export function correlateTerm(query: string): { query: string; files: number; me
 
 /* ---------------- vault ---------------- */
 
-export const VAULT_SEQUENCE = ["lantern", "orpheus", "echo"];
-
 export function attemptVault(words: string[]): { result: "success" | "decoy" | "fail"; message: string } {
   const os = useOS.getState();
+  const vault = activeCorpus().vault;
+  if (!vault) return { result: "fail", message: "no sealed container on this workstation." };
+  const seq = vault.sequence;
   const norm = words.map((w) => w.toLowerCase().trim());
   const attempts = os.countVaultAttempt();
-  if (
-    norm.length >= 3 &&
-    norm.slice(0, 3).every((w, i) => w === VAULT_SEQUENCE[i])
-  ) {
+  if (norm.length >= seq.length && seq.every((w, i) => norm[i] === w)) {
     os.setVaultUnlocked();
     os.addFlag("VAULT_OPENED");
     os.addFlag("FOUND_HIDDEN_ARCHIVE");
     checkReconstructionAvailable();
-    return { result: "success", message: "CHECKSUM OK — vestibule archive decrypted.\nNew objects available under /Private." };
+    return { result: "success", message: vault.successMessage };
   }
   // wrong sequence → decoy archive reveals itself
   os.addFlag("VAULT_DECOY");
-  if (attempts === 1) {
-    os.pushToast({ app: "TERMINAL", title: "HINT", body: "Light → name → echo. One was photographed on his desk." });
-  } else if (attempts === 2) {
-    os.pushToast({ app: "TERMINAL", title: "HINT", body: "Order matters. He also wore one on a brass plate — middle slot is worn smooth." });
+  for (const hint of vault.attemptHints) {
+    if (attempts === hint.after) os.pushToast({ app: "TERMINAL", title: hint.title, body: hint.body });
   }
   // progressive recovery hints — a stuck investigator is guided, never stalled
-  const hints: string[] = [];
-  if (attempts >= 4) hints.push("RECOVERY SECTOR NOTE: the first word is what you light a dark room with.");
-  if (attempts >= 7) hints.push("RECOVERY SECTOR NOTE: FIRST WORD CONFIRMED — 'lantern'. Two remain.");
-  if (attempts >= 10) hints.push("RECOVERY SECTOR NOTE: SECOND WORD — the name he gave the research itself. The third is what remains when a voice is gone.");
+  const hints = vault.recoveryHints.filter((h) => attempts >= h.after).map((h) => h.note);
   sfx.error();
   return {
     result: "decoy",
-    message:
-      "CHECKSUM MISMATCH — sequence rejected.\nAdjacent recovery sector mounted instead: /Private/_fragments_recovered\n(one wrong key does not destroy anything here. Daniel was gentle with strangers.)" +
-      (hints.length ? "\n\n" + hints.join("\n") : ""),
+    message: vault.failureMessage + (hints.length ? "\n\n" + hints.join("\n") : ""),
   };
 }
 
-/* ---------------- the 02:13 window — time-boxed co-op set piece ---------------- */
-// After the vault, the machine keeps Daniel's habits: 02:13 recurs. For 90 seconds the
-// workstation becomes observable (Keep-Talking-style: BOTH sides must act inside the
-// window — human eyes on the stopped clock, ARIA in the logs — to synchronize).
+/* ---------------- the synchrony window — time-boxed co-op set piece ---------------- */
+// After the seal opens, the workstation becomes briefly observable (Keep-Talking-style:
+// BOTH sides must act inside the window — human eyes on the visual anomaly, the agent in
+// the logs — to synchronize). Timings, target photo and copy come from the corpus.
 
-const OBS_WINDOW_MS = 90_000;
-const OBS_REARM_MS = 150_000;
+function syncWindowCfg() {
+  return activeCorpus().syncWindow;
+}
 
 export function isObsWindowOpen(): boolean {
   return useOS.getState().obsWindow.open;
@@ -695,73 +728,78 @@ export function isObsWindowOpen(): boolean {
 /**
  * Arm the window to open `inSeconds` from now instead of waiting a full re-arm
  * period. Used only by the `?demo=` entry points (src/game/demo.ts) so the set
- * piece can be reached — and recorded — without playing to the vault first.
+ * piece can be reached — and recorded — without playing to the seal first.
  */
 export function armObservabilityWindow(inSeconds = 20): void {
-  const wait = Math.max(0, OBS_REARM_MS - Math.max(0, inSeconds) * 1000);
+  const cfg = syncWindowCfg();
+  if (!cfg) return;
+  const wait = Math.max(0, cfg.rearmMs - Math.max(0, inSeconds) * 1000);
   useOS.setState({ obsWindow: { open: false, endsAt: 0, lastClosedAt: Date.now() - wait } });
 }
 
 /** Called on a short interval (GameRoot) — opens, closes, and re-arms the window. */
 export function tickObservabilityWindow(): void {
+  const cfg = syncWindowCfg();
+  if (!cfg) return;
   const os = useOS.getState();
   if (os.phase !== "desktop") return;
-  if (!os.vaultUnlocked || os.flags.has("WINDOW_SYNCHRONIZED")) return;
+  if (!os.vaultUnlocked || os.flags.has(cfg.syncedFlag)) return;
   const now = Date.now();
   if (os.obsWindow.open) {
     if (now >= os.obsWindow.endsAt) closeObsWindow(false);
     return;
   }
-  if (os.obsWindow.lastClosedAt === 0 || now - os.obsWindow.lastClosedAt >= OBS_REARM_MS) openObsWindow();
+  if (os.obsWindow.lastClosedAt === 0 || now - os.obsWindow.lastClosedAt >= cfg.rearmMs) openObsWindow();
 }
 
 function openObsWindow() {
-  useOS.setState((s) => ({ obsWindow: { open: true, endsAt: Date.now() + OBS_WINDOW_MS, lastClosedAt: s.obsWindow.lastClosedAt } }));
-  useOS.getState().pushToast({
-    app: "SYSTEM",
-    title: "02:13 RECURS — WINDOW OPEN",
-    body: "The room it is not looking at can be seen. 90 seconds: open the study photo and zoom into the wall clock — and have ARIA pull the logs from that minute. Together, inside the window.",
-  });
+  const cfg = syncWindowCfg();
+  if (!cfg) return;
+  useOS.setState((s) => ({ obsWindow: { open: true, endsAt: Date.now() + cfg.openMs, lastClosedAt: s.obsWindow.lastClosedAt } }));
+  useOS.getState().pushToast({ app: "SYSTEM", ...cfg.openToast });
   sfx.deepThud();
   window.dispatchEvent(new CustomEvent("orpheus:event-flash", { detail: { tone: "hot" } }));
   checkWindowSync(); // both sides may have acted before this window opened
 }
 
 function closeObsWindow(synced: boolean) {
+  const cfg = syncWindowCfg();
   useOS.setState({ obsWindow: { open: false, endsAt: 0, lastClosedAt: Date.now() } });
-  if (!synced) {
-    useOS.getState().pushToast({ app: "SYSTEM", title: "WINDOW CLOSED", body: "02:13 comes again. It always does." });
+  if (!synced && cfg) {
+    useOS.getState().pushToast({ app: "SYSTEM", ...cfg.closedToast });
   }
 }
 
-/** Human side — the player zooms the stopped clock (DSC04655) while the window holds. */
+/** Human side — the player zooms the corpus's anomaly photo while the window holds. */
 export function noteWindowHuman(): void {
+  const cfg = syncWindowCfg();
+  if (!cfg) return;
   const os = useOS.getState();
-  if (!os.obsWindow.open || os.flags.has("WINDOW_HUMAN")) return;
-  os.addFlag("WINDOW_HUMAN");
-  os.pushToast({ app: "PHOTOS", title: "THE CLOCK SAW YOU", body: "02:13:00 — both hands stopped mid-beat. Now have ARIA pull the logs from the same minute, while the window holds." });
+  if (!os.obsWindow.open || os.flags.has(cfg.humanFlag)) return;
+  os.addFlag(cfg.humanFlag);
+  os.pushToast({ app: "PHOTOS", ...cfg.humanToast });
   checkWindowSync();
 }
 
-/** Agent side — ARIA reads the logs during the window (get_system_logs). */
+/** Agent side — the agent reads the logs during the window (get_system_logs). */
 export function noteWindowAgent(): void {
+  const cfg = syncWindowCfg();
+  if (!cfg) return;
   const os = useOS.getState();
-  if (!os.obsWindow.open || os.flags.has("WINDOW_AGENT")) return;
-  os.addFlag("WINDOW_AGENT");
+  if (!os.obsWindow.open || os.flags.has(cfg.agentFlag)) return;
+  os.addFlag(cfg.agentFlag);
   checkWindowSync();
 }
 
 function checkWindowSync() {
+  const cfg = syncWindowCfg();
+  if (!cfg) return;
   const os = useOS.getState();
   if (!os.obsWindow.open) return;
-  if (os.flags.has("WINDOW_HUMAN") && os.flags.has("WINDOW_AGENT")) {
-    os.addFlag("WINDOW_SYNCHRONIZED");
+  if (os.flags.has(cfg.humanFlag) && os.flags.has(cfg.agentFlag)) {
+    os.addFlag(cfg.syncedFlag);
     closeObsWindow(true);
-    os.pushToast({
-      app: "ARIA",
-      title: "SYNCHRONIZED — 47 SECONDS",
-      body: "Your eyes on the clock, my query in the logs — for 47 seconds we watched the same window. Something was written to /Private.",
-    });
+    os.pushToast({ app: "ARIA", ...cfg.syncedToast });
     sfx.chime();
     checkReconstructionAvailable();
     // the unexplained thread pulses a second time — only if it ever arrived
@@ -814,12 +852,11 @@ function noteSync(actor: "human" | "agent") {
 
 /* ---------------- evidence ---------------- */
 
-import { EVIDENCE as EVIDENCE_DATA } from "@/game/data/evidence";
 import { useInvestigation } from "@/game/state/investigationStore";
 
 export function recordEvidenceById(id: string): { ok: boolean; error?: string } {
   const inv = useInvestigation.getState();
-  if (!EVIDENCE_DATA.some((e) => e.id === id)) return { ok: false, error: `unknown evidence id: ${id}` };
+  if (!activeCorpus().evidence.some((e) => e.id === id)) return { ok: false, error: `unknown evidence id: ${id}` };
   const added = inv.recordEvidence(id);
   return added ? { ok: true } : { ok: false, error: "already recorded" };
 }
@@ -844,15 +881,11 @@ export function openEvidenceBoard(): void {
 
 export function onFileOpened(path: string) {
   const os = useOS.getState();
-  if (path === "/System/FIELD_GUIDE.txt") os.addFlag("FOUND_GUIDE");
-  if (path.startsWith("/Research/ORPHEUS")) os.addFlag("DISCOVERED_ORPHEUS");
-  if (path.startsWith("/Research/ORPHEUS/private")) os.addFlag("FOUND_PRIVATE_HINT");
-  if (path === "/Research/ORPHEUS/private/haldane_correspondence.txt") os.addFlag("IDENTIFIED_CONTACT");
-  if (path === "/Projects/old_cern/memoir.txt") os.addFlag("FOUND_CERN_CONNECTION");
-  if (path === "/Private/aria_directive.sys" && os.vaultUnlocked) os.addFlag("DISCOVERED_ARIA_DIRECTIVE");
-  if (path === "/Private/vestibule_decrypted.txt") {
-    os.addFlag("VAULT_OPENED");
-    os.addFlag("FOUND_HIDDEN_ARCHIVE");
+  for (const rule of activeCorpus().fileFlags) {
+    const hit = rule.prefix ? path.startsWith(rule.path) : path === rule.path;
+    if (!hit) continue;
+    if (rule.requiresVault && !os.vaultUnlocked) continue;
+    for (const flag of rule.flags) os.addFlag(flag);
   }
   checkReconstructed();
   checkReconstructionAvailable();
@@ -860,10 +893,13 @@ export function onFileOpened(path: string) {
 
 export function markAgentCollaboration() {
   const os = useOS.getState();
-  const first = !os.flags.has("COLLABORATED_WITH_ARIA");
-  os.addFlag("COLLABORATED_WITH_ARIA");
+  const corpus = activeCorpus();
+  const flag = corpus.collaborationFlag;
+  const first = !os.flags.has(flag);
+  os.addFlag(flag);
   if (first) {
-    os.pushToast({ app: "ARIA", title: "LINK ESTABLISHED", body: "Machine-readable search complete — evidence correlation active. Keep describing what you see." });
+    const t = corpus.chrome.collaborationToast;
+    os.pushToast({ app: "ARIA", title: t.title, body: t.body });
     sfx.chime();
   }
   checkReconstructionAvailable();
@@ -871,19 +907,8 @@ export function markAgentCollaboration() {
 
 /* ---------------- case reconstruction gate ---------------- */
 
-/** The six investigative milestones; any four unlock reconstruction. */
-export const RECONSTRUCTION_MILESTONES: { flag: import("@/types/game").StoryFlag; label: string }[] = [
-  { flag: "DISCOVERED_ORPHEUS", label: "ORPHEUS research read" },
-  { flag: "FOUND_0213_LOG", label: "02:13 log cluster found" },
-  { flag: "IDENTIFIED_CONTACT", label: "the visitor identified" },
-  { flag: "DISCOVERED_SURVEILLANCE", label: "surveillance correlated" },
-  { flag: "VAULT_OPENED", label: "vestibule decrypted" },
-  { flag: "DISCOVERED_METADATA", label: "photo metadata surfaced" },
-];
-export const RECONSTRUCTION_REQUIRED = 4;
-
 export interface ReconstructionProgress {
-  /** milestones reached, out of RECONSTRUCTION_MILESTONES.length */
+  /** milestones reached, out of the corpus's milestone list */
   reached: number;
   required: number;
   remaining: number;
@@ -896,23 +921,99 @@ export interface ReconstructionProgress {
 /** What still stands between the player and closing the case. */
 export function reconstructionProgress(): ReconstructionProgress {
   const os = useOS.getState();
-  const reachedItems = RECONSTRUCTION_MILESTONES.filter((m) => os.flags.has(m.flag));
+  const corpus = activeCorpus();
+  const required = corpus.milestonesRequired;
+  const reachedItems = corpus.milestones.filter((m) => os.flags.has(m.flag));
   const reached = reachedItems.length;
-  const collaborated = os.flags.has("COLLABORATED_WITH_ARIA");
+  const collaborated = os.flags.has(corpus.collaborationFlag);
   return {
     reached,
-    required: RECONSTRUCTION_REQUIRED,
-    remaining: Math.max(0, RECONSTRUCTION_REQUIRED - reached),
+    required,
+    remaining: Math.max(0, required - reached),
     collaborated,
     available: os.flags.has("CASE_RECONSTRUCTION_AVAILABLE"),
-    missing: RECONSTRUCTION_MILESTONES.filter((m) => !os.flags.has(m.flag)).map((m) => m.label),
+    missing: corpus.milestones.filter((m) => !os.flags.has(m.flag)).map((m) => m.label),
   };
 }
 
 export function checkReconstructionAvailable() {
   const p = reconstructionProgress();
-  // Without ARIA the case cannot be closed — this is the WebMCP demonstration
+  // Without the agent the case cannot be closed — this is the WebMCP demonstration
   // gate: at least one machine-readable correlation must have run through a tool.
   if (!p.collaborated) return;
-  if (p.reached >= RECONSTRUCTION_REQUIRED) useOS.getState().addFlag("CASE_RECONSTRUCTION_AVAILABLE");
+  if (p.reached >= p.required) useOS.getState().addFlag("CASE_RECONSTRUCTION_AVAILABLE");
+}
+
+/* ---------------- the agent's briefing ---------------- */
+
+export interface AgentBriefing {
+  corpus: string;
+  premise: string;
+  provenance?: string;
+  role: string;
+  style: string;
+  unsettledNotes?: string[];
+  caseStatus: {
+    flagsSet: string[];
+    evidenceRecorded: string[];
+    sealOpen: boolean;
+    caseCompleteAt: boolean;
+  };
+  progress: {
+    evidenceRecorded: number;
+    evidenceTotal: number;
+    completed: string[];
+    suggestedNext: string[];
+  };
+  knownPeople: string[];
+  keyPaths: string[];
+  photoIds: string[];
+  note: string;
+}
+
+/**
+ * Everything `get_investigation_context` returns, assembled from the active corpus.
+ * Lives here rather than in the tool layer so a second corpus needs no tool changes.
+ */
+export function getAgentBriefing(): AgentBriefing {
+  const os = useOS.getState();
+  const inv = useInvestigation.getState();
+  const corpus = activeCorpus();
+  const evidence = inv.getVisibleEvidence().map((e) => e.id);
+
+  // live co-pilot — what's done and what to do next (keeps the agent useful to a stuck player)
+  const completed: string[] = [];
+  const next: string[] = [];
+  for (const step of corpus.contextSteps) {
+    const done = step.vaultUnlocked ? os.vaultUnlocked : step.flag ? os.flags.has(step.flag) : false;
+    if (done) completed.push(step.completed);
+    else if (!step.requiresVault || os.vaultUnlocked) next.push(step.next);
+  }
+
+  const unsettled = corpus.unsettledNotes.filter((u) => os.flags.has(u.flag)).map((u) => u.note);
+
+  return {
+    corpus: corpus.label,
+    premise: corpus.premise,
+    provenance: corpus.provenance,
+    role: corpus.agentRole,
+    style: corpus.agentStyle,
+    unsettledNotes: unsettled.length ? unsettled : undefined,
+    caseStatus: {
+      flagsSet: [...os.flags],
+      evidenceRecorded: evidence,
+      sealOpen: os.vaultUnlocked,
+      caseCompleteAt: inv.caseCompleteAt !== null,
+    },
+    progress: {
+      evidenceRecorded: evidence.length,
+      evidenceTotal: corpus.evidence.length,
+      completed,
+      suggestedNext: next.slice(0, 3),
+    },
+    knownPeople: corpus.knownPeople,
+    keyPaths: corpus.keyPaths,
+    photoIds: corpus.photoIds,
+    note: "You see only machine-readable data — files, mail, messages, logs, EXIF. You cannot see pixels: photographs and anything visual are visible only to the player, who must describe them to you.",
+  };
 }

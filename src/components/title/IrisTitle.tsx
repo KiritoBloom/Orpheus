@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { sfx } from "@/audio/engine";
 import { useOS } from "@/game/state/osStore";
 import { getSave, wipeSave } from "@/game/state/persistence";
+import { activeCorpus } from "@/game/data/corpus";
 
 /* ============================================================
    THE IRIS — wake sequence.
@@ -67,6 +68,7 @@ function CheckRow({ label, sub, on, onToggle }: { label: string; sub: string; on
 }
 
 export default function IrisTitle({ onLaunch }: { onLaunch: (mode: "new" | "continue") => void }) {
+  const chrome = activeCorpus().chrome;
   // 0 dark → 1 housing silhouette → 2 blades assemble + tick sweep → 3 iris OPENS → 4 core ignite → 5 calibrate → 6 menu/idle
   const [stage, setStage] = useState(0);
   const [keyNav, setKeyNav] = useState(false); // arrows active → hide the pointer
@@ -878,7 +880,7 @@ export default function IrisTitle({ onLaunch }: { onLaunch: (mode: "new" | "cont
                     </div>
                     {caseDone !== null ? (
                       <div className="iris-list-row is-sel">
-                        <span>CASE_001.MCDUFF</span>
+                        <span>{chrome.caseArchiveName}</span>
                         <span className="is-closed">CLOSED</span>
                         <span>{typeof caseDone === "number" ? new Date(caseDone).toISOString().slice(0, 10) : "—"}</span>
                       </div>
@@ -891,7 +893,7 @@ export default function IrisTitle({ onLaunch }: { onLaunch: (mode: "new" | "cont
                   </div>
                   <div className="iris-details">
                     {caseDone !== null ? (
-                      <>SUBJECT — D. MCDUFF, KESTREL INSTITUTE<br />STATUS — CLOSED · EVIDENCE ARCHIVED</>
+                      <>{chrome.caseArchiveDetail}<br />STATUS — CLOSED · EVIDENCE ARCHIVED</>
                     ) : (
                       "SELECT AN ITEM TO VIEW DETAILS"
                     )}
@@ -901,13 +903,13 @@ export default function IrisTitle({ onLaunch }: { onLaunch: (mode: "new" | "cont
               {panel === "credits" && (
                 <div className="iris-about">
                   <div className="iris-about-logo">ORPHEUS</div>
-                  <div className="iris-about-sub">THE MCDUFF INVESTIGATION</div>
+                  <div className="iris-about-sub">{chrome.aboutSubtitle}</div>
                   <div className="iris-about-ver">VERSION 1.0 · BUILD 2026.03.10 · SINGLE-USER WORKSTATION</div>
                   <div className="iris-hr" />
                   <div className="iris-about-row"><span className="iris-about-role">FORMAT</span><span className="iris-about-val">A WEBMCP EXPERIMENT</span></div>
                   <div className="iris-about-row"><span className="iris-about-role">DESIGN</span><span className="iris-about-val">built with an AI co-investigator</span></div>
                   <div className="iris-about-row"><span className="iris-about-role">SOUND</span><span className="iris-about-val">hybrid sampler + Web Audio synthesis</span></div>
-                  <div className="iris-about-note">DANIEL MCDUFF IS FICTIONAL</div>
+                  <div className="iris-about-note">{chrome.aboutNote}</div>
                   <div className="iris-about-challenge">BUILT FOR THE WEBMCP CHALLENGE</div>
                 </div>
               )}

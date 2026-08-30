@@ -87,6 +87,13 @@ export interface ChatMsg {
   hiddenUntilFlag?: StoryFlag;
 }
 
+export interface Thread {
+  id: string;
+  name: string;
+  handle: string;
+  hiddenUntilFlag?: StoryFlag;
+}
+
 /* ---------- photos ---------- */
 
 export interface PhotoMeta {
@@ -147,7 +154,11 @@ export interface CachedPage {
     | "search-results"
     | "weather"
     | "local-file"
-    | "generic";
+    | "generic"
+    | "apollo-history"
+    | "apollo-report"
+    | "apollo-image"
+    | "apollo-archive";
   body: string[]; // paragraphs
 }
 
@@ -157,16 +168,12 @@ export interface LogEntry {
   id: string;
   date: string; // "2026-02-11"
   time: string; // "02:13:07"
-  category:
-    | "LOGIN"
-    | "DEVICE"
-    | "FILE"
-    | "NETWORK"
-    | "APP"
-    | "DELETE"
-    | "POWER"
-    | "SECURITY"
-    | "SYSTEM";
+  /**
+   * Corpus-defined category shown in the log viewer's second column.
+   * Instance one uses LOGIN/DEVICE/FILE/NETWORK/APP/DELETE/POWER/SECURITY/SYSTEM;
+   * another corpus may use its own vocabulary, so this is not a closed union.
+   */
+  category: string;
   severity: "info" | "warn" | "alert";
   detail: string;
 }
@@ -187,11 +194,32 @@ export interface EvidenceItem {
 
 /* ---------- story flags ---------- */
 
-export type StoryFlag =
+/**
+ * Flags the engine itself reads. Every corpus must provide these, because
+ * GameRoot, the ending sequence, and the vault check them by name.
+ */
+export type EngineFlag =
   | "INTRO_COMPLETE"
   | "MET_ARIA"
   | "FOUND_GUIDE"
   | "FOUND_PRIVATE_HINT"
+  | "VAULT_OPENED"
+  | "VAULT_DECOY"
+  | "FOUND_HIDDEN_ARCHIVE"
+  | "MYSTERY_MESSAGE"
+  | "MYSTERY_MESSAGE_2"
+  | "CASE_RECONSTRUCTION_AVAILABLE"
+  | "CASE_COMPLETE"
+  | "COLLABORATED_WITH_ARIA"
+  | "WINDOW_HUMAN"
+  | "WINDOW_AGENT"
+  | "WINDOW_SYNCHRONIZED";
+
+/**
+ * Instance one's own vocabulary. A second corpus names its own discoveries;
+ * these are the McDuff case's.
+ */
+export type McDuffFlag =
   | "FOUND_PHOTO_017"
   | "DISCOVERED_METADATA"
   | "DISCOVERED_ORPHEUS"
@@ -201,19 +229,16 @@ export type StoryFlag =
   | "FOUND_CERN_CONNECTION"
   | "IDENTIFIED_CONTACT"
   | "DISCOVERED_SURVEILLANCE"
-  | "VAULT_OPENED"
-  | "VAULT_DECOY"
-  | "FOUND_HIDDEN_ARCHIVE"
   | "DISCOVERED_ARIA_DIRECTIVE"
-  | "MYSTERY_MESSAGE"
-  | "MYSTERY_MESSAGE_2"
-  | "RECONSTRUCTED_FINAL_HOURS"
-  | "CASE_RECONSTRUCTION_AVAILABLE"
-  | "CASE_COMPLETE"
-  | "COLLABORATED_WITH_ARIA"
-  | "WINDOW_HUMAN"
-  | "WINDOW_AGENT"
-  | "WINDOW_SYNCHRONIZED";
+  | "RECONSTRUCTED_FINAL_HOURS";
+
+/**
+ * A story flag is an engine flag, a known instance flag, or a string a corpus
+ * invents. The `string & {}` arm keeps editor autocomplete for the named ones
+ * while letting a new corpus define its own discoveries without touching this
+ * file.
+ */
+export type StoryFlag = EngineFlag | McDuffFlag | (string & {});
 
 /* ---------- agent status ---------- */
 

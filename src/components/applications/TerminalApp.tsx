@@ -1,14 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as S from "@/game/services";
 import { useOS } from "@/game/state/osStore";
 import { sfx } from "@/audio/engine";
+import { activeCorpus } from "@/game/data/corpus";
 import { termRunBus } from "@/webmcp/register";
 
 /* ============================================================
    TERMINAL — simulated shell with real commands.
    `unlock` is the vault.
+
+   The verbs are the machine's; the banner, prompt host and vault
+   wording are the corpus's.
    ============================================================ */
 
 interface Line {
@@ -16,21 +20,28 @@ interface Line {
   cls?: string;
 }
 
-const HELP = `available commands:
+function buildHelp(unlockLine: string): string {
+  return `available commands:
   ls [path]          list directory
   cd <path>          change directory (.. supported)
   cat <file>         print file contents
   open <path>        open in the graphical viewer
   search <text>      search filenames + contents
-  unlock <w> <w> <w> attempt vestibule decryption
+  ${unlockLine}
   history            command history
   clear              clear screen
   help               this text`;
+}
 
 export default function TerminalApp() {
+  const corpus = activeCorpus();
+  const chrome = corpus.chrome;
+  const vaultUi = corpus.vaultUi;
+  const HELP = useMemo(() => buildHelp(vaultUi.helpLine), [vaultUi.helpLine]);
+  const prompt = `investigator@${chrome.hostname}`;
   const [cwd, setCwd] = useState("/");
   const [lines, setLines] = useState<Line[]>([
-    { text: "MCDUFF PERSONAL COMPUTING SYSTEM — terminal", cls: "text-faint" },
+    { text: `${chrome.systemBrand} — terminal`, cls: "text-faint" },
     { text: "session: INVESTIGATOR (restricted)", cls: "text-faint" },
     { text: "type 'help' for commands", cls: "text-dim" },
     { text: "" },
@@ -85,7 +96,7 @@ export default function TerminalApp() {
       sfx.error();
       return;
     }
-    if (node.requiresUnlock && !os.vaultUnlocked) { push({ text: "sealed — vestibule archive must be decrypted first", cls: "text-amber" }); return; }
+    if (node.requiresUnlock && !os.vaultUnlocked) { push({ text: vaultUi.sealedMessage, cls: "text-amber" }); return; }
     if (!node.content) { push({ text: `(binary object: ${node.name})`, cls: "text-dim" }); return; }
     push({ text: node.content });
     S.openFile(p); // also open graphically so the player can read comfortably
@@ -96,7 +107,7 @@ export default function TerminalApp() {
     if (r.result === "success") {
       push({ text: r.message, cls: "text-accent" });
       sfx.chime();
-      os.pushToast({ app: "SYSTEM", title: "VESTIBULE DECRYPTED", body: "/Private contents unlocked" });
+      os.pushToast({ app: "SYSTEM", title: vaultUi.successToast.title, body: vaultUi.successToast.body });
     } else if (r.result === "decoy") {
       push({ text: r.message, cls: "text-amber" });
       sfx.click();
@@ -111,7 +122,7 @@ export default function TerminalApp() {
     if (!cmd) { if (echo) push({ text: "" }); return; }
     if (!fromAgent) S.noteHumanAction(); // human-typed commands feed the synchrony rhythm
     if (echo) {
-      push({ text: `investigator@mcduff-wks01:${cwd}$ ${cmd}`, cls: "text-accentdim" });
+      push({ text: `${prompt}:${cwd}$ ${cmd}`, cls: "text-accentdim" });
       setHist((h) => [...h, cmd]);
       sfx.keyClick();
     }
@@ -120,9 +131,9 @@ export default function TerminalApp() {
       case "help": push({ text: HELP, cls: "text-dim" }); break;
       case "clear": setLines([]); break;
       case "pwd": push({ text: cwd }); break;
-      case "whoami": push({ text: "investigator (authorized) · previous user DANIEL_MCDUFF [deceased]", cls: "text-dim" }); break;
-      case "date": push({ text: "2026-03-10 · local time drifting since last sync", cls: "text-dim" }); break;
-      case "sudo": push({ text: "daniel was the only administrator.", cls: "text-amber" }); break;
+      case "whoami": push({ text: chrome.terminalWhoami, cls: "text-dim" }); break;
+      case "date": push({ text: chrome.terminalDate, cls: "text-dim" }); break;
+      case "sudo": push({ text: chrome.terminalSudo, cls: "text-amber" }); break;
       case "history": hist.forEach((h, i) => push({ text: ` ${String(i + 1).padStart(3)}  ${h}`, cls: "text-dim" })); break;
       case "ls": {
         const p = resolve(rest[0]);
@@ -183,7 +194,7 @@ export default function TerminalApp() {
         ))}
       </div>
       <div className="shrink-0 flex items-center gap-2 px-3 py-2 border-t border-line bg-surface">
-        <span className="text-accentdim shrink-0">investigator@mcduff-wks01:{cwd}$</span>
+        <span className="text-accentdim shrink-0">{prompt}:{cwd}$</span>
         <input
           id="term-input"
           className="flex-1 bg-transparent outline-none text-txt font-[inherit]"

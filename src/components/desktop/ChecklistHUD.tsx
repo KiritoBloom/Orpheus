@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useOS } from "@/game/state/osStore";
 import { useInvestigation } from "@/game/state/investigationStore";
+import { activeCorpus, type ChecklistStep } from "@/game/data/corpus";
 import * as S from "@/game/services";
 import { sfx } from "@/audio/engine";
 
@@ -12,92 +13,23 @@ import { sfx } from "@/audio/engine";
    Polished, collapsible, non-intrusive.
    ============================================================ */
 
-interface Step {
-  id: string;
-  label: string;
-  desc: string;
-  done: (flags: Set<string>, evidenceCount: number) => boolean;
-  hint: string;
-  action: () => void;
-  actionLabel: string;
+/* One step's completion test and its GO destination, both derived from the
+   corpus's declarative `guidance.checklist`. The HUD itself knows nothing
+   about any particular investigation. */
+function stepDone(st: ChecklistStep, flags: Set<string>): boolean {
+  if (st.anyFlags) return st.anyFlags.some((f) => flags.has(f));
+  return st.flag ? flags.has(st.flag) : false;
 }
 
-const STEPS: Step[] = [
-  {
-    id: "guide",
-    label: "The Letter",
-    desc: "He left you a thread",
-    done: (f) => f.has("FOUND_GUIDE"),
-    hint: "He always left instructions where only he would think to look — near the system's own voice.",
-    action: () => S.openDirectory("/System"),
-    actionLabel: "BROWSE",
-  },
-  {
-    id: "orpheus",
-    label: "The Tilt",
-    desc: "What the instruments agree on",
-    done: (f) => f.has("DISCOVERED_ORPHEUS"),
-    hint: "Five unrelated datasets, one curve. The name is a myth about looking back.",
-    action: () => S.openDirectory("/Research/ORPHEUS"),
-    actionLabel: "EXPLORE",
-  },
-  {
-    id: "reflection",
-    label: "The Window",
-    desc: "What the glass remembers",
-    done: (f) => f.has("FOUND_PHOTO_017"),
-    hint: "Evening light. A figure. A badge turned backwards for a reason.",
-    action: () => S.openApplication("photos"),
-    actionLabel: "LOOK",
-  },
-  {
-    id: "collab",
-    label: "Ask ARIA",
-    desc: "You see, she searches",
-    done: (f) => f.has("COLLABORATED_WITH_ARIA"),
-    hint: "Describe what you see to her. She will search & open what you cannot. Watch the windows move — that is WebMCP.",
-    action: () => window.dispatchEvent(new CustomEvent("orpheus:open-link")),
-    actionLabel: "LINK",
-  },
-  {
-    id: "timeline",
-    label: "The Hour",
-    desc: "02:13",
-    done: (f) => f.has("FOUND_0213_LOG"),
-    hint: "Clocks, logs, heartbeats — all stop at the same minute. One says nothing happened.",
-    action: () => S.openApplication("systemlog"),
-    actionLabel: "TRACE",
-  },
-  {
-    id: "vault",
-    label: "The Vestibule",
-    desc: "Three words, his habit",
-    done: (f) => f.has("VAULT_OPENED"),
-    hint: "Light → name → echo. Photographed so paper could burn and pixels would remember. Order matters.",
-    action: () => S.openApplication("terminal"),
-    actionLabel: "UNLOCK",
-  },
-  {
-    id: "window",
-    label: "The Window",
-    desc: "02:13 comes again",
-    done: (f) => f.has("WINDOW_SYNCHRONIZED"),
-    hint: "After the vault, the machine keeps his habits. When the room opens — 90 seconds, amber pulse, taskbar badge — look where the clock stopped, and have ARIA watch the logs in the same minute. Together, inside the window.",
-    action: () => S.openApplication("photos"),
-    actionLabel: "LOOK",
-  },
-  {
-    id: "case",
-    label: "The Verdict",
-    desc: "Four questions",
-    done: (f) => f.has("CASE_RECONSTRUCTION_AVAILABLE") || f.has("CASE_COMPLETE"),
-    hint: "When the board feels full, it will offer you a final form. You and ARIA must agree.",
-    action: () => S.openApplication("evidence"),
-    actionLabel: "JUDGE",
-  },
-];
+function runAction(a: ChecklistStep["action"]) {
+  if (a.kind === "app") S.openApplication(a.app);
+  else if (a.kind === "directory") S.openDirectory(a.path);
+  else window.dispatchEvent(new CustomEvent("orpheus:open-link"));
+}
 
 export default function ChecklistHUD() {
+  const corpus = activeCorpus();
+  const STEPS = corpus.guidance.checklist;
   const flags = useOS((s) => s.flags);
   const evidenceIds = useInvestigation((s) => s.evidenceIds);
   const syncStreak = useOS((s) => s.syncStreak);
@@ -107,9 +39,9 @@ export default function ChecklistHUD() {
 
   const doneMap = useMemo(() => {
     const m: Record<string, boolean> = {};
-    for (const st of STEPS) m[st.id] = st.done(flags as unknown as Set<string>, evidenceIds.size);
+    for (const st of STEPS) m[st.id] = stepDone(st, flags as unknown as Set<string>);
     return m;
-  }, [flags, evidenceIds.size]);
+  }, [flags, evidenceIds.size, STEPS]);
 
   const completed = Object.values(doneMap).filter(Boolean).length;
   const total = STEPS.length;
@@ -230,7 +162,7 @@ export default function ChecklistHUD() {
                         <button
                           className="btn-bevel text-[10px] px-2 py-1"
                           onClick={() => {
-                            st.action();
+                            runAction(st.action);
                             sfx.click();
                           }}
                         >
@@ -256,7 +188,7 @@ export default function ChecklistHUD() {
                     onClick={() => {
                       if (isNext) setHintOpen(hintOpen === st.id ? null : st.id);
                       else {
-                        st.action();
+                        runAction(st.action);
                         sfx.click();
                       }
                     }}
@@ -289,7 +221,7 @@ export default function ChecklistHUD() {
             <button
               className="shrink-0 btn-bevel text-[10px] px-2 py-1"
               onClick={() => {
-                nextStep.action();
+                runAction(nextStep.action);
                 sfx.windowOpen();
               }}
             >
@@ -313,7 +245,7 @@ export default function ChecklistHUD() {
         <div className="px-2 py-1.5 bg-bg border-t border-line flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-amber/70 shrink-0" />
           <span className="text-[9px] tracking-[0.12em] text-faint leading-tight">
-            ARIA sees the machine. You see the room. Neither alone is enough.
+            {corpus.chrome.assistantTagline}
             {syncStreak >= 2 && <span className="text-amber"> · SYNCHRONY ×{syncStreak}</span>}
           </span>
         </div>

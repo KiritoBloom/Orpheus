@@ -7,6 +7,7 @@ import { useAria } from "@/game/state/ariaStore";
 import { useInvestigation } from "@/game/state/investigationStore";
 import { registerWebMCPTools, getModelContext, getRegistrationState } from "@/webmcp/register";
 import { readDemoConfig, isDemoEntry, applyDemoConfig, demoBanner, type DemoConfig } from "@/game/demo";
+import { activeCorpus } from "@/game/data/corpus";
 import { sfx } from "@/audio/engine";
 import IrisTitle from "@/components/title/IrisTitle";
 import BootSequence from "@/components/boot/BootSequence";
@@ -57,7 +58,8 @@ export default function GameRoot() {
       // ariaStore now only holds status; no chat persistence needed
       useAria.setState({ status: "idle", statusDetail: "" });
       useInvestigation.getState().loadFromSave({
-        evidenceIds: save.evidenceIds,
+        // a fresh save carries no evidence; seed from the active corpus
+        evidenceIds: save.evidenceIds.length ? save.evidenceIds : activeCorpus().seedEvidenceIds,
         caseReport: save.caseReport,
         caseVerdicts: save.caseVerdicts,
         caseCompleteAt: save.caseCompleteAt,
@@ -187,7 +189,7 @@ export default function GameRoot() {
     return () => clearTimeout(id);
   }, [phase]);
 
-  /* ---------- the 02:13 window — recurring co-op set piece after the vault ---------- */
+  /* ---------- the observability window — recurring co-op set piece after the vault ---------- */
   useEffect(() => {
     const id = setInterval(() => {
       void import("@/game/services").then((m) => m.tickObservabilityWindow());
@@ -218,9 +220,10 @@ export default function GameRoot() {
       // Auto-open Field Guide exactly once per investigation — the promised "file that opens when we first enter the desktop"
       if (!sawGuide && !useOS.getState().flags.has("FOUND_GUIDE")) {
         const { openFile, openApplication } = await import("@/game/services");
+        const guidePath = activeCorpus().guidePath;
         // small stagger so the desktop settles, then guide appears on top
         setTimeout(() => {
-          openFile("/System/FIELD_GUIDE.txt");
+          openFile(guidePath);
           if (useOS.getState().settings.sound) sfx.windowOpen();
         }, 500);
         setTimeout(() => {
@@ -272,15 +275,12 @@ export default function GameRoot() {
     if (phase !== "desktop" || !ready) return;
     const f = useOS.getState().flags;
     if (f.has("CASE_RECONSTRUCTION_AVAILABLE") || f.has("CASE_COMPLETE")) return;
+    /* The ladder is the corpus's: offer the first nudge whose flag is still
+       missing. No investigation-specific strings live in this component. */
     const hintFor = (): { title: string; body: string } | null => {
       const cur = useOS.getState().flags;
-      if (!cur.has("FOUND_GUIDE")) return { title: "START HERE", body: "A guide waits in System — it explains why you need ARIA." };
-      if (!cur.has("DISCOVERED_ORPHEUS")) return { title: "THE TILT", body: "Five datasets, one curve. He named it after looking back." };
-      if (!cur.has("FOUND_PHOTO_017")) return { title: "LOOK CLOSER", body: "Evening light, a window — zoom. The glass remembers what the eye missed." };
-      if (!cur.has("FOUND_0213_LOG")) return { title: "THE HOUR", body: "Clocks, logs, heartbeats — all stop at 02:13. The power log says nothing happened." };
-      if (!cur.has("VAULT_OPENED")) return { title: "THREE WORDS", body: "Light → name → echo. Photographed so paper could burn. Order matters." };
-      if (!cur.has("IDENTIFIED_CONTACT")) return { title: "WHO VISITED?", body: "A badge turned backwards. Ask ARIA to find where that phrase appears." };
-      return null;
+      const entry = activeCorpus().guidance.hintChain.find((h) => !cur.has(h.flag));
+      return entry ? { title: entry.title, body: entry.body } : null;
     };
     const t = setTimeout(() => {
       const h = hintFor();
@@ -369,7 +369,7 @@ export default function GameRoot() {
           syncLastAt: 0,
         });
         useAria.setState({ status: "idle", statusDetail: "" });
-        useInvestigation.setState({ evidenceIds: new Set(["ev_daniel"]), caseReport: {}, caseVerdicts: {}, caseCompleteAt: null });
+        useInvestigation.setState({ evidenceIds: new Set(activeCorpus().seedEvidenceIds), caseReport: {}, caseVerdicts: {}, caseCompleteAt: null });
         sfx.ensure();
         setCurtain((c) => c + 1);
         setPhase("boot");
@@ -434,7 +434,7 @@ export default function GameRoot() {
       {/* the shutter opens on whatever phase just mounted — one continuous optic */}
       {curtain > 0 && phase !== "title" && <Aperture key={curtain} dir="in" />}
 
-      {/* cinematic event moments — dim + amber rim on mystery messages & 02:13 */}
+      {/* cinematic event moments — dim + amber rim on mystery messages & the window */}
       <EventFlash />
     </div>
   );

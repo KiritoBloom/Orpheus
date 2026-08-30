@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useOS } from "@/game/state/osStore";
+import { activeCorpus } from "@/game/data/corpus";
 import { sfx } from "@/audio/engine";
 import WindowFrame from "@/components/windows/WindowFrame";
 import Taskbar from "@/components/taskbar/Taskbar";
@@ -23,12 +24,14 @@ import { PhotosApp, ImageViewerApp } from "@/components/applications/PhotosApp";
    ============================================================ */
 
 export default function Desktop() {
+  const chrome = activeCorpus().chrome;
+  const sticky = chrome.sticky;
   const crt = useOS((s) => s.settings.crt);
   const textScale = useOS((s) => s.settings.textScale);
   const obsOpen = useOS((s) => s.obsWindow.open);
   const [flicker, setFlicker] = useState(false);
 
-  // subtle 02:13 intrigue pulse — brief horizontal scan, every ~38s, only when no window has focus (not distracting)
+  // subtle intrigue pulse — brief horizontal scan, every ~38s, only when no window has focus (not distracting)
   useEffect(() => {
     if (typeof window === "undefined") return;
     const schedule = () => {
@@ -92,26 +95,28 @@ export default function Desktop() {
           opacity: 0.22,
         }}
       />
-      {/* diegetic sticky — human trace that makes ORPHEUS personal, not just numbers */}
-      <div
-        className="absolute left-[108px] bottom-[64px] w-[148px] select-none hidden lg:block rotate-[-1.2deg] hover:rotate-[0.2deg] transition-transform duration-150 cursor-pointer"
-        onMouseEnter={() => sfx.typeTick()}
-        onClick={() => sfx.click()}
-      >
-        <div className="bg-[#f4edd6] text-[#2b241e] p-2.5 shadow-[0_2px_10px_rgba(0,0,0,0.35),0_0_0_1px_rgba(0,0,0,0.12)] relative">
-          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-amber/80 shadow-[0_1px_3px_rgba(0,0,0,0.4)]" />
-          <div className="text-[9px] tracking-[0.14em] text-[#8a7a5a]">MAYA — RECITAL</div>
-          <div className="text-[11px] font-medium leading-none mt-0.5 line-through decoration-[#b48a5a] decoration-1">19:00 — DON&apos;T BE LATE</div>
-          <div className="text-[10px] text-[#6b5a3a] mt-1">run 150? @02:13??</div>
-          <div className="absolute bottom-0 right-0 w-3 h-3 bg-[#e8dcc0] shadow-[-1px_-1px_2px_rgba(0,0,0,0.08)]" style={{ clipPath: "polygon(100% 0, 0 100%, 100% 100%)" }} />
+      {/* diegetic paper artefact — the human trace, if this corpus has one */}
+      {sticky && (
+        <div
+          className="absolute left-[108px] bottom-[64px] w-[148px] select-none hidden lg:block rotate-[-1.2deg] hover:rotate-[0.2deg] transition-transform duration-150 cursor-pointer"
+          onMouseEnter={() => sfx.typeTick()}
+          onClick={() => sfx.click()}
+        >
+          <div className="bg-[#f4edd6] text-[#2b241e] p-2.5 shadow-[0_2px_10px_rgba(0,0,0,0.35),0_0_0_1px_rgba(0,0,0,0.12)] relative">
+            <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-amber/80 shadow-[0_1px_3px_rgba(0,0,0,0.4)]" />
+            <div className="text-[9px] tracking-[0.14em] text-[#8a7a5a]">{sticky.kicker}</div>
+            <div className="text-[11px] font-medium leading-none mt-0.5 line-through decoration-[#b48a5a] decoration-1">{sticky.line}</div>
+            <div className="text-[10px] text-[#6b5a3a] mt-1">{sticky.scrawl}</div>
+            <div className="absolute bottom-0 right-0 w-3 h-3 bg-[#e8dcc0] shadow-[-1px_-1px_2px_rgba(0,0,0,0.08)]" style={{ clipPath: "polygon(100% 0, 0 100%, 100% 100%)" }} />
+          </div>
+          <div className="text-[8px] tracking-[0.16em] text-amber/50 mt-1 text-center">{sticky.caption}</div>
         </div>
-        <div className="text-[8px] tracking-[0.16em] text-amber/50 mt-1 text-center">FOUND TAPED TO MONITOR — PHOTOGRAPHED</div>
-      </div>
+      )}
 
       {/* watermark — 90s inventory tag, muted */}
       <div className="absolute top-2 right-3 mono-xs text-faint select-none pointer-events-none flex items-center gap-2">
-        <span className="text-faint">MCDUFF WORKSTATION v4.2 · AIR-GAPPED</span>
-        <span className="hidden md:inline text-[9px] tracking-[0.16em] text-faint/70 border border-faint/20 px-1">02:13</span>
+        <span className="text-faint">{chrome.watermark}</span>
+        <span className="hidden md:inline text-[9px] tracking-[0.16em] text-faint/70 border border-faint/20 px-1">{chrome.watermarkBadge}</span>
       </div>
 
       {/* desktop icons */}
@@ -132,7 +137,7 @@ export default function Desktop() {
       <WindowFrame id="textviewer" title="DOCUMENT VIEWER"><TextViewerApp /></WindowFrame>
       <WindowFrame id="imageviewer" title="PHOTO VIEWER"><ImageViewerApp /></WindowFrame>
 
-      {/* 02:13 window — amber observability pulse (time-boxed co-op set piece) */}
+      {/* observability window — amber pulse (time-boxed co-op set piece) */}
       {obsOpen && <div className="window-pulse" />}
 
       {/* subtle 90s CRT retrace — gray, not green */}

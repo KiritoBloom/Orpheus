@@ -184,17 +184,21 @@ It is a two-player mechanic where one player is an agent, and it cannot exist wi
 
 One rule runs through the codebase: **if the human can do it and the agent can do it, the logic exists exactly once.** `src/game/services.ts` is that once. The React apps call it; the WebMCP tools call it. Removing WebMCP does not degrade the agent — it removes it entirely.
 
-Next.js 16.3 (App Router, Turbopack, TypeScript), React 19, Tailwind 4, Zustand 5 persisted to IndexedDB via `idb-keyval`, CSS-only motion stepped at 80 ms, Web Audio (sampled first, procedural fallback). One static route, SSR-safe throughout. No server, database, authentication, external API calls, or environment variables.
+Next.js 16.3 (App Router, Turbopack, TypeScript), React 19, Tailwind 4, Zustand 5 persisted to IndexedDB via `idb-keyval`, CSS-only motion stepped at 80 ms, Web Audio (sampled first, procedural fallback). Two static routes over one engine, SSR-safe throughout. No server, database, authentication, external API calls, or environment variables.
 
 ```
 src/
-  app/                   layout (+ declarative focus styles), globals.css, page
+  app/                   layout (+ declarative focus styles), globals.css, page · apollo13/page
   types/game.ts          every domain and state shape
   game/
-    data/                filesystem (docs + computed key lines) · emails (17/5 folders) ·
-                         chatMessages (7 threads incl. t_observer, 35 msgs) ·
-                         browserHistory (18 + 17 cached) · systemLogs (51) ·
-                         evidence (21/5 sections) · photos (12, 3 sealed)
+    data/                corpus.ts        THE instance seam — record + rules + chrome
+                         mcduff:          filesystem (docs + computed key lines) · emails (17/5 folders) ·
+                                          chatMessages (7 threads incl. t_observer, 35 msgs) ·
+                                          browserHistory (18 + 17 cached) · systemLogs (51) ·
+                                          evidence (21/5 sections) · photos (12, 3 sealed)
+                         apollo13/        Review Board + Mission Report docs · 5 voice loops (53 msgs) ·
+                                          42 log rows · 9 NASA photographs · 20 evidence items ·
+                                          SOURCES.md (every citation, every known gap)
     state/               osStore (phase, windows, flags, vault, obsWindow, synchrony) ·
                          ariaStore (agent status only — WebMCP is the channel) ·
                          investigationStore (evidence, four-question verdicts) ·
@@ -209,7 +213,37 @@ src/
 
 **Capability parity.** Each capability has one implementation and up to two entry points. `FilesApp` double-click and `open_file` both call `openFile()`. The text viewer's find bar and `show_in_document` both call `showInDocument()`. Two capabilities are deliberately one-sided: `notePhotoInspection` (the zoom detent — UI only, no zoom tool) and `getTimeline` (agent only, no UI equivalent). Components communicate through five `SimpleBus` channels plus `TermBus` and the document listeners.
 
-**Adding to the world.** A document is an `FsNode` in `filesystem.ts`; a photo is a `PhotoMeta` plus a PNG in `public/Images/`; an evidence item is an `EvidenceItem` with an optional `autoUnlockFlag`. A new tool is a `services.ts` function plus one entry in `TOOL_DEFS` — `register.ts` may not import from `game/data/*`, and `pnpm test:webmcp` fails if it does.
+**Adding to the world.** A document is an `FsNode` in the corpus's `filesystem.ts`; a photo is a `PhotoMeta` plus an image in `public/Images/`; an evidence item is an `EvidenceItem` with an optional `autoUnlockFlag`. A new tool is a `services.ts` function plus one entry in `TOOL_DEFS` — `register.ts` may not import from `game/data/*`, and `pnpm test:webmcp` fails if it does.
+
+---
+
+## Two instances, one tool layer
+
+The claim that this generalises is not an assertion in a README; it is a second route. **[`/apollo13`](https://orpheus-mcduff.vercel.app/apollo13)** runs the same 25 tools, the same `services.ts`, the same vault and the same observability window over the primary record of the Apollo 13 accident — the Review Board report of June 1970, the MSC-02680 Mission Report, five voice-loop threads, and nine photographs from the NASA Image Library with real byte sizes and real SHA-256 prefixes.
+
+Everything that differs between the two instances lives behind one interface, `Corpus` in `src/game/data/corpus.ts`. It has two halves:
+
+- **the record** — `filesystem`, `emails`, `threads`, `messages`, `history`, `cachedPages`, `logs`, `photos`, `evidence`, `photoSources`
+- **the rules and the chrome** — `fileFlags`, `photoFlags`, `historyFlags`, `derivedFlags`, `milestones`, `vault`, `syncWindow`, plus `chrome`, `briefing`, `briefingSpine`, `guidance` and `vaultUi`, which supply every string a player reads outside a document: BIOS wordmark, terminal prompt and `whoami`, desktop watermark, case jacket, checklist steps, idle hints, evidence empty states, the LINK console's canned arguments, and the closing card.
+
+`services.ts` resolves the corpus lazily through `activeCorpus()` and contains no corpus-specific string. Registering an instance is two lines:
+
+```ts
+registerCorpus("apollo13", () => APOLLO13_CORPUS);
+setActiveCorpus("apollo13");
+```
+
+Saves are scoped per corpus, so the two investigations cannot overwrite each other.
+
+**The real corpus was the harder constraint.** Instance one can invent a clue when the puzzle needs one; instance two cannot. So the design rule inverted: quote verbatim or don't quote, flag every derived timestamp in the metadata `note`, and where the record contradicts itself, **preserve the contradiction**. Three are load-bearing:
+
+| Conflict | Δ |
+|---|---|
+| SM jettison — Mission Report GET 138:01:48 vs voice loop 138:02:06 | 18 s |
+| Splashdown — report-derived 12:07:41 p.m. CST vs press caption 12:07:44 | 3 s |
+| S70-35013 captions the CO2 adapter as the command module's; the frame is the lunar module's | wrong vehicle |
+
+A corpus that resolves its own conflicts cannot teach anyone to find one. The second clock is the other half: the disk speaks Ground Elapsed Time, UTC is range zero `1970-04-11 19:13:00` plus GET, and the accident at GET 55:54:53.182 is **03:07 UTC** — the number that plays the role 02:13 plays in instance one.
 
 ---
 

@@ -7,15 +7,12 @@
 
 import { useEffect, useState } from "react";
 import { useOS } from "@/game/state/osStore";
+import { activeCorpus } from "@/game/data/corpus";
 import { sfx } from "@/audio/engine";
 
-const FINAL_MESSAGES: string[] = [
-  "There is one thing I still cannot explain.",
-  "The first anomaly was recorded before Daniel began the research.",
-  "He didn't discover it.",
-];
-
 export default function EndingSequence({ onDone }: { onDone: () => void }) {
+  const chrome = activeCorpus().chrome;
+  const FINAL_MESSAGES = chrome.endingLines;
   const [step, setStep] = useState(0);
   const windows = useOS((s) => s.windows);
   const os = useOS();
@@ -81,8 +78,8 @@ export default function EndingSequence({ onDone }: { onDone: () => void }) {
       {/* the final line — step 5 */}
       {step === 5 && (
         <div className="text-center">
-          <div className="text-[18px] tracking-[0.28em] text-txt">It may have been looking for him.</div>
-          <div className="mt-8 text-[9px] tracking-[0.4em] text-faint">END OF CASE 001</div>
+          <div className="text-[18px] tracking-[0.28em] text-txt">{chrome.endingFinalLine}</div>
+          <div className="mt-8 text-[9px] tracking-[0.4em] text-faint">{chrome.endingStamp}</div>
         </div>
       )}
     </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { THREADS } from "@/game/data/chatMessages";
+import { activeCorpus } from "@/game/data/corpus";
 import { listMessages, listThreads, markThreadRead, messagesThreadBus } from "@/game/services";
 import { useOS } from "@/game/state/osStore";
 import { sfx } from "@/audio/engine";
@@ -23,7 +23,8 @@ const THREAD_META: Record<string, { status: string; color: string }> = {
 };
 
 export default function MessagesApp() {
-  const [active, setActive] = useState<string>("t_sarah");
+  // the first thread of whichever corpus is loaded — no hardcoded thread id
+  const [active, setActive] = useState<string>(() => activeCorpus().threads[0]?.id ?? "");
   const [filter, setFilter] = useState("");
   const scroller = useRef<HTMLDivElement>(null);
   const readThreadIds = useOS((s) => s.readThreadIds);
@@ -65,7 +66,7 @@ export default function MessagesApp() {
   useEffect(() => {
     return messagesThreadBus.on((id) => {
       const tid = String(id);
-      if (THREADS.some((t) => t.id === tid)) {
+      if (activeCorpus().threads.some((t) => t.id === tid)) {
         setActive(tid);
         markThreadRead(tid);
       }

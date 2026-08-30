@@ -6,6 +6,8 @@
 
 **Judges, skip ahead:** [`?demo=verify`](https://orpheus-mcduff.vercel.app/?demo=verify) lands on the desktop with the tool console open · [`?demo=window`](https://orpheus-mcduff.vercel.app/?demo=window) preloads the vault so the 02:13 set piece arms in ~20 seconds. Preloaded flags only — every gate is the real gate.
 
+**Second instance — the same 25 tools over real NASA documents:** [`/apollo13`](https://orpheus-mcduff.vercel.app/apollo13). Every file, voice loop, photograph and timestamp there is public-domain primary material (Apollo 13 Review Board report, MSC-02680 Mission Report, NASA Image Library), including three places where the record contradicts itself — preserved, not corrected. Same engine, same tool layer, different corpus: see [`src/game/data/corpus.ts`](src/game/data/corpus.ts).
+
 ```js
 // src/webmcp/register.ts — 25 narrow tools registered this way
 document.modelContext.registerTool({
