@@ -304,33 +304,6 @@ export default function GameRoot() {
     return () => window.removeEventListener("keydown", h);
   }, []);
 
-  /* ---------- declarative tool lifecycle — agent fills a form ---------- */
-  // Per the Declarative API, `toolactivated` fires on the window once the agent
-  // has pre-filled a form's fields, and `toolcancel` when it aborts or resets.
-  // Both carry `toolName` as a property ON THE EVENT (not in `detail`).
-  useEffect(() => {
-    const nameOf = (e: Event) =>
-      (e as Event & { toolName?: string }).toolName ??
-      (e as CustomEvent<{ toolName?: string }>).detail?.toolName ??
-      "tool";
-    const onActivated = (e: Event) => {
-      useOS.getState().pushToast({
-        app: "WEBMCP",
-        title: "TOOL ACTIVATED",
-        body: `${nameOf(e)} — agent is filling the form`,
-      });
-    };
-    const onCancel = (e: Event) => {
-      useOS.getState().pushToast({ app: "WEBMCP", title: "TOOL CANCELLED", body: nameOf(e) });
-    };
-    window.addEventListener("toolactivated" as never, onActivated as never);
-    window.addEventListener("toolcancel" as never, onCancel as never);
-    return () => {
-      window.removeEventListener("toolactivated" as never, onActivated as never);
-      window.removeEventListener("toolcancel" as never, onCancel as never);
-    };
-  }, []);
-
   /* ---------- phase transitions from title ---------- */
   const handleLaunch = useCallback(
     async (mode: "new" | "continue") => {
