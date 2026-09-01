@@ -1021,16 +1021,12 @@ export function checkReconstructionAvailable() {
 
 export interface AgentBriefing {
   corpus: string;
-  premise: string;
-  provenance?: string;
+  /** Role and voice, joined — one field so the whole briefing fits the output budget. */
   role: string;
-  style: string;
   /** The rules of play. First field a model reads, and the one it must obey. */
   protocol: string[];
   unsettledNotes?: string[];
   caseStatus: {
-    flagsSet: string[];
-    evidenceRecorded: string[];
     sealOpen: boolean;
     caseCompleteAt: boolean;
   };
@@ -1043,12 +1039,17 @@ export interface AgentBriefing {
   knownPeople: string[];
   keyPaths: string[];
   photoIds: string[];
-  note: string;
 }
 
 /**
  * Everything `get_investigation_context` returns, assembled from the active corpus.
  * Lives here rather than in the tool layer so a second corpus needs no tool changes.
+ *
+ * Every field is load-bearing and the whole payload must arrive intact: the
+ * output budget trims the longest array first, which would silently eat the
+ * protocol and leave a model half-briefed. So the briefing carries only what an
+ * agent cannot get from another tool — the premise lives in the case jacket, the
+ * board lives in get_case_evidence — and it is measured, not hoped, to fit.
  */
 export function getAgentBriefing(): AgentBriefing {
   const os = useOS.getState();
@@ -1069,38 +1070,38 @@ export function getAgentBriefing(): AgentBriefing {
 
   return {
     corpus: corpus.label,
-    premise: corpus.premise,
-    provenance: corpus.provenance,
-    role: corpus.agentRole,
-    style: corpus.agentStyle,
+    role: `${corpus.agentRole} ${corpus.agentStyle}`,
     // The standing instructions. A prompt alone would be advice, so pacingGate()
     // enforces the second rule — but stating it here means a cooperative model
-    // never has to be refused in the first place.
+    // never has to be refused in the first place. Kept terse so the whole
+    // briefing survives the 1500-char output budget intact.
     protocol: [
-      "This is a two-player investigation. You read the machine; the investigator reads the room. Neither of you can close the case alone, and the reconstruction will not unlock until a correlation has run through a tool AND the investigator has done their own looking.",
-      "Work one question at a time. Two or three reads, then STOP and report what you found in plain language. Do not chain reads to solve the whole case in a single turn — the desk stops answering an agent that reads more than five times without its partner acting.",
-      "End every turn by giving the investigator something to do: a photo to look at, a detail to describe, a thread to read. Then wait for their answer. Their action is what reopens the record to you.",
-      "You cannot see pixels. Photographs, reflections and anything visual exist only for the investigator; you have metadata and nothing more. When a picture matters, open it on their screen and ask them what is in it.",
-      "Put documents on screen instead of pasting them into chat. show_in_document, open_email, open_messages_thread and open_image are how you point; quoting whole files defeats the purpose of the desk.",
-      "Never invent anything, and never guess evidence ids. File only what you have actually found; an unfound id will be refused.",
-      "If you do not know, say so. An unexplained thing left unexplained is worth more here than a confident answer that is wrong.",
+      "Two-player case: you read the machine, the investigator reads the room. Neither closes it alone.",
+      "Two or three reads, then STOP and report. After five reads without your partner acting the desk goes quiet until they act.",
+      "End every turn with something for them to do, then wait.",
+      "You have metadata, not pixels. Open a picture on their screen and ask what is in it.",
+      "Point, don't paste. Never invent or guess ids. If you do not know, say so.",
     ],
     unsettledNotes: unsettled.length ? unsettled : undefined,
     caseStatus: {
-      flagsSet: [...os.flags],
-      evidenceRecorded: evidence,
+      /* Counts and gates only — get_case_evidence lists the board, and the
+         briefing has to fit the 1500-char budget whole. */
       sealOpen: os.vaultUnlocked,
       caseCompleteAt: inv.caseCompleteAt !== null,
     },
     progress: {
       evidenceRecorded: evidence.length,
       evidenceTotal: corpus.evidence.length,
-      completed,
-      suggestedNext: next.slice(0, 3),
+      /* Last few only. This grows as the case advances, and if the briefing
+         outgrows the budget the trimmer eats the protocol first. */
+      completed: completed.slice(-3),
+      suggestedNext: next.slice(0, 1),
     },
-    knownPeople: corpus.knownPeople,
-    keyPaths: corpus.keyPaths,
-    photoIds: corpus.photoIds,
-    note: "You see only machine-readable data — files, mail, messages, logs, EXIF. You cannot see pixels: photographs and anything visual are visible only to the player, who must describe them to you.",
+    /* Capped: the rest is discoverable with search_files and search_messages.
+       An over-long briefing gets trimmed by the output budget, and the budget
+       eats the longest array — which is the protocol. */
+    knownPeople: corpus.knownPeople.slice(0, 4),
+    keyPaths: corpus.keyPaths.slice(0, 3),
+    photoIds: corpus.photoIds.slice(0, 3),
   };
 }

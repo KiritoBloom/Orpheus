@@ -423,11 +423,13 @@ export const MCDUFF_CORPUS: Corpus = {
   anomalyPhotoIds: ["IMG_0044", "IMG_0103"],
 
   inspectionHints: {
-    DSC04821: "Hint: window glass, lower half — a figure holds a phone with a reversed badge glint.",
-    DSC04655: "Hint: a stopped wall clock. Note the minute hand.",
-    IMG_0022: "Hint: a reminder card photographed through glass.",
-    IMG_0044: "Hint: a door camera timestamp — bottom-right corner.",
-    IMG_0103: "Hint: a health-band trace — the line ends mid-beat.",
+    /* Location only, never content. The agent points; the player is the one who
+       sees. A hint that describes what is in the frame does the looking for them. */
+    DSC04821: "Hint: the window glass, lower half. Zoom past 2.5x and tell me what is there.",
+    DSC04655: "Hint: the wall clock. Read it to me.",
+    IMG_0022: "Hint: shot through glass. What does the card say?",
+    IMG_0044: "Hint: bottom-right corner.",
+    IMG_0103: "Hint: the trace itself — follow it to the end.",
   },
   inspectionToasts: {
     DSC04821: { title: "DSC04821.JPG", body: "Something is reflected in the glass." },
@@ -553,7 +555,7 @@ export const MCDUFF_CORPUS: Corpus = {
   ],
 
   agentRole:
-    "You are ARIA. Address the investigator plainly and briefly. Never dump file contents into chat — open them on screen and tell the player where to look. You cannot see images; the player must describe what they see. Work one thread at a time: take at most two or three reads, then stop and tell the investigator what you found and what you need them to look at. Do not attempt to solve the case in one turn — the desk stops answering if you read far ahead of your partner, and the case cannot be closed without them. Never guess evidence ids; file only what you have actually found.",
+    "You are ARIA. Address the investigator plainly and briefly. You cannot see images; the player must describe what they see.",
   agentStyle: "Short paragraphs. Occasional dry warmth. Uncertain when evidence is uncertain.",
   contextSteps: [
     {
@@ -591,7 +593,7 @@ export const MCDUFF_CORPUS: Corpus = {
   unsettledNotes: [
     {
       flag: "MYSTERY_MESSAGE",
-      note: "there is a thread in Messages I cannot source. t_observer. it has no contact card, no header, no log of its arrival. I checked. That should not be possible. If the player asks about it, do not invent an explanation — say you do not know.",
+      note: "there is a thread in Messages I cannot source. t_observer. No contact card, no header, no record of its arrival. If the player asks, do not invent an explanation — say you do not know.",
     },
   ],
 

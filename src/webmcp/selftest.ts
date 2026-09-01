@@ -127,14 +127,21 @@ function runChecks(): SelfTestResult[] {
 
   // 2 — briefing shape + live co-pilot progress
   const briefing = tool("get_investigation_context").execute({}) as {
-    caseStatus?: { flagsSet?: string[] };
+    caseStatus?: { sealOpen?: boolean };
     knownPeople?: string[];
+    protocol?: string[];
     progress?: { completed?: string[]; suggestedNext?: string[]; evidenceTotal?: number };
   };
   check(
-    "get_investigation_context: briefing + progress block",
-    !!briefing?.caseStatus && Array.isArray(briefing.knownPeople) && briefing.knownPeople.length > 0 && !!briefing.progress,
-    `people: ${briefing?.knownPeople?.length ?? 0} · next: ${briefing?.progress?.suggestedNext?.length ?? 0} suggestion(s)`,
+    "get_investigation_context: briefing + protocol + progress, whole and unbudgeted",
+    !!briefing?.caseStatus &&
+      Array.isArray(briefing.knownPeople) &&
+      briefing.knownPeople.length > 0 &&
+      !!briefing.progress &&
+      Array.isArray(briefing.protocol) &&
+      briefing.protocol.length === 5 &&
+      JSON.stringify(briefing).length <= 1500,
+    `protocol: ${briefing?.protocol?.length ?? 0}/5 rules · ${JSON.stringify(briefing).length} chars · next: ${briefing?.progress?.suggestedNext?.length ?? 0}`,
   );
 
   // 3 — search at scale with excerpt budget — corpus-aware query

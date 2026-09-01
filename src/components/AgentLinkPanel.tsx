@@ -63,7 +63,18 @@ export default function AgentLinkPanel({ onClose }: { onClose: () => void }) {
         via === "host"
           ? "▸ routed through document.modelContext.executeTool (real host path)"
           : "▸ no host present — called the tool handler directly";
-      setOutput(`${routed}\n\n${JSON.stringify(result, null, 2).slice(0, 4000)}`);
+      // A real host hands back a JSON *string*; stringifying it again would show
+      // the reader a wall of escaped quotes. Parse first, then pretty-print once.
+      let shown: unknown = result;
+      if (typeof shown === "string") {
+        try {
+          shown = JSON.parse(shown);
+        } catch {
+          /* not JSON — print the string as-is */
+        }
+      }
+      const text = typeof shown === "string" ? shown : JSON.stringify(shown, null, 2);
+      setOutput(`${routed}\n\n${text.slice(0, 4000)}`);
     } catch (e) {
       setOutput(`ERROR: ${e instanceof Error ? e.message : String(e)}`);
     }

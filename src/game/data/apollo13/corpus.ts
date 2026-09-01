@@ -62,16 +62,14 @@ export const APOLLO13_CORPUS: Corpus = {
   anomalyPhotoIds: ["as13-59-8500", "s70-41984"],
 
   inspectionHints: {
+    /* Location only, never content. The agent points; the investigator is the one
+       who sees. A hint that describes the frame does their looking for them. */
     "as13-59-8500":
-      "Hint: the bay to the right of the high-gain antenna. Do not look for damage — look for what is not there. The outer panel is gone from near the antenna almost to the engine bell.",
-    "as13-62-8929":
-      "Hint: follow the hose. Grey tape, a cue-card cover, a stowage bag — a command module canister running on a lunar module fitting.",
-    "s70-41984":
-      "Hint: the conduit where the wiring enters the tank. That is the failure point the Board describes, filmed from outside the vessel.",
-    "as13-59-8562":
-      "Hint: Aquarius, drifting away, undamaged and still working — jettisoned four hours before it would have been needed to fly anything at all.",
-    "s70-35145":
-      "Hint: the room at splashdown. Flags, cigars, a wall clock. The consoles behind the celebration are the ones that ran the arithmetic in threads C and D.",
+      "Hint: the bay to the right of the high-gain antenna. Do not look for damage — look for what is not there. Describe it to me.",
+    "as13-62-8929": "Hint: follow the hose from the canister to the fitting. What is holding it together?",
+    "s70-41984": "Hint: the conduit where the wiring enters the tank. Tell me what happens there.",
+    "as13-59-8562": "Hint: Aquarius after jettison. What condition is it in?",
+    "s70-35145": "Hint: the room at splashdown. What is on the wall, and what time does it say?",
   },
   inspectionToasts: {
     "as13-59-8500": {
@@ -264,10 +262,10 @@ export const APOLLO13_CORPUS: Corpus = {
   ],
 
   agentRole:
-    "You are ARIA, working an accident review with the investigator. This corpus is real: every document, timestamp and quotation is public-domain NASA material. Never invent a fact, a quotation, or a time. If a value is derived rather than quoted, say it is derived. Never dump file contents into chat — open them on screen and say where to look. You cannot see images: you can read every metadata field and no pixels, so the investigator has to tell you what a frame shows. Times are GET unless marked UTC; range zero is 19:13:00 G.m.t. April 11 1970. Work one question at a time: take at most two or three reads, then stop and report what you found and what you need the investigator to look at. Do not attempt to finish the review in one turn — the desk stops answering if you read far ahead of your partner. Never guess evidence ids; file only what you have actually found.",
+    "You are ARIA, working a real accident review: every document, time and quotation here is public-domain NASA material. Never invent one. Times are GET; range zero is 1970-04-11 19:13:00 G.m.t. You read metadata, not pixels.",
 
   agentStyle:
-    "Short paragraphs. Engineer's precision about numbers, plain language about people. Quote the documents rather than paraphrasing them. Say 'the Board did not conclude that' when the Board did not conclude that.",
+    "Short paragraphs. Engineer's precision about numbers. Say 'the Board did not conclude that' when it did not.",
 
   contextSteps: [
     {

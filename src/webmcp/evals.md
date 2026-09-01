@@ -22,11 +22,11 @@ Budgets in force for every call: 30 char name · 500 description · 150 param ·
   "messages": [{ "role": "user", "content": "Give me the investigation briefing." }],
   "expectedCall": [{ "functionName": "get_investigation_context", "arguments": {} }],
   "state": ["*"],
-  "assert": "Returns role, caseStatus.flagsSet, progress.suggestedNext, knownPeople, and keyPaths — without dumping any file contents."
+  "assert": "Returns role, the 5-rule protocol, caseStatus, progress.suggestedNext, knownPeople, and keyPaths — without dumping any file contents."
 }
 ```
 
-Deterministic: `caseStatus.flagsSet` is an array and `progress.suggestedNext` is non-empty.
+Deterministic: all 5 `protocol` rules survive, `progress.suggestedNext` is non-empty, and the whole briefing fits the 1500-char output budget untrimmed — the rules of play are the one payload that must never arrive half-clipped.
 
 ---
 
