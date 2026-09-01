@@ -816,6 +816,71 @@ function checkWindowSync() {
   }
 }
 
+/* ---------------- pacing — the desk answers one thread at a time ---------------- */
+/**
+ * The co-op premise dies if the agent can empty the corpus in one turn. A capable
+ * model, asked to "gather context", will happily fire forty reads and hand back a
+ * solved case — leaving the human nothing to find and no reason to be at the desk.
+ *
+ * Asking it not to is not a mechanic; a prompt is advice. So the desk withholds.
+ * After AGENT_READ_BUDGET consecutive machine reads with no human action in
+ * between, the read tools stop answering until the investigator does something.
+ * Actuation (open_*, highlight_*) is never gated — putting a document on the
+ * player's screen is the behaviour we want, and the human is watching it happen.
+ *
+ * The run decays after IDLE_RESET_MS so a later question starts fresh: the gate
+ * paces a single burst, it does not punish a conversation.
+ */
+const AGENT_READ_BUDGET = 5;
+const IDLE_RESET_MS = 30_000;
+
+let agentRun = 0;
+let agentRunAt = 0;
+
+/** Read tools yield to the human; actuation and the briefing never do. */
+const UNGATED_TOOLS = new Set([
+  "get_investigation_context",
+  "open_application",
+  "focus_application",
+  "open_file",
+  "open_directory",
+  "open_image",
+  "open_email",
+  "open_messages_thread",
+  "open_browser_entry",
+  "open_evidence_board",
+  "show_in_document",
+  "highlight_evidence",
+  "record_evidence",
+  "terminal_command",
+]);
+
+/**
+ * Called by the tool layer before every agent invocation. Returns an error
+ * envelope when the agent has read too far ahead of its partner, else null.
+ */
+export function pacingGate(toolName: string): { ok: false; error: string } | null {
+  const now = Date.now();
+  if (now - agentRunAt > IDLE_RESET_MS) agentRun = 0;
+  agentRunAt = now;
+
+  if (UNGATED_TOOLS.has(toolName)) return null;
+
+  agentRun += 1;
+  if (agentRun <= AGENT_READ_BUDGET) return null;
+
+  return {
+    ok: false,
+    error:
+      "the desk has stopped answering: you have read " +
+      agentRun +
+      " times without your partner moving. This is deliberate — you are one of two " +
+      "investigators, not an autosolver. Report what you already found, then ask the " +
+      "investigator to look at something and wait for their answer. Opening a document, " +
+      "photo or thread on their screen still works, and their next action reopens the record.",
+  };
+}
+
 /* ---------------- synchrony — reward the handoff rhythm ---------------- */
 // The core loop is human-looks → agent-searches. Alternating clean handoffs inside
 // 45 seconds build a SYNCHRONY streak — the game quietly celebrates real collaboration.
@@ -833,6 +898,8 @@ export function noteHumanAction(): void {
 function noteSync(actor: "human" | "agent") {
   const os = useOS.getState();
   const now = Date.now();
+  // A human action clears the agent's read run — the handoff is what reopens the desk.
+  if (actor === "human") agentRun = 0;
   const streak =
     os.syncLastActor && os.syncLastActor !== actor && now - os.syncLastAt < 45_000
       ? os.syncStreak + 1
@@ -856,7 +923,13 @@ import { useInvestigation } from "@/game/state/investigationStore";
 
 export function recordEvidenceById(id: string): { ok: boolean; error?: string } {
   const inv = useInvestigation.getState();
-  if (!activeCorpus().evidence.some((e) => e.id === id)) return { ok: false, error: `unknown evidence id: ${id}` };
+  const item = activeCorpus().evidence.find((e) => e.id === id);
+  if (!item) return { ok: false, error: `unknown evidence id: ${id}` };
+  // Guessing ids is not investigating. An item whose discovery is flag-gated cannot
+  // be filed until that flag is set, so the board can never be brute-forced.
+  if (item.autoUnlockFlag && !useOS.getState().flags.has(item.autoUnlockFlag)) {
+    return { ok: false, error: `not yet discovered: ${id} — find it on the desk first` };
+  }
   const added = inv.recordEvidence(id);
   return added ? { ok: true } : { ok: false, error: "already recorded" };
 }
@@ -952,6 +1025,8 @@ export interface AgentBriefing {
   provenance?: string;
   role: string;
   style: string;
+  /** The rules of play. First field a model reads, and the one it must obey. */
+  protocol: string[];
   unsettledNotes?: string[];
   caseStatus: {
     flagsSet: string[];
@@ -998,6 +1073,18 @@ export function getAgentBriefing(): AgentBriefing {
     provenance: corpus.provenance,
     role: corpus.agentRole,
     style: corpus.agentStyle,
+    // The standing instructions. A prompt alone would be advice, so pacingGate()
+    // enforces the second rule — but stating it here means a cooperative model
+    // never has to be refused in the first place.
+    protocol: [
+      "This is a two-player investigation. You read the machine; the investigator reads the room. Neither of you can close the case alone, and the reconstruction will not unlock until a correlation has run through a tool AND the investigator has done their own looking.",
+      "Work one question at a time. Two or three reads, then STOP and report what you found in plain language. Do not chain reads to solve the whole case in a single turn — the desk stops answering an agent that reads more than five times without its partner acting.",
+      "End every turn by giving the investigator something to do: a photo to look at, a detail to describe, a thread to read. Then wait for their answer. Their action is what reopens the record to you.",
+      "You cannot see pixels. Photographs, reflections and anything visual exist only for the investigator; you have metadata and nothing more. When a picture matters, open it on their screen and ask them what is in it.",
+      "Put documents on screen instead of pasting them into chat. show_in_document, open_email, open_messages_thread and open_image are how you point; quoting whole files defeats the purpose of the desk.",
+      "Never invent anything, and never guess evidence ids. File only what you have actually found; an unfound id will be refused.",
+      "If you do not know, say so. An unexplained thing left unexplained is worth more here than a confident answer that is wrong.",
+    ],
     unsettledNotes: unsettled.length ? unsettled : undefined,
     caseStatus: {
       flagsSet: [...os.flags],

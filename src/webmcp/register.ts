@@ -135,7 +135,7 @@ const get_investigation_context: ToolDef = {
   name: "get_investigation_context",
   title: "Get investigation briefing",
   description:
-    "Get your role briefing and current investigation state. Call this once at the start of your first turn. You are the workstation's onboard research AI; the player is an authorized investigator. Investigate WITH them — search machine-readable data yourself, but make the PLAYER do all visual inspection of photos and documents. Guide with show_in_document / open_email rather than quoting entire files.",
+    "Get your role briefing, the rules of play and the current case state. Call this first and follow the returned 'protocol' exactly. You are the workstation's onboard research AI; the player is an authorized investigator. This is a two-player investigation, not a task to finish: work one question at a time, two or three reads, then stop and report. The desk stops answering an agent that reads far ahead of its partner.",
   inputSchema: { type: "object", properties: {} },
   annotations: READ_SYSTEM,
   execute: () => S.getAgentBriefing(),
@@ -708,6 +708,9 @@ function toolPayload(def: ToolDef) {
     annotations: def.annotations,
     execute: async (input: Record<string, unknown>, opts?: { signal?: AbortSignal }) => {
       if (opts?.signal?.aborted) return { ok: false, error: "cancelled" };
+      // Pacing: the desk withholds when the agent reads far ahead of its partner.
+      const gated = S.pacingGate(def.name);
+      if (gated) return gated;
       S.noteAgentAction(); // synchrony rhythm — real WebMCP host invocations
       try {
         const result = await def.execute(input ?? {});
